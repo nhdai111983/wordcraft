@@ -1579,13 +1579,9 @@ impl WordApp {
     }
 
     pub fn status(&mut self, s: impl Into<String>) {
-        // NexusOffices: engine messages name the product too (`… WordCraft can open`).
-        let s: String = s.into();
-        let s = match i18n::brand(&s) {
-            std::borrow::Cow::Owned(branded) => branded,
-            std::borrow::Cow::Borrowed(_) => s,
-        };
-        self.status_msg = Some((s, now_ms()));
+        // NexusOffices: upstream's engine messages name the product (`… WordCraft can open`);
+        // only those phrases are renamed, never a file name or text quoted in the message.
+        self.status_msg = Some((i18n::brand::brand_status(s.into()), now_ms()));
     }
 
     /// Media key of the selected picture, if any.

@@ -25,7 +25,7 @@
 //! - [`location`]: a ribbon location such as `Home › Font`, segment by segment.
 //! - [`fmt`]: fill `{name}` placeholders after a lookup; translators may reorder them.
 
-mod brand;
+pub mod brand;
 mod catalog;
 
 pub use brand::{brand, nexus_text};

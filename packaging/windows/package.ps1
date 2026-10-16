@@ -5,7 +5,7 @@
 .DESCRIPTION
   Produces, in $env:DIST (default: dist/release):
     NexusDocs-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
-    NexusDocs-<version>-windows-<arch>-portable.zip   wordcraft.exe + wordcraft-cli.exe
+    NexusDocs-<version>-windows-<arch>-portable.zip   nexus-docs.exe + nexus-docs-cli.exe
 
   The binaries link the C runtime statically (+crt-static), so neither the MSI nor the portable
   zip needs the Visual C++ redistributable. Signing is delegated to sign.ps1 (skipped with a
@@ -140,7 +140,9 @@ Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Ms
 $Portable = Join-Path $TargetDir "windows-package\NexusDocs-$Version-windows-$Arch-portable"
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
-Copy-Item (Join-Path $Stage '*.exe') $Portable
+# NexusOffices: the same binary names the MSI installs.
+Copy-Item (Join-Path $Stage 'wordcraft.exe') (Join-Path $Portable 'nexus-docs.exe')
+Copy-Item (Join-Path $Stage 'wordcraft-cli.exe') (Join-Path $Portable 'nexus-docs-cli.exe')
 foreach ($f in 'README.md', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE') {
   $p = Join-Path $Root $f
   if (Test-Path $p) { Copy-Item $p $Portable }

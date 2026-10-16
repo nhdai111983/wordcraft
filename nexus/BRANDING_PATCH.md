@@ -21,13 +21,13 @@ nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi côn
 | File | Lý do | Thay được bằng white-label? |
 |---|---|---|
 | `crates/ui-egui/src/i18n/mod.rs` | `mod brand; pub use brand::{brand, nexus_text};` + gọi `brand::branded` trong `t()`/`tc()` | Có — hook "display name" trong i18n |
-| `crates/ui-egui/src/lib.rs` | `pub mod nexus;`; tiêu đề cửa sổ = `nexus::APP_NAME`; `ui.discord` không mở Discord ArtCraft; `status()` gọi `brand()`; 3 dòng test theo nhãn mới | Có — `APP_NAME`, `COMMUNITY_URL: Option` |
+| `crates/ui-egui/src/lib.rs` | `pub mod nexus;`; tiêu đề cửa sổ = `nexus::APP_NAME`; `ui.discord` không mở Discord ArtCraft; `status()` gọi `i18n::brand::brand_status` (chỉ đổi tên trong các cụm thông báo của engine upstream, không đụng tên file/văn bản người dùng trích trong thông báo); 3 dòng test theo nhãn mới | Có — `APP_NAME`, `COMMUNITY_URL: Option` |
 | `crates/ui-egui/src/dialogs.rs` | Tab About → `nexus::about_ui` (bỏ link getartcraft/Discord, mô tả "Crafting Apps from the ArtCraft team") | Có |
 | `crates/ui-egui/src/chrome.rs` | Ẩn nút Discord trên title bar; tiêu đề khi không có tài liệu qua `tl!` (→ Nexus Docs) | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/ribbon.rs` | Ẩn nút Help › Community Discord | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/backstage.rs` | Ẩn mục "Discord community" trong File | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/options.rs` | Ẩn ô "Show the community button" (nút đã ẩn); test kittest tra nhãn "…when Nexus Docs starts" | Có — `COMMUNITY_URL` |
-| `crates/mcp/src/server.rs` | `serverInfo.title = "Nexus Docs"`, websiteUrl fork; bỏ link Discord/getartcraft khỏi instructions (`name` giữ `wordcraft` làm định danh) | Có |
+| `crates/mcp/src/server.rs` | `serverInfo.title = "Nexus Docs"`, websiteUrl fork; bỏ link Discord/getartcraft khỏi instructions. **`serverInfo.name` giữ `"wordcraft"`** có chủ đích: là định danh máy (test MCP và cấu hình client dựa vào), không phải tên hiển thị | Có |
 | `crates/engine/src/sample.rs` | Tài liệu mẫu: creator `Nexus Docs`, link `getartcraft.com` → `example.org` | Có |
 | `crates/formats/src/latex.rs` | Dòng đầu LaTeX: bỏ URL getartcraft, "Written by Nexus Docs" | Có — tên app qua biến build |
 | `crates/formats/src/tests.rs` | Test khẳng định dòng đầu LaTeX mới | Đi cùng `latex.rs` |
@@ -38,11 +38,20 @@ nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi côn
 | `apps/wordcraft-web/index.html` | `<title>Nexus Docs</title>`, favicon, chữ "Loading" | Có |
 | `apps/wordcraft-web/src/web.rs` | Thông báo lỗi khởi động bản web | Có |
 | `packaging/windows/wordcraft.wxs` | MSI: Name/Manufacturer, **UpgradeCode + GUID component mới**, cài `nexus-docs.exe`/`nexus-docs-cli.exe` vào `Program Files\Nexus Docs`, ProgId `Sonnytech.NexusDocs.*`, khoá `Software\Sonnytech\Nexus Docs`, `RegisteredApplications\NexusDocs`, bỏ URL ARP của ArtCraft | Một phần (biến WiX) |
-| `packaging/windows/package.ps1` | Tài sản `NexusDocs-*.msi/.zip`, icon Nexus, trang giấy phép có ghi công | Một phần |
+| `packaging/windows/package.ps1` | Tài sản `NexusDocs-*.msi/.zip`, icon Nexus, trang giấy phép có ghi công; zip portable chứa `nexus-docs.exe`/`nexus-docs-cli.exe` như MSI | Một phần |
 | `packaging/macos/Info.plist.in` | Tên bundle, executable `NexusDocs`, id `vn.sonnytech.nexus.docs`, icon, copyright (ghi công) | Một phần |
-| `packaging/macos/package.sh` | `Nexus Docs.app`, `NexusDocs-*.dmg/zip`, icns Nexus, tên volume | Một phần |
+| `packaging/macos/package.sh` | `Nexus Docs.app`, `NexusDocs-*.dmg/zip`, icns Nexus, tên volume; zip CLI chứa `nexus-docs-cli` | Một phần |
 | `packaging/linux/package.sh` | `APP_ID=vn.sonnytech.nexus.docs`, binary `/usr/bin/nexus-docs(-cli)`, `NexusDocs-*`, icon `nexus/assets/hicolor`, maintainer Sonnytech, zsync trỏ fork | Một phần |
 | `packaging/linux/nfpm.yaml` | Gói `nexus-docs`, vendor/homepage, binary, ghi công | Một phần |
+| `crates/engine/src/session.rs` | Tác giả mặc định `"Nexus Docs User"` (ghi vào nhận xét/theo dõi thay đổi; avatar "ND") | Có — tên app qua biến build |
+| `crates/engine/src/tests.rs` | Assert tác giả mặc định mới | Đi cùng `session.rs` |
+| `crates/pdf/src/lib.rs` | PDF creator/producer `Nexus Docs` | Có — tên app qua biến build |
+| `crates/docx/src/write/mod.rs` | DOCX `docProps/app.xml` `<Application>Nexus Docs</Application>` | Có — tên app qua biến build |
+| `crates/docx/tests/passthrough.rs` | Assert `<Application>` mới | Đi cùng `write/mod.rs` |
+| `crates/formats/src/html.rs` | `<meta name="generator" content="Nexus Docs">` | Có — tên app qua biến build |
+| `crates/formats/src/odt.rs` | `<meta:generator>Nexus Docs</meta:generator>` | Có — tên app qua biến build |
+| `crates/formats/src/rtf.rs` | `{\*\generator Nexus Docs;}` | Có — tên app qua biến build |
+| `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffices/Sonnytech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
 | `ATTRIBUTION.md` | 14 dòng cho icon Nexus (`nexus/assets/**`, Sonnytech, CC0-1.0) | Không (bắt buộc theo luật asset) |
 
 ### GUID WiX mới (Nexus Docs riêng, không dùng chung với WordCraft hay app Nexus khác)
@@ -66,7 +75,7 @@ Sinh bằng `python3 -c "import uuid; print(uuid.uuid4())"` ngày 2026-10-16.
 
 | File | Lý do | Thay được bằng white-label? |
 |---|---|---|
-| `crates/ui-egui/src/i18n/audit.rs` | Test audit i18n: thêm "Nexus Docs" vào danh sách miễn (tên creator của tài liệu mẫu hiện ở File › Info, là dữ liệu tài liệu) | Có — nếu tên app là hằng dùng chung |
+| `crates/ui-egui/src/i18n/audit.rs` | Test audit i18n: danh sách miễn thêm "Nexus Docs" và "Nexus Docs User" (thay "WordCraft User") (tên creator của tài liệu mẫu hiện ở File › Info, là dữ liệu tài liệu) | Có — nếu tên app là hằng dùng chung |
 
 ## Rà soát gọi mạng (guard §5)
 `rg -n -i "artcraft|storytold|storyteller|discord|telemetry|update|crash|sentry|posthog|https?://" --type rust`:
@@ -75,12 +84,9 @@ không có telemetry/crash report/cập nhật tự động trong app. Link ArtC
 GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft`).
 
 ## Việc còn nợ (đã allowlist có lý do, cần PR white-label lên upstream — UPSTREAM_PRS.md)
-- Tên ứng dụng ghi vào file: PDF creator/producer (`crates/pdf/src/lib.rs`), DOCX `Application`
-  (`crates/docx/src/write/mod.rs`), HTML/ODT/RTF generator (`crates/formats/src/{html,odt,rtf}.rs`).
-- Tác giả mặc định `"WordCraft User"` (`crates/engine/src/session.rs`, test engine + audit).
 - Chuỗi cho agent/CLI: `crates/mcp/src/{backend,tools}.rs`, `apps/wordcraft-cli/src/main.rs`; lỗi Zotero; tên lệnh in `apps/wordcraft/src/print.rs`.
 - Đề xuất PR upstream: hằng `APP_NAME`/`SETTINGS_DIR`/`COMMUNITY_URL` lấy từ biến build (`WORDCRAFT_APP_NAME`…) → fork chỉ còn đặt biến, bỏ phần lớn patch ở trên.
-- `README.md` vẫn của upstream (có logo ArtCraft từ `docs/brand/`) và được `copy_docs`/zip portable đóng vào gói → cần README Nexus (quyết định của Henry).
 - DMG macOS: `dmg-layout.DS_Store`/`background.tiff` gắn với volume "WordCraft" → cửa sổ DMG Nexus chưa có nền; làm lại trên macOS (Task 12).
 - Flatpak (`packaging/linux/flatpak/*`, `flatpak-bundle.sh`) chưa đổi — chưa phát hành Flatpak.
+- Đã biết: `brand_status` chỉ đổi tên trong 7 cụm thông báo engine liệt kê sẵn; thông báo engine mới của upstream có "WordCraft" sẽ hiện nguyên cho tới khi thêm cụm (brand-check bắt được chuỗi mới ở file chưa allowlist).
 - Hunspell vẫn tìm từ điển ở `%APPDATA%\WordCraft\dictionaries` (chỉ đọc, dùng chung).

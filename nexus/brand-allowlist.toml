@@ -23,7 +23,7 @@ reason = "Chú thích trong file cấu hình/script, không hiện cho người 
 
 [[allow]]
 path = "**/*.{xml,in,wxs,html,svg}"
-pattern = '<!--.*'
+pattern = '<!--[^:>]*'
 reason = "Chú thích XML/HTML, không hiện cho người dùng"
 
 [[allow]]
@@ -63,7 +63,7 @@ reason = "Dữ liệu test gạch nối (#[cfg(test)])"
 
 [[allow]]
 path = "crates/ui-egui/src/i18n/audit.rs"
-pattern = '"WordCraft" \| "WordCraft User"'
+pattern = 'matches!\(plain, "WordCraft" \|'
 reason = "Whitelist của test audit i18n (#[cfg(test)])"
 
 [[allow]]
@@ -72,9 +72,9 @@ pattern = '.*'
 reason = "Chính bảng thay thế WordCraft→Nexus Docs, ArtCraft→NexusOffices và test của nó"
 
 [[allow]]
-path = "{README.md,ROADMAP.md,AGENTS.md,CLAUDE.md,packaging/web/README.md,packaging/macos/dmg/README.md}"
+path = "{ROADMAP.md,AGENTS.md,CLAUDE.md,packaging/web/README.md,packaging/macos/dmg/README.md}"
 pattern = '.*'
-reason = "Tài liệu dev của upstream, không phải giao diện; README sẽ viết lại riêng (xem BRANDING_PATCH: việc còn nợ)"
+reason = "Tài liệu dev của upstream, không đóng gói, không phải giao diện (README.md đã viết lại cho Nexus Docs và được quét)"
 
 [[allow]]
 path = "**/Cargo.toml"
@@ -102,17 +102,17 @@ reason = "i18n::brand() trong t()/tc() (đường tl!) thay WordCraft→Nexus Do
 
 [[allow]]
 path = "crates/ui-egui/src/**/*.rs"
-pattern = 'tl!\(\s*"[^"]*"'
+pattern = 'tl!\(\s*"[^"/]*"'
 reason = "Chuỗi đi qua tl! → i18n::brand() thay tên lúc chạy"
 
 [[allow]]
 path = "{crates/ui-egui/src/options.rs,crates/ui-egui/src/dialogs.rs,crates/ui-egui/src/file_browser.rs}"
-pattern = '^\s*"[^"]*WordCraft[^"]*"$'
+pattern = '^\s*"[^"/]*WordCraft[^"/]*"$'
 reason = "Đối số dòng tiếp theo của tl!( … ) nhiều dòng → i18n::brand()"
 
 [[allow]]
 path = "crates/ui-egui/src/chrome.rs"
-pattern = 'tl!\("No spelling dictionary for \{language\}.*'
+pattern = 'tl!\("No spelling dictionary for \{language\}[^"/]*'
 reason = "Chuỗi tl! (dài) → i18n::brand(); WORDCRAFT_DICTIONARIES là tên biến môi trường giữ nguyên"
 
 [[allow]]
@@ -128,7 +128,7 @@ reason = "Lỗi trả cho script/agent (không phải nút bấm); nếu hiện 
 [[allow]]
 path = "{crates/engine/src/io.rs,crates/engine/src/cmd/chart.rs,crates/engine/src/cmd/smart_art.rs,crates/engine/src/cmd/citations.rs,crates/docx/src/crypt.rs,apps/wordcraft/src/clipboard.rs}"
 pattern = '"[^"]*WordCraft[^"]*"'
-reason = "Thông báo lỗi/trạng thái của engine: lên giao diện qua WordApp::status() hoặc tl! → i18n::brand(); CLI/MCP còn tên cũ (việc còn nợ, PR white-label upstream)"
+reason = "Thông báo lỗi/trạng thái của engine: lên giao diện qua WordApp::status() (i18n::brand::brand_status đổi đúng các cụm này) hoặc tl! → i18n::brand(); CLI/MCP còn tên cũ (việc còn nợ, PR white-label upstream)"
 
 # ---------------------------------------------------------------------------------------------
 # 3. Ghi công upstream (bắt buộc theo giấy phép / brand license, chỉ chữ)
@@ -148,6 +148,11 @@ reason = "Test (#[cfg(test)]) khẳng định câu ghi công giữ tên upstream
 path = "crates/ui-egui/src/nexus.rs"
 pattern = 'upstream.s \(ArtCraft.s Discord\)'
 reason = "Chú thích doc giải thích vì sao ẩn link cộng đồng"
+
+[[allow]]
+path = "README.md"
+pattern = '(Nexus Docs được phát triển dựa trên WordCraft của ArtCraft|Nexus Docs is developed from WordCraft by ArtCraft) \(MIT/Apache-2\.0\)\.'
+reason = "Câu ghi công upstream trong README (chỉ chữ, không logo/link)"
 
 [[allow]]
 path = "apps/wordcraft/build.rs"
@@ -208,16 +213,6 @@ reason = "Ký mã của upstream; bản Nexus 0.x không ký (spec), Task 12 kh�
 # ---------------------------------------------------------------------------------------------
 
 [[allow]]
-path = "{crates/pdf/src/lib.rs,crates/docx/src/write/mod.rs,crates/formats/src/html.rs,crates/formats/src/odt.rs,crates/formats/src/rtf.rs}"
-pattern = '"[^"]*WordCraft[^"]*"'
-reason = "NỢ: tên ứng dụng tạo file (generator/Application/producer) ghi vào tài liệu; chờ PR upstream đặt tên app qua biến build"
-
-[[allow]]
-path = "crates/engine/src/session.rs"
-pattern = '"WordCraft User"'
-reason = "NỢ: tên tác giả mặc định; đổi cần sửa test engine + audit; chờ PR white-label upstream"
-
-[[allow]]
 path = "{crates/mcp/src/backend.rs,crates/mcp/src/tools.rs,apps/wordcraft-cli/src/main.rs}"
 pattern = '"[^"]*WordCraft[^"]*"'
 reason = "NỢ: chuỗi cho agent MCP/CLI (không phải giao diện người dùng cuối); chờ PR white-label upstream"
@@ -244,5 +239,5 @@ reason = "Thông điệp log (log::warn), không hiện trên giao diện"
 
 [[allow]]
 path = "{assets/app-icon/wordcraft.svg,assets/app-icon/hicolor/scalable/apps/ai.storyteller.wordcraft.svg}"
-pattern = '<!--.*'
+pattern = '<!--[^:>]*'
 reason = "Icon upstream không còn dùng (Nexus dùng nexus/assets/)"

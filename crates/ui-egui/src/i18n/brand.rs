@@ -58,6 +58,30 @@ pub(super) fn branded(s: &str) -> &str {
     leaked
 }
 
+/// Upstream's engine messages that name the product. [`brand_status`] renames the product only
+/// inside these phrases, so a file name or document text quoted in the same message is kept.
+const STATUS_PHRASES: [&str; 7] = [
+    "document WordCraft can open",
+    "text file WordCraft can open",
+    "WordCraft shows it but can't edit it",
+    "which WordCraft can't open",
+    "WordCraft can't decode its format",
+    "making WordCraft the default app",
+    "WordCraft can't change the default apps",
+];
+
+/// A status-bar message with the product renamed in upstream's own message phrases only
+/// ([`STATUS_PHRASES`]); everything else, such as a quoted file name, is left as it is.
+pub fn brand_status(s: String) -> String {
+    let mut out = s;
+    for phrase in STATUS_PHRASES {
+        if out.contains(phrase) {
+            out = out.replace(phrase, &phrase.replace("WordCraft", "Nexus Docs"));
+        }
+    }
+    out
+}
+
 /// Text NexusOffices adds to the interface (the About page), written in English and Vietnamese
 /// only: `vi` gets `vi`, every other language `en`. Deliberately not a catalog key, so neither
 /// branded nor asked of the other catalogs (upstream's complete-catalog checks).
@@ -82,6 +106,15 @@ mod tests {
         assert!(matches!(brand("Giới thiệu"), Cow::Borrowed("Giới thiệu")));
         // Identifiers and variables keep upstream's spelling.
         assert!(matches!(brand("wordcraft:canvas WORDCRAFT_LANGUAGE"), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn status_messages_rename_the_product_but_keep_quoted_names() {
+        assert_eq!(
+            brand_status("WordCraft notes.docx: not a document WordCraft can open (bad zip)".into()),
+            "WordCraft notes.docx: not a document Nexus Docs can open (bad zip)"
+        );
+        assert_eq!(brand_status("Saved WordCraft.docx".into()), "Saved WordCraft.docx", "user text is never rewritten");
     }
 
     #[test]
