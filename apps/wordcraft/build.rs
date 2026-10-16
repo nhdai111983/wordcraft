@@ -7,18 +7,18 @@
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../../assets/app-icon/wordcraft.ico");
+    println!("cargo:rerun-if-changed=../../nexus/assets/nexus-docs.ico");
     println!("cargo:rerun-if-env-changed=WORDCRAFT_REQUIRE_WINRES");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
     let mut res = winresource::WindowsResource::new();
-    res.set_icon("../../assets/app-icon/wordcraft.ico")
-        .set("ProductName", "WordCraft")
-        .set("FileDescription", "WordCraft word processor")
-        .set("CompanyName", "Learning Machines LLC")
-        .set("LegalCopyright", "Copyright (c) the WordCraft authors. MIT OR Apache-2.0.")
-        .set("OriginalFilename", "wordcraft.exe")
+    res.set_icon("../../nexus/assets/nexus-docs.ico")
+        .set("ProductName", "Nexus Docs")
+        .set("FileDescription", "Nexus Docs word processor")
+        .set("CompanyName", "Sonnytech")
+        .set("LegalCopyright", "Nexus Docs (c) 2026 Sonnytech; based on WordCraft by the ArtCraft team. MIT OR Apache-2.0.")
+        .set("OriginalFilename", "nexus-docs.exe")
         .set("InternalName", "wordcraft");
     if let Err(e) = res.compile() {
         if std::env::var_os("WORDCRAFT_REQUIRE_WINRES").is_some() {

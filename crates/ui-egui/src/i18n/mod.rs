@@ -25,8 +25,10 @@
 //! - [`location`]: a ribbon location such as `Home › Font`, segment by segment.
 //! - [`fmt`]: fill `{name}` placeholders after a lookup; translators may reorder them.
 
+mod brand;
 mod catalog;
 
+pub use brand::{brand, nexus_text};
 use std::cell::Cell;
 use std::sync::OnceLock;
 
@@ -355,15 +357,16 @@ pub fn has(lang: Lang, s: &str) -> bool {
     lang.catalog().plain(s).is_some()
 }
 
-/// `s` in the current language ([`tr`] with [`current`]).
+/// `s` in the current language ([`tr`] with [`current`]), with NexusOffices' product names
+/// ([`brand`]).
 pub fn t(s: &str) -> &str {
-    tr(current(), s)
+    brand::branded(tr(current(), s))
 }
 
 /// `s` in the current language as worded for `context` (one of `catalog::CONTEXTS`), falling
 /// back to the plain translation and then to English.
 pub fn tc<'a>(context: &str, s: &'a str) -> &'a str {
-    trc(current(), context, s)
+    brand::branded(trc(current(), context, s))
 }
 
 /// [`tc`] in a given language.

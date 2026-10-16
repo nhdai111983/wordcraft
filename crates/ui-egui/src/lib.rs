@@ -62,6 +62,7 @@ pub mod ink;
 pub mod keys;
 pub mod keytips;
 pub mod mini_toolbar;
+pub mod nexus;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -1493,7 +1494,9 @@ impl WordApp {
                 ));
             }
             "ui.discord" => {
-                self.canvas.open_url = Some("https://discord.gg/artcraft".into());
+                // NexusOffices: upstream's community (ArtCraft's Discord) is never opened.
+                let Some(url) = nexus::COMMUNITY_URL else { return Some(Err("no community link in this build".into())) };
+                self.canvas.open_url = Some(url.into());
                 json!({})
             }
             "ui.caretAnimation" => {
@@ -1576,7 +1579,13 @@ impl WordApp {
     }
 
     pub fn status(&mut self, s: impl Into<String>) {
-        self.status_msg = Some((s.into(), now_ms()));
+        // NexusOffices: engine messages name the product too (`… WordCraft can open`).
+        let s: String = s.into();
+        let s = match i18n::brand(&s) {
+            std::borrow::Cow::Owned(branded) => branded,
+            std::borrow::Cow::Borrowed(_) => s,
+        };
+        self.status_msg = Some((s, now_ms()));
     }
 
     /// Media key of the selected picture, if any.
@@ -2034,9 +2043,9 @@ impl WordApp {
             ctx.open_url(egui::OpenUrl::new_tab(url));
         }
         let title = if self.has_document() {
-            format!("{}{} - WordCraft", self.title_stem(), if self.session.dirty { " •" } else { "" })
+            format!("{}{} - {}", self.title_stem(), if self.session.dirty { " •" } else { "" }, nexus::APP_NAME)
         } else {
-            "WordCraft".to_string()
+            nexus::APP_NAME.to_string()
         };
         if title != self.sent_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
@@ -2698,7 +2707,7 @@ mod tests {
         let a = h.state_mut();
         assert!(!a.ui.backstage, "Esc leaves the Start screen");
         assert!(!a.has_document(), "for an empty window, not a blank document");
-        assert_eq!(a.sent_title, "WordCraft", "the window is titled with the app alone");
+        assert_eq!(a.sent_title, nexus::APP_NAME, "the window is titled with the app alone");
         // The ribbon's commands are off, but Help, the File tab and the settings work.
         for id in ["format.bold", "text.insert", "file.save", "file.saveAs", "file.print", "edit.paste", "insert.table", "ui.print"] {
             assert!(!widgets::enabled(a, id), "{id} is off with no document");
@@ -4519,7 +4528,7 @@ mod tests {
     #[test]
     fn the_default_app_button_shows_only_with_the_hosts_hook() {
         use egui_kittest::kittest::Queryable;
-        const LABEL: &str = "Make WordCraft the default for Word documents…";
+        const LABEL: &str = "Make Nexus Docs the default for Word documents…";
         for hook in [false, true] {
             let calls = std::rc::Rc::new(std::cell::Cell::new(0));
             let mut a = app();
@@ -4540,7 +4549,7 @@ mod tests {
                 a,
             );
             h.run_steps(4);
-            assert!(h.query_by_label("Show the community button in the title bar").is_some(), "hook {hook}: the Options page rendered");
+            assert!(h.query_by_label("Start-up").is_some(), "hook {hook}: the Options page rendered");
             assert_eq!(h.query_by_label(LABEL).is_some(), hook, "hook {hook}: the button");
             if hook {
                 h.get_by_label(LABEL).click();

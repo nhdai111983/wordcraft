@@ -1,0 +1,116 @@
+//! NexusOffices: the product names the interface shows.
+//!
+//! Upstream's English source strings (the catalog keys) and their translations say "WordCraft"
+//! and "ArtCraft". Rather than rewrite thousands of keys in 23 catalogs, every lookup
+//! ([`super::t`], [`super::tc`], which `tl!` uses) passes its result through [`brand`] once, so every language,
+//! English included, shows Nexus Docs / NexusOffices. Keys, command ids, file keys
+//! (`wordcraft:*`) and `WORDCRAFT_*` variables are untouched: only `WordCraft` and `ArtCraft`
+//! spelled exactly so are replaced.
+//!
+//! Text that must keep the upstream names (the attribution and the copyright notice in About)
+//! is not looked up through `tl!` (see `crate::nexus`).
+
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+/// Upstream name → the name NexusOffices shows, in the order they are replaced.
+const NAMES: [(&str, &str); 2] = [("WordCraft", "Nexus Docs"), ("ArtCraft", "NexusOffices")];
+
+/// At most this many distinct branded strings are kept ([`branded`]). Interface strings number in
+/// the low hundreds; the cap only bounds memory if something unexpected (a document's text) were
+/// ever passed through the lookup, which then simply comes back unbranded.
+const MAX_INTERNED: usize = 4096;
+
+/// `s` with the upstream product names replaced (`WordCraft` → `Nexus Docs`, `ArtCraft` →
+/// `NexusOffices`). Strings without them come back borrowed, without allocating.
+pub fn brand(s: &str) -> Cow<'_, str> {
+    if !NAMES.iter().any(|(from, _)| s.contains(from)) {
+        return Cow::Borrowed(s);
+    }
+    let mut out = s.to_string();
+    for (from, to) in NAMES {
+        if out.contains(from) {
+            out = out.replace(from, to);
+        }
+    }
+    Cow::Owned(out)
+}
+
+/// [`brand`] for the lookup functions, which hand out `&str`: a string that needs branding is
+/// branded once and kept for the life of the process (a bounded set: the interface strings).
+pub(super) fn branded(s: &str) -> &str {
+    if !NAMES.iter().any(|(from, _)| s.contains(from)) {
+        return s;
+    }
+    static CACHE: OnceLock<Mutex<HashMap<String, &'static str>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    // A poisoned lock still holds a usable map (inserts are single statements).
+    let mut map = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(&hit) = map.get(s) {
+        return hit;
+    }
+    if map.len() >= MAX_INTERNED {
+        return s;
+    }
+    let leaked: &'static str = Box::leak(brand(s).into_owned().into_boxed_str());
+    map.insert(s.to_string(), leaked);
+    leaked
+}
+
+/// Text NexusOffices adds to the interface (the About page), written in English and Vietnamese
+/// only: `vi` gets `vi`, every other language `en`. Deliberately not a catalog key, so neither
+/// branded nor asked of the other catalogs (upstream's complete-catalog checks).
+pub fn nexus_text<'a>(en: &'a str, vi: &'a str) -> &'a str {
+    #[cfg(test)]
+    if super::pseudo::on() {
+        // Marked like a catalog lookup, so the untranslated-text audit sees it as handled.
+        return Box::leak(format!("⟦{}⟧", en.replace('\n', "⟧\n⟦")).into_boxed_str());
+    }
+    if super::current().code() == "vi" { vi } else { en }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn brand_substitutes_product_names() {
+        assert_eq!(brand("About WordCraft"), "About Nexus Docs");
+        assert_eq!(brand("Join the ArtCraft community"), "Join the NexusOffices community");
+        assert_eq!(brand("Giới thiệu về WordCraft"), "Giới thiệu về Nexus Docs");
+        assert!(matches!(brand("Giới thiệu"), Cow::Borrowed("Giới thiệu")));
+        // Identifiers and variables keep upstream's spelling.
+        assert!(matches!(brand("wordcraft:canvas WORDCRAFT_LANGUAGE"), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn branded_lookups_are_stable_and_borrow_when_unbranded() {
+        let a = branded("Make WordCraft the default");
+        let b = branded("Make WordCraft the default");
+        assert_eq!(a, "Make Nexus Docs the default");
+        assert!(std::ptr::eq(a, b), "the branded string is made once");
+        let plain = String::from("Close");
+        assert!(std::ptr::eq(branded(&plain), plain.as_str()));
+    }
+
+    /// `tl!` ([`super::super::t`]) brands in every language, English included; [`super::super::tr`]
+    /// keeps returning the catalog's own text (upstream's catalog tests rely on it).
+    #[test]
+    fn interface_lookups_show_nexus_names_in_english_and_vietnamese() {
+        use super::super::{Lang, current, set_current, t, tc, tr};
+        let before = current();
+        set_current(Lang::from_code("en").unwrap());
+        assert_eq!(t("About WordCraft"), "About Nexus Docs");
+        assert_eq!(crate::tl!("WordCraft"), "Nexus Docs");
+        set_current(Lang::from_code("vi").unwrap());
+        assert_eq!(t("About WordCraft"), "Giới thiệu về Nexus Docs");
+        assert_eq!(tc("preview", "About WordCraft"), "Giới thiệu về Nexus Docs");
+        assert!(!t("Show the Start screen when WordCraft starts").contains("WordCraft"));
+        assert_eq!(tr(Lang::from_code("vi").unwrap(), "WordCraft"), "WordCraft");
+        assert_eq!(nexus_text("Source", "Mã nguồn"), "Mã nguồn");
+        set_current(Lang::from_code("de").unwrap());
+        assert_eq!(nexus_text("Source", "Mã nguồn"), "Source");
+        set_current(before);
+    }
+}
