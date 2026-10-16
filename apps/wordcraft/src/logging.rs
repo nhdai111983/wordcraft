@@ -332,7 +332,7 @@ pub fn install_panic_hook() {
             log::error!("{report}");
         } else {
             // `eprintln!` panics on a broken stderr pipe, and a panic inside the panic hook aborts.
-            let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("wordcraft: {report}\n"));
+            let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("nexus-docs: {report}\n"));
         }
     }));
 }

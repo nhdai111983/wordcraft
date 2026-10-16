@@ -33,7 +33,7 @@ fn help_and_h_print_the_options_and_exit() {
         let out = app(flag);
         let (stdout, stderr) = (String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
         assert!(out.status.success(), "{flag}: status {:?}, stderr: {stderr}", out.status);
-        assert!(stdout.starts_with("wordcraft — "), "{flag}: stdout: {stdout}");
+        assert!(stdout.starts_with("nexus-docs — "), "{flag}: stdout: {stdout}");
         for option in ["--sample", "--control PORT", "--version", "-h, --help"] {
             assert!(stdout.contains(option), "{flag}: {option} missing from: {stdout}");
         }

@@ -264,10 +264,10 @@ fn app_icon() -> Option<egui::IconData> {
 }
 
 const USAGE: &str = "\
-wordcraft — the Nexus Docs desktop app (NexusOffices)
+nexus-docs — the Nexus Docs desktop app (NexusOffices)
 
 USAGE:
-  wordcraft [--sample] [--control PORT] [FILE…]
+  nexus-docs [--sample] [--control PORT] [FILE…]
 
 OPTIONS:
   --sample            open the sample document
@@ -292,7 +292,7 @@ fn text_args() -> (Vec<String>, Vec<std::path::PathBuf>) {
             Err(a) if args.last().is_some_and(|p| p == "--control") => {
                 // Unlike `eprintln!`, never panics.
                 let (n, lossy) = (i + 1, a.to_string_lossy());
-                let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("wordcraft: argument {n} is not valid Unicode: {lossy}\n"));
+                let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("nexus-docs: argument {n} is not valid Unicode: {lossy}\n"));
                 std::process::exit(2);
             }
             Err(a) => files.push(a.into()),
@@ -338,7 +338,7 @@ fn main() -> eframe::Result {
             }
             "--sample" => sample = true,
             "--version" => {
-                println!("wordcraft {} ({})", env!("CARGO_PKG_VERSION"), build_sha());
+                println!("nexus-docs {} ({})", env!("CARGO_PKG_VERSION"), build_sha());
                 return Ok(());
             }
             // Before the window opens (#968). Unlike `print!`, a closed stdout can't panic.
@@ -352,7 +352,7 @@ fn main() -> eframe::Result {
     // After the loop, so `--version` later on the line still wins. Unlike `eprintln!`, never panics.
     if let Some(port) = bad_control {
         let got = port.map(|p| format!(", got {p:?}")).unwrap_or_default();
-        let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("wordcraft: --control needs a port number from 1 to 65535{got}\n"));
+        let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("nexus-docs: --control needs a port number from 1 to 65535{got}\n"));
         std::process::exit(2);
     }
     // The log file lives in the settings directory, next to the preferences; opened after the

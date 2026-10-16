@@ -5,7 +5,9 @@
 //! ([`super::t`], [`super::tc`], which `tl!` uses) passes its result through [`brand`] once, so every language,
 //! English included, shows Nexus Docs / NexusOffices. Keys, command ids, file keys
 //! (`wordcraft:*`) and `WORDCRAFT_*` variables are untouched: only `WordCraft` and `ArtCraft`
-//! spelled exactly so are replaced.
+//! spelled exactly so are replaced, plus the CLI's command name where an interface string quotes
+//! it as a command (`` `wordcraft-cli `` → `` `nexus-docs-cli ``, the installed binary's name).
+//! Only interface strings go through here: never document or other user text (see [`super::t`]).
 //!
 //! Text that must keep the upstream names (the attribution and the copyright notice in About)
 //! is not looked up through `tl!` (see `crate::nexus`).
@@ -14,8 +16,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-/// Upstream name → the name NexusOffices shows, in the order they are replaced.
-const NAMES: [(&str, &str); 2] = [("WordCraft", "Nexus Docs"), ("ArtCraft", "NexusOffices")];
+/// Upstream name → the name NexusOffices shows, in the order they are replaced. The command name
+/// is matched only as quoted code (a backtick, then `wordcraft-cli `), as in Options › Agent
+/// control, so identifiers (`wordcraft_engine`, a bare `wordcraft-cli`) are never touched.
+const NAMES: [(&str, &str); 3] = [("WordCraft", "Nexus Docs"), ("ArtCraft", "NexusOffices"), ("`wordcraft-cli ", "`nexus-docs-cli ")];
 
 /// At most this many distinct branded strings are kept ([`branded`]). Interface strings number in
 /// the low hundreds; the cap only bounds memory if something unexpected (a document's text) were
@@ -106,6 +110,23 @@ mod tests {
         assert!(matches!(brand("Giới thiệu"), Cow::Borrowed("Giới thiệu")));
         // Identifiers and variables keep upstream's spelling.
         assert!(matches!(brand("wordcraft:canvas WORDCRAFT_LANGUAGE"), Cow::Borrowed(_)));
+        assert!(matches!(brand("wordcraft-cli wordcraft_engine"), Cow::Borrowed(_)));
+        // A quoted command uses the installed binary's name.
+        assert_eq!(brand("run `wordcraft-cli mcp` for an MCP server"), "run `nexus-docs-cli mcp` for an MCP server");
+    }
+
+    /// Options › Agent control quotes the CLI command; every catalog shows the installed name.
+    #[test]
+    fn agent_control_hint_names_the_installed_cli() {
+        use super::super::{Lang, current, set_current, t};
+        const KEY: &str = "Every command is available to scripts and AI agents: run `wordcraft-cli mcp` for an MCP server, or start the app with `--control <port>` for the JSON control channel.";
+        let before = current();
+        for code in ["en", "vi", "de", "ko", "ja"] {
+            set_current(Lang::from_code(code).unwrap());
+            let shown = t(KEY);
+            assert!(shown.contains("`nexus-docs-cli mcp`") && !shown.contains("wordcraft"), "{code}: {shown}");
+        }
+        set_current(before);
     }
 
     #[test]

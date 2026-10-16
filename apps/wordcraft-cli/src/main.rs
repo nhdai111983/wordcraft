@@ -13,25 +13,25 @@ use serde_json::{Value, json};
 use wordcraft_engine::Session;
 
 const USAGE: &str = "\
-wordcraft-cli — WordCraft from the command line
+nexus-docs-cli — Nexus Docs from the command line
 
 USAGE:
-  wordcraft-cli convert <in> <out> [--markup] [--format wordml2003|flatopc]
+  nexus-docs-cli convert <in> <out> [--markup] [--format wordml2003|flatopc]
                                               convert between formats (docx, doc [read], pdf, odt, rtf, html, md, tex, txt, json, png,
                                               xml); an .xml file is a Word XML Document (Flat OPC), or with
                                               --format wordml2003 a Word 2003 XML Document;
                                               --markup (Print Markup): comments beside each page and
                                               tracked changes in pdf/png, a comment list in html/md/txt
-  wordcraft-cli info <file>                   pages, words, paragraphs, properties (JSON)
-  wordcraft-cli text <file>                   plain text
-  wordcraft-cli inspect <file>                document structure (JSON)
-  wordcraft-cli render <file> <out.png> [--page N] [--scale S]
-  wordcraft-cli run [--file F | --template T] --cmd 'id={json}' [--cmd …] [--save OUT] [--print]
-                    [--author NAME]           run commands headlessly, then save (--author names
+  nexus-docs-cli info <file>                  pages, words, paragraphs, properties (JSON)
+  nexus-docs-cli text <file>                  plain text
+  nexus-docs-cli inspect <file>               document structure (JSON)
+  nexus-docs-cli render <file> <out.png> [--page N] [--scale S]
+  nexus-docs-cli run [--file F | --template T] --cmd 'id={json}' [--cmd …] [--save OUT] [--print]
+                     [--author NAME]          run commands headlessly, then save (--author names
                                               who tracked changes and comments are by)
-  wordcraft-cli commands [--json]             list every command
-  wordcraft-cli parity [--markdown]           feature-catalog parity
-  wordcraft-cli mcp [--connect HOST:PORT | --author NAME] [--automation-read-root DIR] [--automation-write-root DIR]
+  nexus-docs-cli commands [--json]            list every command
+  nexus-docs-cli parity [--markdown]          feature-catalog parity
+  nexus-docs-cli mcp [--connect HOST:PORT | --author NAME] [--automation-read-root DIR] [--automation-write-root DIR]
                                               MCP server on stdio (headless, or bridged to the app).
                                               --automation-read-root / --automation-write-root confine
                                               the files the agent's commands read (open, insert text
@@ -39,13 +39,13 @@ USAGE:
                                               export, merge output…) to DIR, links followed; a root left
                                               out grants none of its access. They apply to the headless
                                               server and are an error with --connect.
-  wordcraft-cli zotero <command> <file> [--cmd 'id={json}' …] [--save OUT] [--trace] [--port P]
+  nexus-docs-cli zotero <command> <file> [--cmd 'id={json}' …] [--save OUT] [--trace] [--port P]
                                               run a Zotero command on a document (Zotero must be
                                               running): addEditCitation, addEditBibliography,
                                               addNote, refresh, removeCodes, setDocPrefs
                                               (--cmd runs first, e.g. --cmd caret.docEnd)
-  wordcraft-cli [<command>] -h | --help       this help
-  wordcraft-cli --version
+  nexus-docs-cli [<command>] -h | --help      this help
+  nexus-docs-cli --version
 
 Paper: documents created here, and HTML, Markdown and text files (which give no page size), use
 the system region's paper (A4, or Letter in the US and other Letter regions), read from
@@ -450,9 +450,9 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
                     return Err("mcp: --author applies to the headless server; with --connect, run file.setAuthor".into());
                 }
                 Some(addr) => {
-                    let remote = wordcraft_mcp::Remote::connect(&addr).map_err(|e| format!("can't reach the WordCraft app at {addr}: {e}"))?;
+                    let remote = wordcraft_mcp::Remote::connect(&addr).map_err(|e| format!("can't reach the Nexus Docs app at {addr}: {e}"))?;
                     if let Some(w) = remote.key_warning() {
-                        eprintln!("wordcraft-cli: {w}");
+                        eprintln!("nexus-docs-cli: {w}");
                     }
                     Box::new(remote)
                 }
@@ -462,7 +462,7 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
                         // Every thread of this process, not only the server's: nothing reaches past the roots.
                         wordcraft_engine::file_access::confine_process(roots.clone());
                         let show = |root: Option<&std::path::Path>| root.map_or_else(|| "none".to_string(), |r| r.display().to_string());
-                        eprintln!("wordcraft-cli: files confined: read root {}, write root {}", show(roots.read_root()), show(roots.write_root()));
+                        eprintln!("nexus-docs-cli: files confined: read root {}, write root {}", show(roots.read_root()), show(roots.write_root()));
                         headless = headless.with_automation_roots(Some(roots));
                     }
                     if let Some(name) = author {
@@ -515,7 +515,7 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
             }
             Ok(())
         }
-        "--version" | "-V" => write_stdout(|o| writeln!(o, "wordcraft-cli {}", env!("CARGO_PKG_VERSION"))),
+        "--version" | "-V" => write_stdout(|o| writeln!(o, "nexus-docs-cli {}", env!("CARGO_PKG_VERSION"))),
         "" | "help" | "--help" | "-h" => write_stdout(|o| write!(o, "{USAGE}")),
         other => Err(format!("unknown command `{other}`\n\n{USAGE}").into()),
     }
@@ -560,7 +560,7 @@ fn main() -> ExitCode {
     match run(&args) {
         Ok(()) | Err(Failure::StdoutClosed) => ExitCode::SUCCESS,
         Err(Failure::Error(e)) => {
-            eprintln!("wordcraft-cli: {e}");
+            eprintln!("nexus-docs-cli: {e}");
             ExitCode::FAILURE
         }
     }
@@ -614,7 +614,7 @@ mod tests {
     fn usage_lists_exactly_the_subcommands() {
         let listed: Vec<&str> = USAGE
             .lines()
-            .filter_map(|line| line.strip_prefix("  wordcraft-cli ")?.split_whitespace().next())
+            .filter_map(|line| line.strip_prefix("  nexus-docs-cli ")?.split_whitespace().next())
             .filter(|word| !word.starts_with(['-', '[']))
             .collect();
         assert_eq!(listed, SUBCOMMANDS);

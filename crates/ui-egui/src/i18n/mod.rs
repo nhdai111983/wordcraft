@@ -359,12 +359,18 @@ pub fn has(lang: Lang, s: &str) -> bool {
 
 /// `s` in the current language ([`tr`] with [`current`]), with NexusOffices' product names
 /// ([`brand`]).
+///
+/// Invariant (NexusOffices): never pass document or other user text (file names, document text,
+/// custom style or caption names, comment authors) to `t`, [`tc`] or `tl!`: what they return goes
+/// through [`brand`], which renames the product in interface strings only. Show user text as it
+/// is, or look it up with [`tr`], which is not branded.
 pub fn t(s: &str) -> &str {
     brand::branded(tr(current(), s))
 }
 
 /// `s` in the current language as worded for `context` (one of `catalog::CONTEXTS`), falling
-/// back to the plain translation and then to English.
+/// back to the plain translation and then to English. Branded like [`t`] (same invariant: never
+/// user text).
 pub fn tc<'a>(context: &str, s: &'a str) -> &'a str {
     brand::branded(trc(current(), context, s))
 }
@@ -397,7 +403,9 @@ pub fn lowercase(s: &str) -> String {
     out
 }
 
-/// `s` in `lang`; strings without a translation come back unchanged.
+/// `s` in `lang`; strings without a translation come back unchanged. Not branded (NexusOffices):
+/// upstream's catalog tests compare its result with the catalogs, and About's attribution keeps
+/// the upstream names; interface strings are shown through [`t`] / `tl!`.
 pub fn tr(lang: Lang, s: &str) -> &str {
     #[cfg(test)]
     if pseudo::on() {

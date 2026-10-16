@@ -11,7 +11,8 @@ Không sửa catalog `.tsv` nào: chữ mới của About (en/vi) nằm trong `n
 (không phải key catalog, nên không bắt 7 catalog "đầy đủ" của upstream phải dịch thêm).
 
 Cơ chế chính: `crates/ui-egui/src/i18n/brand.rs` (file mới) — `pub fn brand(s) -> Cow<str>` thay
-`WordCraft → Nexus Docs`, `ArtCraft → NexusOffices`, được gọi **một lần** trong `i18n::t`/`i18n::tc`
+`WordCraft → Nexus Docs`, `ArtCraft → NexusOffices` và tên lệnh CLI khi được trích dạng mã
+(`` `wordcraft-cli `` → `` `nexus-docs-cli ``, vd. Options › Agent control, đủ 23 catalog), được gọi **một lần** trong `i18n::t`/`i18n::tc`
 (đường `tl!`), nên mọi ngôn ngữ (cả `en`) hiện tên Nexus mà không sửa key/catalog. `i18n::tr` giữ
 nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi công). Hằng và trang About ở
 `crates/ui-egui/src/nexus.rs` (file mới).
@@ -20,7 +21,7 @@ nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi côn
 
 | File | Lý do | Thay được bằng white-label? |
 |---|---|---|
-| `crates/ui-egui/src/i18n/mod.rs` | `mod brand; pub use brand::{brand, nexus_text};` + gọi `brand::branded` trong `t()`/`tc()` | Có — hook "display name" trong i18n |
+| `crates/ui-egui/src/i18n/mod.rs` | `mod brand; pub use brand::{brand, nexus_text};` + gọi `brand::branded` trong `t()`/`tc()`; doc của `t`/`tc`/`tr` ghi bất biến "không bao giờ đưa văn bản tài liệu/người dùng vào `t`/`tc`/`tl!`" | Có — hook "display name" trong i18n |
 | `crates/ui-egui/src/lib.rs` | `pub mod nexus;`; tiêu đề cửa sổ = `nexus::APP_NAME`; `ui.discord` không mở Discord ArtCraft; `status()` gọi `i18n::brand::brand_status` (chỉ đổi tên trong các cụm thông báo của engine upstream, không đụng tên file/văn bản người dùng trích trong thông báo); 3 dòng test theo nhãn mới | Có — `APP_NAME`, `COMMUNITY_URL: Option` |
 | `crates/ui-egui/src/dialogs.rs` | Tab About → `nexus::about_ui` (bỏ link getartcraft/Discord, mô tả "Crafting Apps from the ArtCraft team") | Có |
 | `crates/ui-egui/src/chrome.rs` | Ẩn nút Discord trên title bar; tiêu đề khi không có tài liệu qua `tl!` (→ Nexus Docs) | Có — `COMMUNITY_URL` |
@@ -32,7 +33,18 @@ nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi côn
 | `crates/formats/src/latex.rs` | Dòng đầu LaTeX: bỏ URL getartcraft, "Written by Nexus Docs" | Có — tên app qua biến build |
 | `crates/formats/src/tests.rs` | Test khẳng định dòng đầu LaTeX mới | Đi cùng `latex.rs` |
 | `crates/control-key/src/lib.rs` | Thư mục cấu hình `Nexus Docs` (macOS/Windows) / `nexus-docs` (XDG) — không đụng cấu hình WordCraft gốc (+ test) | Có — tên thư mục qua biến build |
-| `apps/wordcraft/src/main.rs` | Tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log | Có |
+| `apps/wordcraft/src/main.rs` | Tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log; tên lệnh `nexus-docs` trong USAGE, `--version` và tiền tố stderr | Có |
+| `apps/wordcraft/src/logging.rs` | Tiền tố stderr của panic hook `nexus-docs:` (tên file log `wordcraft.log`, log target giữ nguyên) | Có — tên binary qua biến build |
+| `apps/wordcraft/src/print.rs` | Tên lệnh in trong hàng đợi máy in `"Nexus Docs document"` | Có — tên app qua biến build |
+| `apps/wordcraft/tests/help.rs` | Assert USAGE bắt đầu bằng `nexus-docs — ` | Đi cùng `main.rs` |
+| `apps/wordcraft/tests/control_arg.rs` | Assert tiền tố lỗi `nexus-docs:` và `--version` `nexus-docs …` | Đi cùng `main.rs` |
+| `apps/wordcraft/tests/non_utf8_args.rs` | Assert tiền tố lỗi `nexus-docs:` | Đi cùng `main.rs` |
+| `apps/wordcraft-cli/src/main.rs` | USAGE (dòng đầu "Nexus Docs from the command line", tên lệnh `nexus-docs-cli`, giữ cột mô tả), `--version`, tiền tố lỗi `nexus-docs-cli:`, lỗi "can't reach the Nexus Docs app"; test `usage_lists_exactly_the_subcommands` theo tên mới. Giữ đầu trang `parity --markdown` (sinh `docs/parity-checklist.md` của upstream qua `cargo xtask parity`) | Có — tên binary qua biến build |
+| `apps/wordcraft-cli/tests/help.rs` | Assert USAGE bắt đầu bằng `nexus-docs-cli — ` | Đi cùng `main.rs` |
+| `apps/wordcraft-cli/tests/non_utf8_args.rs` | Assert tiền tố lỗi `nexus-docs-cli:` | Đi cùng `main.rs` |
+| `crates/mcp/src/lib.rs` | `NEEDS_APP` (trả lời headless cho công cụ chỉ có trên app): `nexus-docs --control 7981` / `nexus-docs-cli mcp --connect 127.0.0.1:7981` | Có — tên binary qua biến build |
+| `crates/mcp/src/tools.rs` | Mô tả công cụ MCP `list_commands`, `parity`, `screenshot`: "Nexus Docs" | Có — tên app qua biến build |
+| `crates/mcp/src/backend.rs` | Thông báo của backend nối app: "Nexus Docs app at … is not reachable", "unauthorized: the Nexus Docs app …", `describe()` (biến `WORDCRAFT_CONTROL_KEY` giữ nguyên) | Có — tên app qua biến build |
 | `apps/wordcraft/build.rs` | Resource Windows: ProductName, CompanyName Sonnytech, icon, LegalCopyright (ghi công), OriginalFilename `nexus-docs.exe` | Có |
 | `apps/wordcraft/src/default_apps.rs` | Desktop id `vn.sonnytech.nexus.docs.desktop`, `registeredAppMachine=NexusDocs`, thông báo Flatpak (+ test) | Có |
 | `apps/wordcraft-web/index.html` | `<title>Nexus Docs</title>`, favicon, chữ "Loading" | Có |
@@ -66,7 +78,8 @@ nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi côn
 Sinh bằng `python3 -c "import uuid; print(uuid.uuid4())"` ngày 2026-10-16.
 
 ### File mới (không tính là patch)
-`crates/ui-egui/src/i18n/brand.rs`, `crates/ui-egui/src/nexus.rs`,
+`crates/ui-egui/src/i18n/brand.rs`, `crates/ui-egui/src/nexus.rs`, `apps/wordcraft-cli/tests/nexus_brand.rs`
+(USAGE/`--version`/tiền tố lỗi của CLI), `crates/mcp/tests/nexus_brand.rs` (mô tả công cụ, trả lời headless, backend nối app),
 `packaging/linux/vn.sonnytech.nexus.docs.desktop`, `packaging/linux/vn.sonnytech.nexus.docs.metainfo.xml.in`
 (MIME dùng lại file upstream `ai.storyteller.wordcraft.mime.xml`), `nexus/assets/*` (logo tạm
 `nexus-docs.svg` + PNG/ICO/ICNS/hicolor sinh bằng `nexus/assets/render-icons.py`).
@@ -84,7 +97,8 @@ không có telemetry/crash report/cập nhật tự động trong app. Link ArtC
 GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft`).
 
 ## Việc còn nợ (đã allowlist có lý do, cần PR white-label lên upstream — UPSTREAM_PRS.md)
-- Chuỗi cho agent/CLI: `crates/mcp/src/{backend,tools}.rs`, `apps/wordcraft-cli/src/main.rs`; lỗi Zotero; tên lệnh in `apps/wordcraft/src/print.rs`.
+- Lỗi trả về plugin Zotero (`crates/ui-egui/src/zotero.rs`, `crates/zotero/src/bridge.rs`) còn "WordCraft".
+- Đầu trang `wordcraft-cli parity --markdown` ("# WordCraft feature parity", `cargo xtask parity`) giữ tên upstream: nó sinh `docs/parity-checklist.md` của upstream (tài liệu dev); sửa sẽ làm `cargo xtask parity` ghi đè tài liệu upstream và gây xung đột khi đồng bộ.
 - Đề xuất PR upstream: hằng `APP_NAME`/`SETTINGS_DIR`/`COMMUNITY_URL` lấy từ biến build (`WORDCRAFT_APP_NAME`…) → fork chỉ còn đặt biến, bỏ phần lớn patch ở trên.
 - DMG macOS: `dmg-layout.DS_Store`/`background.tiff` gắn với volume "WordCraft" → cửa sổ DMG Nexus chưa có nền; làm lại trên macOS (Task 12).
 - Flatpak (`packaging/linux/flatpak/*`, `flatpak-bundle.sh`) chưa đổi — chưa phát hành Flatpak.

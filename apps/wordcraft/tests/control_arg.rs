@@ -45,7 +45,7 @@ fn a_bad_port_is_an_error_naming_it() {
         let out = app(args);
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert_eq!(out.status.code(), Some(2), "{args:?}: stderr: {stderr}");
-        assert_eq!(stderr, format!("wordcraft: --control needs a port number from 1 to 65535{got}\n"), "{args:?}");
+        assert_eq!(stderr, format!("nexus-docs: --control needs a port number from 1 to 65535{got}\n"), "{args:?}");
     }
 }
 
@@ -54,5 +54,5 @@ fn a_flag_after_control_is_read_as_a_flag() {
     let out = app(&["--control", "--version"]);
     let (stdout, stderr) = (String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(out.status.success(), "status {:?}, stderr: {stderr}", out.status);
-    assert!(stdout.starts_with("wordcraft "), "stdout: {stdout}");
+    assert!(stdout.starts_with("nexus-docs "), "stdout: {stdout}");
 }
