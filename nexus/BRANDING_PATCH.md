@@ -63,12 +63,14 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | `apps/wordcraft/src/default_apps.rs` | Desktop id `vn.sonnytech.nexus.docs.desktop`, `registeredAppMachine=NexusDocs`, thông báo Flatpak (+ test) | Có |
 | `apps/wordcraft-web/index.html` | `<title>Nexus Docs</title>`, favicon, chữ "Loading" | Có |
 | `apps/wordcraft-web/src/web.rs` | Thông báo lỗi khởi động bản web | Có |
-| `packaging/windows/wordcraft.wxs` | MSI: Name/Manufacturer, **UpgradeCode + GUID component mới**, cài `nexus-docs.exe`/`nexus-docs-cli.exe` vào `Program Files\Nexus Docs`, ProgId `Sonnytech.NexusDocs.*`, khoá `Software\Sonnytech\Nexus Docs`, `RegisteredApplications\NexusDocs`, bỏ URL ARP của ArtCraft | Một phần (biến WiX) |
-| `packaging/windows/package.ps1` | Tài sản `NexusDocs-*.msi/.zip`, icon Nexus, trang giấy phép có ghi công; zip portable chứa `nexus-docs.exe`/`nexus-docs-cli.exe` như MSI | Một phần |
+| `packaging/windows/wordcraft.wxs` | MSI: Name/Manufacturer, **UpgradeCode + GUID component mới**, cài `nexus-docs.exe`/`nexus-docs-cli.exe` vào `Program Files\Nexus Docs`, ProgId `Sonnytech.NexusDocs.*`, khoá `Software\Sonnytech\Nexus Docs`, `RegisteredApplications\NexusDocs`, bỏ URL ARP của ArtCraft; cài `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` cạnh exe (4 component mới, GUID tự sinh) | Một phần (biến WiX) |
+| `packaging/windows/package.ps1` | Tài sản `NexusDocs-*.msi/.zip`, icon Nexus, trang giấy phép có ghi công; zip portable chứa `nexus-docs.exe`/`nexus-docs-cli.exe` như MSI; chép `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` vào thư mục stage (MSI cài từ đó) và zip portable (Apache-2.0 §4(d)) | Một phần |
+| `packaging/windows/sign.ps1` | Mô tả chữ ký `/d Nexus Docs`, `/du` repo fork (như 3 fork kia); bỏ mục allowlist cả file | Một phần |
 | `packaging/macos/Info.plist.in` | Tên bundle, executable `NexusDocs`, id `vn.sonnytech.nexus.docs`, icon, copyright (ghi công) | Một phần |
-| `packaging/macos/package.sh` | `Nexus Docs.app`, `NexusDocs-*.dmg/zip`, icns Nexus, tên volume; zip CLI chứa `nexus-docs-cli` | Một phần |
-| `packaging/linux/package.sh` | `APP_ID=vn.sonnytech.nexus.docs`, binary `/usr/bin/nexus-docs(-cli)`, `NexusDocs-*`, icon `nexus/assets/hicolor`, maintainer Sonnytech, zsync trỏ fork | Một phần |
+| `packaging/macos/package.sh` | `Nexus Docs.app`, `NexusDocs-*.dmg/zip`, icns Nexus, tên volume; zip CLI chứa `nexus-docs-cli`; `copy_notices` chép `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` vào `Contents/Resources` của app (trước khi ký) | Một phần |
+| `packaging/linux/package.sh` | `APP_ID=vn.sonnytech.nexus.docs`, binary `/usr/bin/nexus-docs(-cli)`, `NexusDocs-*`, icon `nexus/assets/hicolor`, maintainer Sonnytech, zsync trỏ fork; AppImage giữ `usr/share/doc/nexus-docs` (giấy phép, `NOTICE`, `ATTRIBUTION.md`) thay vì bỏ ra ngoài | Một phần |
 | `packaging/linux/nfpm.yaml` | Gói `nexus-docs`, vendor/homepage, binary, ghi công | Một phần |
+| `packaging/env.sh` | `copy_docs` chép thêm `NOTICE` (Apache-2.0 §4(d)) và `ATTRIBUTION.md` (README Nexus trỏ tới cả hai) qua hàm mới `copy_notices` — bắt buộc, thiếu file thì lỗi; dùng cho deb/AppImage/tar, zip CLI macOS, zip web | Nên PR upstream (gói upstream cũng thiếu NOTICE) |
 | `crates/engine/src/session.rs` | Tác giả mặc định `"Nexus Docs User"` (ghi vào nhận xét/theo dõi thay đổi; avatar "ND") | Có — tên app qua biến build |
 | `crates/engine/src/tests.rs` | Assert tác giả mặc định mới | Đi cùng `session.rs` |
 | `crates/pdf/src/lib.rs` | PDF creator/producer `Nexus Docs` | Có — tên app qua biến build |
@@ -77,7 +79,7 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | `crates/formats/src/html.rs` | `<meta name="generator" content="Nexus Docs">` | Có — tên app qua biến build |
 | `crates/formats/src/odt.rs` | `<meta:generator>Nexus Docs</meta:generator>` | Có — tên app qua biến build |
 | `crates/formats/src/rtf.rs` | `{\*\generator Nexus Docs;}` | Có — tên app qua biến build |
-| `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffices/Sonnytech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
+| `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffices/Sonnytech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE/NOTICE/ATTRIBUTION.md, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
 | `ATTRIBUTION.md` | 14 dòng cho icon Nexus (`nexus/assets/**`, Sonnytech, CC0-1.0) | Không (bắt buộc theo luật asset) |
 
 ### GUID WiX mới (Nexus Docs riêng, không dùng chung với WordCraft hay app Nexus khác)
@@ -88,6 +90,7 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | Component `WordcraftApp` | `855DCEC6-9285-444F-9382-9654B83B34F6` | `817F98F7-FA47-45DC-B404-2CB8E089B5CD` |
 | Component `WordcraftFileTypes` | `EFF89E6A-F9B8-49F9-B3AE-E243347484B4` | `18759204-C532-417D-B43D-41C0A4D0376E` |
 | Component `WordcraftCli` | (tự sinh theo đường dẫn) | tự sinh — thư mục cài và tên file đã khác |
+| Component `WordcraftMitLicense`, `WordcraftApacheLicense`, `WordcraftNotice`, `WordcraftAttribution` | (không có ở upstream) | tự sinh — file giấy phép/NOTICE/ATTRIBUTION.md cài cạnh exe |
 
 Sinh bằng `python3 -c "import uuid; print(uuid.uuid4())"` ngày 2026-10-16.
 

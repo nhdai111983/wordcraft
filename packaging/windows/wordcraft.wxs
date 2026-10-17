@@ -150,6 +150,20 @@
       <Component Id="WordcraftCli">
         <File Id="WordcraftCliExe" Source="$(var.BinDir)\wordcraft-cli.exe" Name="nexus-docs-cli.exe" KeyPath="yes" />
       </Component>
+      <!-- NexusOffices: the licences, NOTICE (Apache-2.0 4(d)) and ATTRIBUTION.md, staged by
+           package.ps1, are installed beside the binaries. Auto GUIDs, like the CLI component. -->
+      <Component Id="WordcraftMitLicense">
+        <File Id="WordcraftMitLicenseFile" Source="$(var.BinDir)\LICENSE-MIT" KeyPath="yes" />
+      </Component>
+      <Component Id="WordcraftApacheLicense">
+        <File Id="WordcraftApacheLicenseFile" Source="$(var.BinDir)\LICENSE-APACHE" KeyPath="yes" />
+      </Component>
+      <Component Id="WordcraftNotice">
+        <File Id="WordcraftNoticeFile" Source="$(var.BinDir)\NOTICE" KeyPath="yes" />
+      </Component>
+      <Component Id="WordcraftAttribution">
+        <File Id="WordcraftAttributionFile" Source="$(var.BinDir)\ATTRIBUTION.md" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
   </Fragment>
 </Wix>

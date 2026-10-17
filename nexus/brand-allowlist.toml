@@ -203,11 +203,6 @@ path = "packaging/macos/dmg/generate.py"
 pattern = '.*'
 reason = "Script tạo layout DMG chỉ chạy trên macOS; layout DMG Nexus làm lại ở Task 12"
 
-[[allow]]
-path = "packaging/windows/sign.ps1"
-pattern = '.*'
-reason = "Ký mã của upstream; bản Nexus 0.x không ký (spec), Task 12 không gọi"
-
 # ---------------------------------------------------------------------------------------------
 # 5. Việc còn nợ (đã ghi trong BRANDING_PATCH.md, cần PR white-label lên upstream)
 # ---------------------------------------------------------------------------------------------
