@@ -92,6 +92,11 @@ pattern = '.*'
 reason = "CI phát hành của upstream (craft-common-actions); NexusOffices phát hành bằng nexus-release.yml (Task 12)"
 
 [[allow]]
+path = ".github/workflows/{nexus-ci.yml,nexus-sync.yml}"
+pattern = 'github\.com/storytold/\$UPSTREAM_REPO'
+reason = "Workflow NexusOffices (template trong NexusOffices/templates/workflows) phải lấy upstream để đếm patch và đồng bộ; không phát hành, người dùng không thấy"
+
+[[allow]]
 path = "assets/spelling/*-extra.txt"
 pattern = '.*'
 reason = "Từ điển chính tả (từ 'WordCraft' được coi là đúng chính tả), không phải chuỗi giao diện"
