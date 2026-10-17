@@ -102,8 +102,8 @@ reason = "Từ điển chính tả (từ 'WordCraft' được coi là đúng ch�
 
 [[allow]]
 path = "crates/ui-egui/src/i18n/*.tsv"
-pattern = 'WordCraft|ArtCraft'
-reason = "i18n::brand() trong t()/tc() (đường tl!) thay WordCraft→Nexus Docs, ArtCraft→NexusOffices lúc chạy cho mọi ngôn ngữ; dòng ghi công vi giữ tên upstream có chủ đích"
+pattern = 'WordCraft|ArtCraft|`wordcraft-cli mcp`'
+reason = "i18n::brand() trong t()/tc() (đường tl!) thay WordCraft→Nexus Docs, ArtCraft→NexusOffices và `wordcraft-cli → `nexus-docs-cli (dạng mã có backtick) lúc chạy cho mọi ngôn ngữ; dòng ghi công vi giữ tên upstream có chủ đích. Cả 22 catalog đều dịch khoá Options › Agent control với `wordcraft-cli mcp` trong backtick (đã kiểm tra), test brand.rs::agent_control_hint_names_the_installed_cli"
 
 [[allow]]
 path = "crates/ui-egui/src/**/*.rs"
@@ -216,3 +216,8 @@ reason = "Thông điệp log (log::warn), không hiện trên giao diện"
 path = "{assets/app-icon/wordcraft.svg,assets/app-icon/hicolor/scalable/apps/ai.storyteller.wordcraft.svg}"
 pattern = '<!--[^:>]*'
 reason = "Icon upstream không còn dùng (Nexus dùng nexus/assets/)"
+
+[[allow]]
+path = "crates/ui-egui/src/i18n/*.tsv"
+pattern = '^\tSource code: github\.com/storytold/wordcraft\t.*$'
+reason = "dead key; About uses nexus.rs (khoá 'Source code: github.com/storytold/wordcraft' không còn mã nào tra — About in link fork qua nexus::about_ui/nexus_text; giữ dòng để không lệch catalog upstream)"

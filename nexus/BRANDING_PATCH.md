@@ -80,6 +80,7 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | `crates/formats/src/odt.rs` | `<meta:generator>Nexus Docs</meta:generator>` | Có — tên app qua biến build |
 | `crates/formats/src/rtf.rs` | `{\*\generator Nexus Docs;}` | Có — tên app qua biến build |
 | `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffices/Sonnytech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE/NOTICE/ATTRIBUTION.md, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
+| `Cargo.toml` | `[workspace.package] repository` → `https://github.com/nhdai111983/wordcraft` (brand-check `brand-url`; metadata, không code nào đọc `CARGO_PKG_REPOSITORY`) | Có — metadata của fork |
 | `ATTRIBUTION.md` | 14 dòng cho icon Nexus (`nexus/assets/**`, Sonnytech, CC0-1.0) | Không (bắt buộc theo luật asset) |
 
 ### GUID WiX mới (Nexus Docs riêng, không dùng chung với WordCraft hay app Nexus khác)
