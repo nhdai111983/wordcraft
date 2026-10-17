@@ -304,9 +304,9 @@ fn caption_ui(app: &mut WordApp, ui: &mut Ui, f: &mut CaptionForm) -> Next {
     egui::Grid::new("cap_opts").num_columns(2).spacing(vec2(10.0, 6.0)).show(ui, |ui| {
         ui.label(tl!("Label:"));
         let labels: Vec<(String, &str)> = f.labels.iter().map(|l| (l.clone(), l.as_str())).collect();
-        egui::ComboBox::from_id_salt("cap_label").selected_text(tl!(&f.label)).width(150.0).show_ui(ui, |ui| {
+        egui::ComboBox::from_id_salt("cap_label").selected_text(crate::i18n::tr(crate::i18n::current(), &f.label)).width(150.0).show_ui(ui, |ui| {
             for (v, l) in &labels {
-                ui.selectable_value(&mut f.label, v.clone(), tl!(l));
+                ui.selectable_value(&mut f.label, v.clone(), crate::i18n::tr(crate::i18n::current(), l));
             }
         });
         ui.end_row();

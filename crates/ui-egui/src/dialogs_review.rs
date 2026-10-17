@@ -608,7 +608,7 @@ fn setup_ui(app: &mut WordApp, ui: &mut Ui, st: &mut RestrictPane) {
         egui::ScrollArea::vertical().id_salt("restrict_styles").max_height(160.0).show(ui, |ui| {
             for (id, name) in &styles {
                 let mut on = allowed.contains(id);
-                if ui.checkbox(&mut on, tl!(name.as_str())).changed() {
+                if ui.checkbox(&mut on, crate::i18n::tr(crate::i18n::current(), name)).changed() {
                     if on {
                         allowed.push(id.clone());
                     } else {

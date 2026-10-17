@@ -357,6 +357,13 @@ pub fn has(lang: Lang, s: &str) -> bool {
     lang.catalog().plain(s).is_some()
 }
 
+/// NexusOffices: is `s` an interface string (a catalog key)? Checked in the current language and
+/// in Vietnamese, the fork's fullest catalog (English has no entries: it is the source). Text
+/// that isn't, such as an engine status quoting a file name, is shown without [`t`]'s branding.
+pub fn is_catalog_key(s: &str) -> bool {
+    has(current(), s) || Lang::from_code("vi").is_some_and(|vi| has(vi, s))
+}
+
 /// `s` in the current language ([`tr`] with [`current`]), with NexusOffices' product names
 /// ([`brand`]).
 ///

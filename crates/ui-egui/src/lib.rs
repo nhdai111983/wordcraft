@@ -1203,7 +1203,9 @@ impl WordApp {
         if !self.session.status.is_empty() {
             // Engine messages are English; the catalog translates the ones it knows.
             let s = std::mem::take(&mut self.session.status);
-            let s = tl!(&s).to_string();
+            // NexusOffices: only a catalog string is looked up (and so branded, `i18n::t`); a
+            // status quoting the user's file or font name is shown as it is.
+            let s = if i18n::is_catalog_key(&s) { tl!(&s).to_string() } else { s };
             self.status(s);
         }
         if matches!(id, "table.deleteTable")
@@ -1489,7 +1491,7 @@ impl WordApp {
             // MCP get an error.
             "ui.makeDefaultApp" => {
                 return Some(Err(
-                    "making WordCraft the default app needs a click in File › Options › General; scripts and agents can't change system defaults"
+                    "making Nexus Docs the default app needs a click in File › Options › General; scripts and agents can't change system defaults"
                         .into(),
                 ));
             }
@@ -1558,7 +1560,7 @@ impl WordApp {
     /// command, so nothing programmatic (control channel, MCP, macros) can change system defaults.
     pub(crate) fn make_default_app(&mut self) -> Result<Value, String> {
         let Some(hook) = self.services.make_default_app.as_ref() else {
-            return Err("WordCraft can't change the default apps here; use your system's settings".into());
+            return Err("Nexus Docs can't change the default apps here; use your system's settings".into());
         };
         match hook() {
             Ok(DefaultApp::SettingsOpened) => {
@@ -1579,9 +1581,7 @@ impl WordApp {
     }
 
     pub fn status(&mut self, s: impl Into<String>) {
-        // NexusOffices: upstream's engine messages name the product (`… WordCraft can open`);
-        // only those phrases are renamed, never a file name or text quoted in the message.
-        self.status_msg = Some((i18n::brand::brand_status(s.into()), now_ms()));
+        self.status_msg = Some((s.into(), now_ms()));
     }
 
     /// Media key of the selected picture, if any.
@@ -3946,6 +3946,35 @@ mod tests {
             })
             .collect();
         assert!(via_key.iter().any(|t| t.contains("My unsaved novel")), "key event Cut: {via_key:?} body={:?}", body_text(h.state()));
+    }
+
+    /// NexusOffices: the status bar shows a file name or other user text as it is. Only catalog
+    /// strings are looked up (and so branded), never an engine status quoting the user's file.
+    #[test]
+    fn status_keeps_the_users_file_name() {
+        // A command's status (what `after_command` shows) that quotes the user's file.
+        let mut a = app();
+        a.status_msg = None;
+        a.session.status = "Saved WordCraft notes.docx".into();
+        a.after_command("file.save");
+        let msg = a.status_msg.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+        assert_eq!(msg, "Saved WordCraft notes.docx", "the file name is kept");
+        // A catalog string is still translated and branded.
+        a.session.status = "Researcher needs an online service; WordCraft keeps your documents offline.".into();
+        a.after_command("references.researcher");
+        let msg = a.status_msg.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+        assert!(msg.contains("Nexus Docs keeps your documents offline"), "{msg:?}");
+
+        // The engine's own error names Nexus Docs at the source and keeps the file name.
+        let dir = scratch("brand-status");
+        let path = dir.join("WordCraft notes.docx");
+        // An OLE header (an old .doc) with nothing behind it: the engine names the file in its error.
+        std::fs::write(&path, [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0]).unwrap();
+        a.status_msg = None;
+        assert!(a.run("file.open", json!({"path": path.to_string_lossy()})).is_err());
+        let msg = a.status_msg.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+        assert!(msg.contains("WordCraft notes.docx: not a document Nexus Docs can open"), "{msg:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A fresh scratch folder for one test.

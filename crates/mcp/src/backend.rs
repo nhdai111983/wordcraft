@@ -382,4 +382,22 @@ mod tests {
         assert!(e.contains("not a loopback address") && e.contains("not sent"), "{e}");
         assert!(seen.recv_timeout(WAIT).unwrap().get("key").is_none());
     }
+
+    /// NexusOffices: the errors an agent sees name the app as installed (Nexus Docs).
+    #[test]
+    fn errors_name_nexus_docs() {
+        // The app refuses the key every time.
+        let (port, _seen) = fake_app(|_| Some((json!({"ok": false, "error": "unauthorized"}), true)));
+        let addr = format!("127.0.0.1:{port}");
+        let mut r = Remote::connect_with(&addr, fixed_key("k")).unwrap();
+        let e = r.call("document.inspect", json!({})).unwrap_err();
+        assert!(e.starts_with(&format!("unauthorized: the Nexus Docs app at {addr} refused the control key")), "{e}");
+
+        // The app closes every connection without answering.
+        let (port, _seen) = fake_app(|_| None);
+        let addr = format!("127.0.0.1:{port}");
+        let mut r = Remote::connect_with(&addr, fixed_key("k")).unwrap();
+        let e = r.call("document.inspect", json!({})).unwrap_err();
+        assert!(e.starts_with(&format!("Nexus Docs app at {addr} is not reachable")), "{e}");
+    }
 }
