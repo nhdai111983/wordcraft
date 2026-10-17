@@ -19,7 +19,7 @@ use wordcraft_engine::Session;
 use wordcraft_engine::file_access::{self, AutomationRoots};
 
 /// Methods that need the desktop app.
-pub const NEEDS_APP: &str = "needs the desktop app: start `wordcraft --control 7981` and run `wordcraft-cli mcp --connect 127.0.0.1:7981`";
+pub const NEEDS_APP: &str = "needs the desktop app: start `nexus-docs --control 7981` and run `nexus-docs-cli mcp --connect 127.0.0.1:7981`";
 
 /// An in-process session.
 pub struct Headless {

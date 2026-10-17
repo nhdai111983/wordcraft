@@ -25,8 +25,10 @@
 //! - [`location`]: a ribbon location such as `Home › Font`, segment by segment.
 //! - [`fmt`]: fill `{name}` placeholders after a lookup; translators may reorder them.
 
+pub mod brand;
 mod catalog;
 
+pub use brand::{brand, nexus_text};
 use std::cell::Cell;
 use std::sync::OnceLock;
 
@@ -355,15 +357,29 @@ pub fn has(lang: Lang, s: &str) -> bool {
     lang.catalog().plain(s).is_some()
 }
 
-/// `s` in the current language ([`tr`] with [`current`]).
+/// NexusOffices: is `s` an interface string (a catalog key)? Checked in the current language and
+/// in Vietnamese, the fork's fullest catalog (English has no entries: it is the source). Text
+/// that isn't, such as an engine status quoting a file name, is shown without [`t`]'s branding.
+pub fn is_catalog_key(s: &str) -> bool {
+    has(current(), s) || Lang::from_code("vi").is_some_and(|vi| has(vi, s))
+}
+
+/// `s` in the current language ([`tr`] with [`current`]), with NexusOffices' product names
+/// ([`brand`]).
+///
+/// Invariant (NexusOffices): never pass document or other user text (file names, document text,
+/// custom style or caption names, comment authors) to `t`, [`tc`] or `tl!`: what they return goes
+/// through [`brand`], which renames the product in interface strings only. Show user text as it
+/// is, or look it up with [`tr`], which is not branded.
 pub fn t(s: &str) -> &str {
-    tr(current(), s)
+    brand::branded(tr(current(), s))
 }
 
 /// `s` in the current language as worded for `context` (one of `catalog::CONTEXTS`), falling
-/// back to the plain translation and then to English.
+/// back to the plain translation and then to English. Branded like [`t`] (same invariant: never
+/// user text).
 pub fn tc<'a>(context: &str, s: &'a str) -> &'a str {
-    trc(current(), context, s)
+    brand::branded(trc(current(), context, s))
 }
 
 /// [`tc`] in a given language.
@@ -394,7 +410,9 @@ pub fn lowercase(s: &str) -> String {
     out
 }
 
-/// `s` in `lang`; strings without a translation come back unchanged.
+/// `s` in `lang`; strings without a translation come back unchanged. Not branded (NexusOffices):
+/// upstream's catalog tests compare its result with the catalogs, and About's attribution keeps
+/// the upstream names; interface strings are shown through [`t`] / `tl!`.
 pub fn tr(lang: Lang, s: &str) -> &str {
     #[cfg(test)]
     if pseudo::on() {

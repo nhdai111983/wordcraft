@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Build and package WordCraft for Linux (<arch> is x86_64 or aarch64, or riscv64 when cross-compiling):
+# Build and package Nexus Docs for Linux (<arch> is x86_64 or aarch64, or riscv64 when cross-compiling):
 #
-#   $DIST/wordcraft-<version>-linux-<arch>.AppImage  any distro with glibc >= the build host's
-#   $DIST/wordcraft-<version>-linux-<arch>.AppImage.zsync  delta updates (needs zsyncmake)
-#   $DIST/wordcraft-<version>-linux-<arch>.deb       Debian, Ubuntu, Mint, Pop!_OS, ...
-#   $DIST/wordcraft-<version>-linux-<arch>.rpm       Fedora, openSUSE, RHEL, ...
-#   $DIST/wordcraft-<version>-linux-<arch>.tar.gz    plain FHS-style tree (bin/, share/)
+#   $DIST/NexusDocs-<version>-linux-<arch>.AppImage  any distro with glibc >= the build host's
+#   $DIST/NexusDocs-<version>-linux-<arch>.AppImage.zsync  delta updates (needs zsyncmake)
+#   $DIST/NexusDocs-<version>-linux-<arch>.deb       Debian, Ubuntu, Mint, Pop!_OS, ...
+#   $DIST/NexusDocs-<version>-linux-<arch>.rpm       Fedora, openSUSE, RHEL, ...
+#   $DIST/NexusDocs-<version>-linux-<arch>.tar.gz    plain FHS-style tree (bin/, share/)
 #
 # Usage: packaging/linux/package.sh [--skip-build] [--formats "appimage deb rpm tar"]
 #
@@ -17,7 +17,9 @@ set -euo pipefail
 # shellcheck source=../env.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 HERE="$ROOT/packaging/linux"
-APP_ID=ai.storyteller.wordcraft
+APP_ID=vn.sonnytech.nexus.docs
+# NexusOffices: the shared MIME definitions stay upstream's file (installed under APP_ID's name).
+MIME_XML=ai.storyteller.wordcraft.mime.xml
 
 SKIP_BUILD=0
 FORMATS="appimage deb rpm tar"
@@ -37,10 +39,10 @@ case "$ARCH" in
   aarch64 | arm64) ARCH=aarch64; DEB_ARCH=arm64 ;;
   *) echo "unsupported architecture $ARCH" >&2; exit 2 ;;
 esac
-export WORDCRAFT_MAINTAINER="${WORDCRAFT_MAINTAINER:-WordCraft maintainers <wordcraft@storyteller.ai>}"
-BASENAME="wordcraft-$VERSION-linux-$ARCH"
+export WORDCRAFT_MAINTAINER="${WORDCRAFT_MAINTAINER:-Sonnytech <nhdai111983@users.noreply.github.com>}"
+BASENAME="NexusDocs-$VERSION-linux-$ARCH"
 
-echo "==> WordCraft $VERSION for Linux $ARCH ($FORMATS)"
+echo "==> Nexus Docs $VERSION for Linux $ARCH ($FORMATS)"
 
 if [ "$SKIP_BUILD" = 0 ]; then
   if [ -n "${CROSS_TARGET:-}" ]; then
@@ -55,18 +57,18 @@ STAGE="$WORK/root"
 rm -rf "$WORK"
 
 # ---- stage an FHS tree (shared by every format) -------------------------------------------------
-install -Dm755 "$BIN/wordcraft" "$STAGE/usr/bin/wordcraft"
-install -Dm755 "$BIN/wordcraft-cli" "$STAGE/usr/bin/wordcraft-cli"
-"${CROSS_COMPILE:-}strip" "$STAGE/usr/bin/wordcraft" "$STAGE/usr/bin/wordcraft-cli" 2>/dev/null || true
+install -Dm755 "$BIN/wordcraft" "$STAGE/usr/bin/nexus-docs"
+install -Dm755 "$BIN/wordcraft-cli" "$STAGE/usr/bin/nexus-docs-cli"
+"${CROSS_COMPILE:-}strip" "$STAGE/usr/bin/nexus-docs" "$STAGE/usr/bin/nexus-docs-cli" 2>/dev/null || true
 install -Dm644 "$HERE/$APP_ID.desktop" "$STAGE/usr/share/applications/$APP_ID.desktop"
-install -Dm644 "$HERE/$APP_ID.mime.xml" "$STAGE/usr/share/mime/packages/$APP_ID.xml"
+install -Dm644 "$HERE/$MIME_XML" "$STAGE/usr/share/mime/packages/$APP_ID.xml"
 mkdir -p "$STAGE/usr/share/metainfo"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@DATE@/$WORDCRAFT_BUILD_DATE/g" \
   "$HERE/$APP_ID.metainfo.xml.in" >"$STAGE/usr/share/metainfo/$APP_ID.metainfo.xml"
 mkdir -p "$STAGE/usr/share/icons"
-cp -R "$ROOT/assets/app-icon/hicolor" "$STAGE/usr/share/icons/"
-mkdir -p "$STAGE/usr/share/doc/wordcraft"
-copy_docs "$STAGE/usr/share/doc/wordcraft"
+cp -R "$ROOT/nexus/assets/hicolor" "$STAGE/usr/share/icons/"
+mkdir -p "$STAGE/usr/share/doc/nexus-docs"
+copy_docs "$STAGE/usr/share/doc/nexus-docs"
 
 if command -v desktop-file-validate >/dev/null; then
   desktop-file-validate "$STAGE/usr/share/applications/$APP_ID.desktop"
@@ -99,12 +101,12 @@ fi
 
 # ---- AppImage -----------------------------------------------------------------------------------
 if has appimage; then
-  APPDIR="$WORK/WordCraft.AppDir"
+  APPDIR="$WORK/NexusDocs.AppDir"
   cp -R "$STAGE" "$APPDIR"
-  mv "$APPDIR/usr/share/doc" "$WORK/doc-unused"
-  ln -s usr/bin/wordcraft "$APPDIR/AppRun"
+  # NexusOffices: usr/share/doc (licences, NOTICE, ATTRIBUTION.md, OFL texts) stays inside the AppImage.
+  ln -s usr/bin/nexus-docs "$APPDIR/AppRun"
   cp "$HERE/$APP_ID.desktop" "$APPDIR/$APP_ID.desktop"
-  cp "$ROOT/assets/app-icon/hicolor/256x256/apps/$APP_ID.png" "$APPDIR/$APP_ID.png"
+  cp "$ROOT/nexus/assets/hicolor/256x256/apps/$APP_ID.png" "$APPDIR/$APP_ID.png"
   ln -s "$APP_ID.png" "$APPDIR/.DirIcon"
 
   TOOL="${APPIMAGETOOL:-$(command -v appimagetool || true)}"
@@ -126,8 +128,8 @@ if has appimage; then
   # fetch only the blocks that changed in a newer release, through the .zsync published next to
   # each AppImage on GitHub Releases. `latest` is the newest published release that is not a
   # pre-release. A fork's builds point at its own releases through GITHUB_REPOSITORY.
-  REPO="${GITHUB_REPOSITORY:-storytold/wordcraft}"
-  UPDATE_INFO="gh-releases-zsync|${REPO%%/*}|${REPO#*/}|latest|wordcraft-*-linux-$ARCH.AppImage.zsync"
+  REPO="${GITHUB_REPOSITORY:-nhdai111983/wordcraft}"
+  UPDATE_INFO="gh-releases-zsync|${REPO%%/*}|${REPO#*/}|latest|NexusDocs-*-linux-$ARCH.AppImage.zsync"
   # Extract-and-run: works without FUSE (containers, CI). The output embeds the static runtime,
   # so users don't need libfuse2 either. With zsyncmake on the host (CI installs the zsync
   # package) appimagetool also writes the .zsync, into its working directory, hence the cd.
@@ -141,9 +143,9 @@ if has appimage; then
 fi
 
 if [ -z "${CROSS_TARGET:-}" ]; then
-  "$STAGE/usr/bin/wordcraft-cli" --version
+  "$STAGE/usr/bin/nexus-docs-cli" --version
 elif [ -n "${EMULATOR:-}" ]; then
-  "$EMULATOR" "$STAGE/usr/bin/wordcraft-cli" --version
+  "$EMULATOR" "$STAGE/usr/bin/nexus-docs-cli" --version
 fi
 echo "==> done"
 ls -lh "$DIST"

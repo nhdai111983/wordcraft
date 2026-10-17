@@ -158,7 +158,7 @@ impl Remote {
     /// One request and its reply, with one retry on a new connection (the app may have
     /// restarted; a new connection also reads the key again).
     fn exchange(&mut self, id: u64, method: &str, params: &Value) -> Result<Value, String> {
-        let unreachable = |addr: &str, e: std::io::Error| format!("WordCraft app at {addr} is not reachable: {e}");
+        let unreachable = |addr: &str, e: std::io::Error| format!("Nexus Docs app at {addr} is not reachable: {e}");
         let mut first = true;
         let reply = loop {
             let tried = if self.conn.is_some() { Ok(()) } else { self.reconnect() };
@@ -203,7 +203,7 @@ impl Backend for Remote {
             Err(self.key_warning().map_or_else(
                 || {
                     format!(
-                        "unauthorized: the WordCraft app at {} refused the control key (from WORDCRAFT_CONTROL_KEY or the app's key file)",
+                        "unauthorized: the Nexus Docs app at {} refused the control key (from WORDCRAFT_CONTROL_KEY or the app's key file)",
                         self.addr
                     )
                 },
@@ -219,7 +219,7 @@ impl Backend for Remote {
     }
 
     fn describe(&self) -> String {
-        format!("connected to the WordCraft app at {}", self.addr)
+        format!("connected to the Nexus Docs app at {}", self.addr)
     }
 }
 
@@ -381,5 +381,23 @@ mod tests {
         let e = r.call("document.inspect", json!({})).unwrap_err();
         assert!(e.contains("not a loopback address") && e.contains("not sent"), "{e}");
         assert!(seen.recv_timeout(WAIT).unwrap().get("key").is_none());
+    }
+
+    /// NexusOffices: the errors an agent sees name the app as installed (Nexus Docs).
+    #[test]
+    fn errors_name_nexus_docs() {
+        // The app refuses the key every time.
+        let (port, _seen) = fake_app(|_| Some((json!({"ok": false, "error": "unauthorized"}), true)));
+        let addr = format!("127.0.0.1:{port}");
+        let mut r = Remote::connect_with(&addr, fixed_key("k")).unwrap();
+        let e = r.call("document.inspect", json!({})).unwrap_err();
+        assert!(e.starts_with(&format!("unauthorized: the Nexus Docs app at {addr} refused the control key")), "{e}");
+
+        // The app closes every connection without answering.
+        let (port, _seen) = fake_app(|_| None);
+        let addr = format!("127.0.0.1:{port}");
+        let mut r = Remote::connect_with(&addr, fixed_key("k")).unwrap();
+        let e = r.call("document.inspect", json!({})).unwrap_err();
+        assert!(e.starts_with(&format!("Nexus Docs app at {addr} is not reachable")), "{e}");
     }
 }

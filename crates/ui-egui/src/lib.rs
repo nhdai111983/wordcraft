@@ -62,6 +62,7 @@ pub mod ink;
 pub mod keys;
 pub mod keytips;
 pub mod mini_toolbar;
+pub mod nexus;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -1202,7 +1203,9 @@ impl WordApp {
         if !self.session.status.is_empty() {
             // Engine messages are English; the catalog translates the ones it knows.
             let s = std::mem::take(&mut self.session.status);
-            let s = tl!(&s).to_string();
+            // NexusOffices: only a catalog string is looked up (and so branded, `i18n::t`); a
+            // status quoting the user's file or font name is shown as it is.
+            let s = if i18n::is_catalog_key(&s) { tl!(&s).to_string() } else { s };
             self.status(s);
         }
         if matches!(id, "table.deleteTable")
@@ -1488,12 +1491,14 @@ impl WordApp {
             // MCP get an error.
             "ui.makeDefaultApp" => {
                 return Some(Err(
-                    "making WordCraft the default app needs a click in File › Options › General; scripts and agents can't change system defaults"
+                    "making Nexus Docs the default app needs a click in File › Options › General; scripts and agents can't change system defaults"
                         .into(),
                 ));
             }
             "ui.discord" => {
-                self.canvas.open_url = Some("https://discord.gg/artcraft".into());
+                // NexusOffices: upstream's community (ArtCraft's Discord) is never opened.
+                let Some(url) = nexus::COMMUNITY_URL else { return Some(Err("no community link in this build".into())) };
+                self.canvas.open_url = Some(url.into());
                 json!({})
             }
             "ui.caretAnimation" => {
@@ -1555,7 +1560,7 @@ impl WordApp {
     /// command, so nothing programmatic (control channel, MCP, macros) can change system defaults.
     pub(crate) fn make_default_app(&mut self) -> Result<Value, String> {
         let Some(hook) = self.services.make_default_app.as_ref() else {
-            return Err("WordCraft can't change the default apps here; use your system's settings".into());
+            return Err("Nexus Docs can't change the default apps here; use your system's settings".into());
         };
         match hook() {
             Ok(DefaultApp::SettingsOpened) => {
@@ -2034,9 +2039,9 @@ impl WordApp {
             ctx.open_url(egui::OpenUrl::new_tab(url));
         }
         let title = if self.has_document() {
-            format!("{}{} - WordCraft", self.title_stem(), if self.session.dirty { " •" } else { "" })
+            format!("{}{} - {}", self.title_stem(), if self.session.dirty { " •" } else { "" }, nexus::APP_NAME)
         } else {
-            "WordCraft".to_string()
+            nexus::APP_NAME.to_string()
         };
         if title != self.sent_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
@@ -2698,7 +2703,7 @@ mod tests {
         let a = h.state_mut();
         assert!(!a.ui.backstage, "Esc leaves the Start screen");
         assert!(!a.has_document(), "for an empty window, not a blank document");
-        assert_eq!(a.sent_title, "WordCraft", "the window is titled with the app alone");
+        assert_eq!(a.sent_title, nexus::APP_NAME, "the window is titled with the app alone");
         // The ribbon's commands are off, but Help, the File tab and the settings work.
         for id in ["format.bold", "text.insert", "file.save", "file.saveAs", "file.print", "edit.paste", "insert.table", "ui.print"] {
             assert!(!widgets::enabled(a, id), "{id} is off with no document");
@@ -3943,6 +3948,35 @@ mod tests {
         assert!(via_key.iter().any(|t| t.contains("My unsaved novel")), "key event Cut: {via_key:?} body={:?}", body_text(h.state()));
     }
 
+    /// NexusOffices: the status bar shows a file name or other user text as it is. Only catalog
+    /// strings are looked up (and so branded), never an engine status quoting the user's file.
+    #[test]
+    fn status_keeps_the_users_file_name() {
+        // A command's status (what `after_command` shows) that quotes the user's file.
+        let mut a = app();
+        a.status_msg = None;
+        a.session.status = "Saved WordCraft notes.docx".into();
+        a.after_command("file.save");
+        let msg = a.status_msg.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+        assert_eq!(msg, "Saved WordCraft notes.docx", "the file name is kept");
+        // A catalog string is still translated and branded.
+        a.session.status = "Researcher needs an online service; WordCraft keeps your documents offline.".into();
+        a.after_command("references.researcher");
+        let msg = a.status_msg.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+        assert!(msg.contains("Nexus Docs keeps your documents offline"), "{msg:?}");
+
+        // The engine's own error names Nexus Docs at the source and keeps the file name.
+        let dir = scratch("brand-status");
+        let path = dir.join("WordCraft notes.docx");
+        // An OLE header (an old .doc) with nothing behind it: the engine names the file in its error.
+        std::fs::write(&path, [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0]).unwrap();
+        a.status_msg = None;
+        assert!(a.run("file.open", json!({"path": path.to_string_lossy()})).is_err());
+        let msg = a.status_msg.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+        assert!(msg.contains("WordCraft notes.docx: not a document Nexus Docs can open"), "{msg:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// A fresh scratch folder for one test.
     fn scratch(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("wordcraft-ui-{name}-{}", std::process::id()));
@@ -4519,7 +4553,7 @@ mod tests {
     #[test]
     fn the_default_app_button_shows_only_with_the_hosts_hook() {
         use egui_kittest::kittest::Queryable;
-        const LABEL: &str = "Make WordCraft the default for Word documents…";
+        const LABEL: &str = "Make Nexus Docs the default for Word documents…";
         for hook in [false, true] {
             let calls = std::rc::Rc::new(std::cell::Cell::new(0));
             let mut a = app();
@@ -4540,7 +4574,7 @@ mod tests {
                 a,
             );
             h.run_steps(4);
-            assert!(h.query_by_label("Show the community button in the title bar").is_some(), "hook {hook}: the Options page rendered");
+            assert!(h.query_by_label("Start-up").is_some(), "hook {hook}: the Options page rendered");
             assert_eq!(h.query_by_label(LABEL).is_some(), hook, "hook {hook}: the button");
             if hook {
                 h.get_by_label(LABEL).click();
