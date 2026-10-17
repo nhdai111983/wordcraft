@@ -16,6 +16,11 @@
   already installed") or silently uninstall the other. packaging-lint.yml checks this.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- NexusOffices: package.ps1 passes FontLicences=yes when it staged licenses\ (the OFL texts of
+       the embedded fonts); a build without that folder (a smoke test) leaves the group out. -->
+  <?ifndef FontLicences ?>
+  <?define FontLicences = "no" ?>
+  <?endif ?>
   <Package
       Name="Nexus Docs"
       Manufacturer="Sonnytech"
@@ -52,12 +57,19 @@
     </UI>
 
     <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="INSTALLFOLDER" Name="Nexus Docs" />
+      <Directory Id="INSTALLFOLDER" Name="Nexus Docs">
+        <?if $(var.FontLicences) = "yes" ?>
+        <Directory Id="LicensesFolder" Name="licenses" />
+        <?endif ?>
+      </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
 
     <Feature Id="Main" Title="Nexus Docs" Level="1">
       <ComponentGroupRef Id="WordcraftFiles" />
+      <?if $(var.FontLicences) = "yes" ?>
+      <ComponentGroupRef Id="WordcraftFontLicences" />
+      <?endif ?>
     </Feature>
   </Package>
 
@@ -165,5 +177,12 @@
         <File Id="WordcraftAttributionFile" Source="$(var.BinDir)\ATTRIBUTION.md" KeyPath="yes" />
       </Component>
     </ComponentGroup>
+    <?if $(var.FontLicences) = "yes" ?>
+    <!-- NexusOffices: OFL texts of the embedded fonts, staged by package.ps1 in licenses\, one
+         auto-GUID component each. -->
+    <ComponentGroup Id="WordcraftFontLicences" Directory="LicensesFolder">
+      <Files Include="$(var.BinDir)\licenses\*" />
+    </ComponentGroup>
+    <?endif ?>
   </Fragment>
 </Wix>
