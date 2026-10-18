@@ -6322,6 +6322,45 @@ fn new_documents_follow_the_region() {
     assert_eq!(t.prefs.region.as_deref(), Some("en-US"), "junk is saved as en-US");
 }
 
+/// Vietnam's decree 30 layout for a new document: A4 with 20/20/30/15 mm margins, Times New
+/// Roman 13 pt, Vietnamese proofing. Other regions keep the usual defaults (VI-DOCS-004).
+#[test]
+fn new_documents_in_vietnam_follow_decree_30() {
+    let near = |a: f32, b: f32| (a - b).abs() < 0.05;
+    let check_vi = |d: &wordcraft_doc::Document| {
+        let sp = &d.last_section;
+        assert!(near(sp.page_w, 595.28) && near(sp.page_h, 841.89), "{}x{}", sp.page_w, sp.page_h);
+        assert!(near(sp.margin_top, 56.69), "top {}", sp.margin_top);
+        assert!(near(sp.margin_bottom, 56.69), "bottom {}", sp.margin_bottom);
+        assert!(near(sp.margin_left, 85.04), "left {}", sp.margin_left);
+        assert!(near(sp.margin_right, 42.52), "right {}", sp.margin_right);
+        let c = &d.styles.default_chr;
+        assert_eq!(c.font.as_deref(), Some("Times New Roman"));
+        assert_eq!(c.size, Some(13.0));
+        assert_eq!(c.lang.as_deref(), Some("vi-VN"));
+    };
+
+    let mut s = s();
+    run(&mut s, "file.options", json!({"region": "vi-VN"}));
+    run(&mut s, "file.new", json!({"template": "blank"}));
+    check_vi(&s.doc);
+
+    // Straight from the start-up path (app and web) too.
+    check_vi(&crate::blank_document(&wordcraft_geom::Region::from_tag("vi-VN")));
+    check_vi(&crate::blank_document(&wordcraft_geom::Region::from_tag("vi")));
+
+    // Every other region is unchanged.
+    for tag in ["en-US", "de-DE"] {
+        let mut o = Session::new(wordcraft_doc::Document::new());
+        run(&mut o, "file.options", json!({"region": tag}));
+        run(&mut o, "file.new", json!({"template": "blank"}));
+        let sp = &o.doc.last_section;
+        assert_eq!((sp.margin_top, sp.margin_bottom, sp.margin_left, sp.margin_right), (72.0, 72.0, 72.0, 72.0), "{tag}");
+        let c = &o.doc.styles.default_chr;
+        assert_eq!((c.font.as_deref(), c.size, c.lang.as_deref()), (Some("Aptos"), Some(12.0), Some("en-US")), "{tag}");
+    }
+}
+
 /// Automatic (HTML-style) paragraph spacing: `para.spacing` turns it on and off, and a number
 /// replaces it, as typing one in Word's Paragraph dialog does; Ctrl+0 and Remove Space After work
 /// on it too.

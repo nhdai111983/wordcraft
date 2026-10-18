@@ -988,7 +988,8 @@ impl Session {
     }
 
     /// A new blank document (the Normal template) on the region's paper: Letter in the US and
-    /// other Letter regions, A4 elsewhere (#838). Margins stay 2.54 cm (1") all round.
+    /// other Letter regions, A4 elsewhere (#838). Margins stay 2.54 cm (1") all round, except
+    /// where the region has its own standard (Vietnam: decree 30).
     pub fn blank_document(&self) -> Document {
         blank_document(&self.region())
     }
@@ -1346,11 +1347,58 @@ impl Session {
     }
 }
 
-/// A new blank document on `region`'s paper (see [`Session::blank_document`]).
+/// What a region sets on a new blank document beyond its paper: margins (pt), the body font and
+/// its size, and the proofing language.
+struct RegionalDefaults {
+    margin_top: f32,
+    margin_bottom: f32,
+    margin_left: f32,
+    margin_right: f32,
+    font: &'static str,
+    size: f32,
+    lang: &'static str,
+}
+
+/// Millimetres in points.
+fn mm(v: f32) -> f32 {
+    v * wordcraft_geom::PT_PER_CM / 10.0
+}
+
+/// The regions whose new documents start from a local standard. Vietnam: decree 30/2020/ND-CP
+/// for administrative documents (A4; top and bottom 20 mm, left 30 mm, right 15 mm; Times New
+/// Roman 13 pt). Every other region keeps the usual defaults.
+fn regional_defaults(region: &wordcraft_geom::Region) -> Option<RegionalDefaults> {
+    match region.language.as_str() {
+        "vi" => Some(RegionalDefaults {
+            margin_top: mm(20.0),
+            margin_bottom: mm(20.0),
+            margin_left: mm(30.0),
+            margin_right: mm(15.0),
+            font: "Times New Roman",
+            size: 13.0,
+            lang: "vi-VN",
+        }),
+        _ => None,
+    }
+}
+
+/// A new blank document on `region`'s paper, with the region's own layout defaults where it has
+/// them (see [`Session::blank_document`]).
 pub fn blank_document(region: &wordcraft_geom::Region) -> Document {
     let mut d = Document::new();
     let (_, w, h) = region.paper();
     d.last_section.page_w = w;
     d.last_section.page_h = h;
+    if let Some(r) = regional_defaults(region) {
+        let sp = &mut d.last_section;
+        sp.margin_top = r.margin_top;
+        sp.margin_bottom = r.margin_bottom;
+        sp.margin_left = r.margin_left;
+        sp.margin_right = r.margin_right;
+        let c = &mut d.styles.default_chr;
+        c.font = Some(r.font.into());
+        c.size = Some(r.size);
+        c.lang = Some(r.lang.into());
+    }
     d
 }
