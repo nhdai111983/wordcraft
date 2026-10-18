@@ -178,6 +178,11 @@ Templates (Letter, Resume, Report) keep their own size. Not yet: Word's "Default
 preference of its own, and Word's locale-specific Normal margins (2,5 cm in some regions;
 WordCraft keeps 2,54 cm).
 
+A region can also carry its own layout standard for new blank documents (`regional_defaults` in
+`crates/engine/src/session.rs`). Vietnam (`vi`) follows decree 30/2020/ND-CP: A4, margins 20 mm
+top and bottom, 30 mm left, 15 mm right, Times New Roman 13 pt, proofing language `vi-VN` (VI-DOCS-004).
+Other regions are unchanged.
+
 ## Shared work (not in the per-language hours)
 
 | Item | Hours | Notes |
@@ -192,6 +197,7 @@ WordCraft keeps 2,54 cm).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-18 | minor | New blank documents in a Vietnamese region (`vi-*`) start on the decree 30 layout: A4, 20/20/30/15 mm margins, Times New Roman 13 pt, `vi-VN` (VI-DOCS-004); `wordcraft-cli run` without `--file`/`--template` follows the system region too |
 | 2026-10-12 | minor | Czech proofing review: short-word splits rank after deletion, NOSUGGEST excludes suggestions while accepting typed forms, affix comments apply only to headers, ratios keep spaces and repeated-word messages use Czech quotes; synthetic engine end-to-end and latency checks |
 | 2026-10-12 | minor | Czech spelling from the installed Hunspell dictionary, runtime-table suggestions and generic checks; Czech interface writes cs-CZ documents; no Czech hyphenation patterns bundled; estimates unchanged |
 | 2026-10-13 | minor | Swedish interface catalog (2,504 entries), locale selection, saved preference, audit coverage and font checks (#1219) |

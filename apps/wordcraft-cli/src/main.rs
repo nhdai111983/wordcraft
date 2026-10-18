@@ -105,6 +105,14 @@ fn session(doc: wordcraft_doc::Document) -> Session {
     s
 }
 
+/// A headless session on a new blank document in `region`: its paper, and its own layout defaults
+/// where it has them (Vietnam: decree 30), as `file.new` gives.
+fn blank_session(region: wordcraft_engine::Region) -> Session {
+    let mut s = Session::new(wordcraft_engine::blank_document(&region));
+    s.system_region = region;
+    s
+}
+
 /// The system region, read as the app reads it (locale variables, else the platform's locale).
 fn system_region() -> wordcraft_engine::Region {
     wordcraft_engine::Region::from_locale_vars(|name| std::env::var(name).ok(), sys_locale::get_locale)
@@ -368,7 +376,7 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
                     s.run("file.new", &json!({"template": t})).map_err(|e| e.to_string())?;
                     s
                 }
-                _ => session(wordcraft_doc::Document::new()),
+                _ => blank_session(system_region()),
             };
             if let Some(name) = arg_value(&rest, "--author") {
                 set_author(&mut s, &name)?;
@@ -624,6 +632,23 @@ mod tests {
     fn text_keeps_bullet_and_number_labels() {
         let doc = wordcraft_engine::io::open_bytes("lists.md", b"- alpha\n- beta\n\n1. first\n2. second\n").unwrap();
         assert_eq!(listed_text(&doc).unwrap(), "\u{2022}\talpha\n\u{2022}\tbeta\n1.\tfirst\n2.\tsecond");
+    }
+
+    #[test]
+    fn run_without_template_follows_the_region() {
+        let probe = |tag: &str| {
+            let mut s = blank_session(wordcraft_engine::Region::from_tag(tag));
+            s.run("text.insert", &json!({"text": "Kinh gui", "raw": true})).unwrap();
+            s.run("select.all", &json!({})).unwrap();
+            let layout = s.run("document.inspect", &json!({})).unwrap().to_string();
+            (layout, s.run("format.state", &json!({})).unwrap().to_string())
+        };
+        let (layout, state) = probe("vi-VN");
+        assert!(layout.contains("\"pageW\":595.") && layout.contains("\"marginLeft\":85.0"), "{layout}");
+        assert!(state.contains("\"font\":\"Times New Roman\"") && state.contains("\"lang\":\"vi-VN\""), "{state}");
+        let (layout, state) = probe("en-US");
+        assert!(layout.contains("\"pageW\":612.0") && layout.contains("\"marginLeft\":72.0"), "{layout}");
+        assert!(state.contains("\"lang\":\"en-US\""), "{state}");
     }
 
     #[test]
