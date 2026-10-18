@@ -102,7 +102,7 @@ Applied when a word is finished by a space, punctuation **or Enter** (`enter_fin
   `capsLock`, `capCells` on `tools.autocorrect`; on by default)
   (`capitalisation_fixes_undo_and_turn_off`).
 - `1/2 1/4 3/4` → `½ ¼ ¾`; `1st 22nd 13th` get superscript suffixes (`ordinals_become_superscript`).
-- `word -- word` → en dash, `word - word` → en dash, `word--word` → em dash (`dashes`).
+- `word -- word` → en dash, `word - word` → en dash, `word--word` → em dash (`dashes`), except that Vietnamese text (language `vi`) keeps `word - word` (the motto "Độc lập - Tự do - Hạnh phúc" is written with hyphens, Decree 30/2020/ND-CP; a typed `--` is still a dash; N-02, `dashes_keep_hyphens_in_vietnamese_text`).
 - Web addresses become links; following text isn't linked (`web_addresses_become_links`).
 - A hyperlink covers only its own text: typing at either end of it, or after Enter at its end,
   isn't linked; typing inside it is. Linking a whole paragraph doesn't link its mark, so the
@@ -196,6 +196,7 @@ Word.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-18 | trivial | AutoFormat: Vietnamese text (`vi`) keeps `word - word` instead of an en dash (N-02, VI-DOCS-020); the dash slicing uses `get()` |
 | 2026-10-14 | trivial | Shift+Delete cuts the selection, and does nothing without one, on macOS and Linux too, as in Word for Windows (#1669); Shift+Backspace already erased (#707) |
 | 2026-10-13 | trivial | Select All then Delete or Backspace removes a table the document starts with (#1198) |
 | 2026-10-12 | trivial | Editing keys: Down and Up from the start of a line beside a table go into it instead of skipping it (#1007) |

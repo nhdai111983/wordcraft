@@ -371,6 +371,35 @@ fn dashes() {
     assert_eq!(s.doc.plain_text(StoryRef::Body), "A – b and c – d and e—f and café—g ");
 }
 
+/// N-02 (VI-DOCS-020): the national motto is written "Độc lập - Tự do - Hạnh phúc" with hyphens
+/// (Decree 30/2020/ND-CP), so Vietnamese text keeps `word - word`. A typed `--` is still an
+/// explicit dash, and English text still gets the en dash.
+#[test]
+fn dashes_keep_hyphens_in_vietnamese_text() {
+    let mut s = s();
+    run(&mut s, "review.language", json!({"lang": "vi-VN", "default": true}));
+    typ(&mut s, "Độc lập - Tự do - Hạnh phúc ");
+    assert_eq!(s.doc.plain_text(StoryRef::Body), "Độc lập - Tự do - Hạnh phúc ");
+    // Two hyphens are the typist's explicit intent: still an en dash.
+    let mut s = self::s();
+    run(&mut s, "review.language", json!({"lang": "vi-VN", "default": true}));
+    typ(&mut s, "a -- b ");
+    assert_eq!(s.doc.plain_text(StoryRef::Body), "A – b ");
+    // The language of the text decides, not only the document default: Vietnamese on the run.
+    let mut s = self::s();
+    typ(&mut s, "Độc");
+    run(&mut s, "select.all", json!({}));
+    run(&mut s, "review.language", json!({"lang": "vi-VN"}));
+    run(&mut s, "caret.docEnd", json!({}));
+    typ(&mut s, " lập - Tự ");
+    assert_eq!(s.doc.plain_text(StoryRef::Body), "Độc lập - Tự ");
+    // Other languages are unchanged.
+    let mut s = self::s();
+    run(&mut s, "review.language", json!({"lang": "en-GB", "default": true}));
+    typ(&mut s, "c - d ");
+    assert_eq!(s.doc.plain_text(StoryRef::Body), "C – d ");
+}
+
 #[test]
 fn border_line_autoformat() {
     let s = typed("Above\n---\nBelow");

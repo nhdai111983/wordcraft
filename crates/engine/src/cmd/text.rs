@@ -165,7 +165,18 @@ fn list_autoformat(s: &mut Session) -> Result<bool, CmdError> {
     Ok(true)
 }
 
-/// "word -- word" → en dash, "word--word" → em dash (on the space after).
+/// True when the character at `off` is Vietnamese text (language tag `vi`, any region): its run,
+/// paragraph style or the document default, else the editing language, as AutoCorrect decides
+/// English. `ProofLang` has no Vietnamese variant, so the primary subtag is compared directly.
+fn is_vietnamese_at(s: &Session, at: &Pos, off: usize) -> bool {
+    let Some(p) = s.doc.para_at(at) else { return false };
+    let rc = s.doc.styles.resolve_char(p.props.style.as_deref(), p.props_of_char(off));
+    let lang = rc.lang.as_deref().or(s.editing_lang.as_deref());
+    lang.and_then(|l| l.split(['-', '_']).next()).is_some_and(|primary| primary.eq_ignore_ascii_case("vi"))
+}
+
+/// "word -- word" → en dash, "word--word" → em dash (on the space after). Vietnamese text keeps
+/// "word - word" (the national motto is written with hyphens); a typed "--" still becomes a dash.
 fn dash_autoformat(s: &mut Session) -> Result<(), CmdError> {
     let f = s.sel.focus.clone();
     let Some(para) = s.doc.para_at(&f) else { return Ok(()) };
@@ -182,7 +193,8 @@ fn dash_autoformat(s: &mut Session) -> Result<(), CmdError> {
         s.sel = Selection::caret(Pos { off: f.off + 1, ..f });
     } else if before.ends_with(' ')
         && let Some(i) = before.trim_end().rfind(" - ")
-        && !before.trim_end()[i + 3..].contains(' ')
+        && before.trim_end().get(i + 3..).is_some_and(|w| !w.contains(' '))
+        && !is_vietnamese_at(s, &f, i + 1)
     {
         let p = s.doc.para_mut(f.story, &f.path)?;
         let props = p.props_at(i + 1).clone();
@@ -192,7 +204,7 @@ fn dash_autoformat(s: &mut Session) -> Result<(), CmdError> {
     } else if before.ends_with(' ')
         && let Some(i) = before.trim_end().rfind("--")
         && i > 0
-        && before.trim_end()[..i].chars().next_back().is_some_and(|c| c != ' ')
+        && before.trim_end().get(..i).and_then(|w| w.chars().next_back()).is_some_and(|c| c != ' ')
     {
         let p = s.doc.para_mut(f.story, &f.path)?;
         let props = p.props_at(i).clone();
