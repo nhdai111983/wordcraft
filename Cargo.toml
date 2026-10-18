@@ -36,6 +36,8 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 log = "0.4"
 proptest = "1"
+# Test-only oracle for the collation tables (crates/doc/src/collate_ucd.rs); never shipped.
+icu_normalizer = { version = "=2.3.0", default-features = false, features = ["compiled_data"] }
 rayon = "1"
 unicode-bidi = "0.3"
 unicode-segmentation = "1"
