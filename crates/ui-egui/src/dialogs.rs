@@ -2742,10 +2742,12 @@ fn recipient_list(
     const ROW_H: f32 = 24.0;
     const NUM_W: f32 = 34.0;
     // Each record's place in the merge (None: filtered out), when there is a filter or sort.
+    // Text compares in the document's language, as `mailings.filterRecipients` does.
+    let lang = wordcraft_engine::cmd::default_lang(&app.session);
     let order: Option<Vec<Option<usize>>> = (!filter.is_empty()).then(|| {
         let (rules, sort) = filter.engine();
         let mut order = vec![None; rows.len()];
-        for (k, i) in wordcraft_engine::cmd::mailings::select_records(fields, rows, &rules, &sort).into_iter().enumerate() {
+        for (k, i) in wordcraft_engine::cmd::mailings::select_records(fields, rows, &rules, &sort, lang.as_deref()).into_iter().enumerate() {
             if let Some(slot) = order.get_mut(i) {
                 *slot = Some(k + 1);
             }
