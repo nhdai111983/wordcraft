@@ -6653,6 +6653,34 @@ fn new_documents_in_vietnam_follow_decree_30() {
     }
 }
 
+/// Nexus: the Table › Sort dialog sends no `lang`, so the sort follows the new document's
+/// language. A document started in the Vietnamese region sorts in the Vietnamese alphabet by
+/// default (`Đ` after `D`, tones as a secondary difference); in other regions it does not.
+#[test]
+fn table_sort_dialog_params_follow_the_vietnamese_region() {
+    // The dialog's parameters (`SortForm::params`): no `lang` key.
+    let sort = json!({"column": 0, "descending": false, "header": false});
+    let sorted = |region: &str| {
+        let mut s = s();
+        run(&mut s, "file.options", json!({"region": region}));
+        run(&mut s, "file.new", json!({"template": "blank"}));
+        run(&mut s, "insert.table", json!({"rows": VI_V1_INPUT.len(), "cols": 1}));
+        for (k, c) in VI_V1_INPUT.iter().enumerate() {
+            if k > 0 {
+                run(&mut s, "text.tab", json!({}));
+            }
+            run(&mut s, "text.insert", json!({"text": c}));
+        }
+        run(&mut s, "table.sort", sort.clone());
+        column_texts(&s)
+    };
+    assert_eq!(sorted("vi-VN"), VI_V1_EXPECTED);
+    let en = sorted("en-US");
+    let pos = |w: &str| en.iter().position(|x| x == w).unwrap();
+    assert!(pos("Đào") < pos("Dũng"), "English order puts Đ with D: {en:?}");
+    assert_ne!(en, VI_V1_EXPECTED);
+}
+
 /// Automatic (HTML-style) paragraph spacing: `para.spacing` turns it on and off, and a number
 /// replaces it, as typing one in Word's Paragraph dialog does; Ctrl+0 and Remove Space After work
 /// on it too.
