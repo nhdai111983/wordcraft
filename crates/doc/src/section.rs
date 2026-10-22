@@ -255,8 +255,9 @@ impl NumFormat {
     pub fn from_ooxml(s: &str) -> NumFormat {
         NumFormat::ALL.into_iter().find(|f| f.ooxml() == s).unwrap_or(NumFormat::Decimal)
     }
-    /// Format `n` (1-based). Formats WordCraft doesn't draw yet (Hebrew, Arabic, Hindi, Thai,
-    /// Vietnamese, text amounts) show decimal, as do values past a sequence's end
+    /// Format `n` (1-based). Vietnamese counting writes Vietnamese words ("một", "hai", … from
+    /// [`crate::vi_numbers`]; chosen from orthography, not observed from Word). Formats WordCraft
+    /// doesn't draw yet (Hebrew, Arabic, Hindi, Thai, text amounts) show decimal, as do values past a sequence's end
     /// (the 21st item of ①…⑳).
     pub fn format(self, n: u32) -> String {
         use crate::cjk_numbers as cjk;
@@ -269,11 +270,12 @@ impl NumFormat {
             NumFormat::RussianUpper => russian_letters(n).to_uppercase(),
             NumFormat::RussianLower => russian_letters(n),
             NumFormat::Ordinal => format!("{n}{}", ordinal_suffix(n)),
-            NumFormat::CardinalText => cardinal_text(n),
-            NumFormat::OrdinalText => ordinal_text(n),
+            NumFormat::CardinalText => cardinal_text_in(u64::from(n), None),
+            NumFormat::OrdinalText => ordinal_text_in(u64::from(n), None),
             NumFormat::Bullet | NumFormat::None => String::new(),
             NumFormat::Chicago => chicago(n),
             NumFormat::NumberInDash => format!("- {n} -"),
+            NumFormat::VietnameseCounting => crate::vi_numbers::cardinal(u64::from(n)),
             NumFormat::IdeographDigital | NumFormat::KoreanDigital2 | NumFormat::TaiwaneseDigital => cjk::ideograph_digital(n),
             NumFormat::JapaneseCounting => cjk::japanese_counting(n),
             NumFormat::JapaneseLegal => cjk::japanese_legal(n),
@@ -305,7 +307,6 @@ impl NumFormat {
             NumFormat::Decimal
             | NumFormat::DecimalHalfWidth
             | NumFormat::Hex
-            | NumFormat::VietnameseCounting
             | NumFormat::Hebrew1
             | NumFormat::Hebrew2
             | NumFormat::ArabicAlpha
@@ -342,15 +343,34 @@ pub fn is_vietnamese(lang: Option<&str>) -> bool {
     lang.and_then(|l| l.split(['-', '_']).next()).is_some_and(|l| l.eq_ignore_ascii_case("vi"))
 }
 
+/// The largest number English words are written for (Word's CardText and OrdText stop there too).
+pub const MAX_ENGLISH_WORDS: u64 = 999_999;
+
 /// Cardinal words for `n` in `lang`: Vietnamese ([`crate::vi_numbers::cardinal`], any `u64`), else
-/// English ([`cardinal_text`], which stops at 999,999).
+/// English ([`cardinal_text`]) up to [`MAX_ENGLISH_WORDS`]; a larger number keeps its digits
+/// rather than words for another number.
 pub fn cardinal_text_in(n: u64, lang: Option<&str>) -> String {
-    if is_vietnamese(lang) { crate::vi_numbers::cardinal(n) } else { cardinal_text(u32::try_from(n).unwrap_or(u32::MAX)) }
+    if is_vietnamese(lang) {
+        crate::vi_numbers::cardinal(n)
+    } else {
+        match u32::try_from(n) {
+            Ok(m) if n <= MAX_ENGLISH_WORDS => cardinal_text(m),
+            _ => n.to_string(),
+        }
+    }
 }
 
-/// Ordinal words for `n` in `lang` (see [`cardinal_text_in`]).
+/// Ordinal words for `n` in `lang` (see [`cardinal_text_in`]; past [`MAX_ENGLISH_WORDS`] English
+/// keeps the digits).
 pub fn ordinal_text_in(n: u64, lang: Option<&str>) -> String {
-    if is_vietnamese(lang) { crate::vi_numbers::ordinal(n) } else { ordinal_text(u32::try_from(n).unwrap_or(u32::MAX)) }
+    if is_vietnamese(lang) {
+        crate::vi_numbers::ordinal(n)
+    } else {
+        match u32::try_from(n) {
+            Ok(m) if n <= MAX_ENGLISH_WORDS => ordinal_text(m),
+            _ => n.to_string(),
+        }
+    }
 }
 
 /// Chicago Manual of Style note marks: *, †, ‡, §, then doubled (**, ††, …) and so on.
@@ -925,7 +945,17 @@ mod tests {
             assert_eq!(NumFormat::CardinalText.format_in(21, lang), "Twenty-One", "{lang:?}");
             assert_eq!(NumFormat::OrdinalText.format_in(112, lang), "One Hundred Twelfth", "{lang:?}");
         }
-        assert_eq!(cardinal_text_in(u64::MAX, None), cardinal_text(u32::MAX));
+        // Past 999,999 English has no words here: the digits, not words for 999,999.
+        assert_eq!(cardinal_text_in(999_999, None), "Nine Hundred Ninety-Nine Thousand Nine Hundred Ninety-Nine");
+        assert_eq!(cardinal_text_in(1_000_000, None), "1000000");
+        assert_eq!(ordinal_text_in(1_250_000, Some("en-US")), "1250000");
+        assert_eq!(cardinal_text_in(u64::MAX, None), "18446744073709551615");
+        assert_eq!(NumFormat::CardinalText.format(1_000_000), "1000000");
+        assert_eq!(NumFormat::OrdinalText.format_in(u32::MAX, None), u32::MAX.to_string());
+        assert_eq!(cardinal_text_in(1_000_000, Some("vi")), "một triệu");
+        // Vietnamese counting (list and page numbers) is Vietnamese whatever the language.
+        assert_eq!(NumFormat::VietnameseCounting.format(21), "hai mươi mốt");
+        assert_eq!(NumFormat::VietnameseCounting.format_in(5, None), "năm");
         // Other formats ignore the language.
         assert_eq!(NumFormat::UpperRoman.format_in(4, Some("vi-VN")), "IV");
         assert!(!is_vietnamese(Some("vie")) && is_vietnamese(Some("vi")) && !is_vietnamese(None));
