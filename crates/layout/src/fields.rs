@@ -125,30 +125,53 @@ pub(crate) fn reference_link(instr: &str) -> Option<String> {
     None
 }
 
-/// `\* FORMAT` switch value (Arabic, roman, ROMAN, alphabetic, ALPHABETIC, CardText, Ordinal…).
-pub fn format_switch(instr: &str) -> Option<NumFormat> {
-    let mut it = instr.split_whitespace();
-    while let Some(w) = it.next() {
-        if let Some(rest) = w.strip_prefix("\\*") {
-            let v = if rest.is_empty() { it.next()? } else { rest };
-            let v = v.split('\\').next().unwrap_or(v);
-            let fmt = match v {
-                "roman" => NumFormat::LowerRoman,
-                "ROMAN" | "Roman" => NumFormat::UpperRoman,
-                "alphabetic" => NumFormat::LowerLetter,
-                "ALPHABETIC" | "Alphabetic" => NumFormat::UpperLetter,
-                "CardText" | "cardtext" => NumFormat::CardinalText,
-                "OrdText" | "ordtext" => NumFormat::OrdinalText,
-                "Ordinal" | "ordinal" => NumFormat::Ordinal,
-                "Arabic" | "arabic" => NumFormat::Decimal,
-                // Chinese numerals: counting (一百零一), legal (壹佰零壹), digit by digit (一〇一).
-                v if v.eq_ignore_ascii_case("ChineseNum1") => NumFormat::ChineseCountingThousand,
-                v if v.eq_ignore_ascii_case("ChineseNum2") => NumFormat::ChineseLegalSimplified,
-                v if v.eq_ignore_ascii_case("ChineseNum3") => NumFormat::IdeographDigital,
-                _ => continue,
-            };
-            return Some(fmt);
+/// The values of a field's `\*` switches, in order: `\* CardText`, `\*CardText`, and switches
+/// run together without spaces (`\*CardText\*Upper`, `\* Arabic\*MERGEFORMAT`).
+fn star_values(instr: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    // A `\*` that ended its word: the next word is its value.
+    let mut pending = false;
+    for w in instr.split_whitespace() {
+        let mut segs = w.split('\\');
+        let first = segs.next().unwrap_or("");
+        if pending && !first.is_empty() {
+            out.push(first);
         }
+        pending = false;
+        for seg in segs {
+            match seg.strip_prefix('*') {
+                Some("") => pending = true,
+                Some(v) => {
+                    out.push(v);
+                    pending = false;
+                }
+                None => pending = false,
+            }
+        }
+    }
+    out
+}
+
+/// `\* FORMAT` switch value (Arabic, roman, ROMAN, alphabetic, ALPHABETIC, CardText, Ordinal…):
+/// the first `\*` switch that names a number format.
+pub fn format_switch(instr: &str) -> Option<NumFormat> {
+    for v in star_values(instr) {
+        let fmt = match v {
+            "roman" => NumFormat::LowerRoman,
+            "ROMAN" | "Roman" => NumFormat::UpperRoman,
+            "alphabetic" => NumFormat::LowerLetter,
+            "ALPHABETIC" | "Alphabetic" => NumFormat::UpperLetter,
+            "CardText" | "cardtext" => NumFormat::CardinalText,
+            "OrdText" | "ordtext" => NumFormat::OrdinalText,
+            "Ordinal" | "ordinal" => NumFormat::Ordinal,
+            "Arabic" | "arabic" => NumFormat::Decimal,
+            // Chinese numerals: counting (一百零一), legal (壹佰零壹), digit by digit (一〇一).
+            v if v.eq_ignore_ascii_case("ChineseNum1") => NumFormat::ChineseCountingThousand,
+            v if v.eq_ignore_ascii_case("ChineseNum2") => NumFormat::ChineseLegalSimplified,
+            v if v.eq_ignore_ascii_case("ChineseNum3") => NumFormat::IdeographDigital,
+            _ => continue,
+        };
+        return Some(fmt);
     }
     None
 }
@@ -170,11 +193,7 @@ pub enum CaseSwitch {
 /// when it has several.
 pub fn case_switch(instr: &str) -> Option<CaseSwitch> {
     let mut found = None;
-    let mut it = instr.split_whitespace();
-    while let Some(w) = it.next() {
-        let Some(rest) = w.strip_prefix("\\*") else { continue };
-        let Some(v) = (if rest.is_empty() { it.next() } else { Some(rest) }) else { break };
-        let v = v.split('\\').next().unwrap_or(v);
+    for v in star_values(instr) {
         found = match v.to_ascii_lowercase().as_str() {
             "upper" => Some(CaseSwitch::Upper),
             "lower" => Some(CaseSwitch::Lower),
@@ -184,6 +203,14 @@ pub fn case_switch(instr: &str) -> Option<CaseSwitch> {
         };
     }
     found
+}
+
+/// `text` in the case the `\*` case switch of `instr` asks for (unchanged without one).
+pub fn cased(text: String, instr: &str) -> String {
+    match case_switch(instr) {
+        Some(case) => apply_case(&text, case),
+        None => text,
+    }
 }
 
 /// `text` in the case `case` asks for (letters of any script, `ộ` → `Ộ`).
@@ -231,16 +258,23 @@ pub fn field_text_on(instr: &str, result: &str, ctx: &FieldCtx, page: u32) -> (S
 /// Display text for a field on page `page` written in language `lang` (the `w:lang` of its
 /// run): `\* CardText` and `\* OrdText` write the number in that language's words (see
 /// [`NumFormat::format_in`]).
+///
+/// The language is the run's own (`w:lang` through its styles and the document defaults). The
+/// engine's Update Field also falls back to the editing language when nothing in the document
+/// names one; a document with no `w:lang` anywhere can then show English words here and
+/// another language in a result Update Field stored (new documents always name a language).
 pub fn field_text_in(instr: &str, result: &str, ctx: &FieldCtx, page: u32, lang: Option<&str>) -> (String, bool) {
     let name = field_name(instr);
     let fmt = format_switch(instr);
+    // Page numbers in their format, then in the case a `\* Upper`/`Caps`/… switch asks for.
+    let number = |n: u32, default: NumFormat| (cased(fmt.unwrap_or(default).format_in(n, lang), instr), true);
     match name.as_str() {
-        "PAGE" => (fmt.unwrap_or(ctx.page_format).format_in(page, lang), true),
-        "NUMPAGES" => (fmt.unwrap_or(NumFormat::Decimal).format_in(ctx.pages, lang), true),
-        "SECTIONPAGES" => (fmt.unwrap_or(NumFormat::Decimal).format_in(ctx.section_pages, lang), true),
-        "SECTION" => (fmt.unwrap_or(NumFormat::Decimal).format_in(ctx.section, lang), true),
+        "PAGE" => number(page, ctx.page_format),
+        "NUMPAGES" => number(ctx.pages, NumFormat::Decimal),
+        "SECTIONPAGES" => number(ctx.section_pages, NumFormat::Decimal),
+        "SECTION" => number(ctx.section, NumFormat::Decimal),
         "PAGEREF" => match pageref_page(instr, ctx) {
-            Some((n, page_format)) => (fmt.unwrap_or(page_format).format_in(n, lang), true),
+            Some((n, page_format)) => number(n, page_format),
             None => (result.to_string(), false),
         },
         "TITLE" if result.is_empty() => (ctx.title.to_string(), false),
@@ -355,6 +389,9 @@ mod tests {
         assert_eq!(field_text_in("PAGE \\* OrdText", "", &ctx, 4, Some("vi-VN")).0, "thứ tư");
         assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &ctx, 4, Some("en-GB")).0, "Twenty-One");
         assert_eq!(field_text_in("PAGE", "", &ctx, 4, Some("vi-VN")).0, "4");
+        assert_eq!(field_text_in("PAGE \\* CardText \\* FirstCap", "", &ctx, 4, Some("vi-VN")).0, "Bốn");
+        assert_eq!(field_text_in("NUMPAGES \\*CardText\\*Upper", "", &ctx, 4, Some("vi-VN")).0, "HAI MƯƠI MỐT");
+        assert_eq!(field_text_in("NUMPAGES \\* CardText \\* Lower", "", &ctx, 4, None).0, "twenty-one");
     }
 
     #[test]
@@ -363,6 +400,14 @@ mod tests {
         assert_eq!(case_switch("= 5 \\* CardText \\* FirstCap \\* MERGEFORMAT"), Some(CaseSwitch::FirstCap));
         assert_eq!(case_switch("= 5 \\*caps"), Some(CaseSwitch::Caps));
         assert_eq!(case_switch("= 5 \\* CardText"), None);
+        // Switches run together without spaces.
+        assert_eq!(case_switch("= 5 \\*CardText\\*Upper"), Some(CaseSwitch::Upper));
+        assert_eq!(case_switch("PAGE \\*MERGEFORMAT\\*Upper"), Some(CaseSwitch::Upper));
+        assert_eq!(case_switch("PAGE \\* Arabic\\*Lower \\* MERGEFORMAT"), Some(CaseSwitch::Lower));
+        assert_eq!(format_switch("= 5 \\*MERGEFORMAT\\*CardText"), Some(NumFormat::CardinalText));
+        assert_eq!(format_switch("= 5 \\* Upper\\*OrdText"), Some(NumFormat::OrdinalText));
+        assert_eq!(format_switch("= 5 \\# \"0\""), None);
+        assert_eq!(format_switch("PAGE \\*"), None, "a switch with no value");
         assert_eq!(case_switch("= 5 \\*"), None);
         assert_eq!(apply_case("một triệu hai trăm", CaseSwitch::FirstCap), "Một triệu hai trăm");
         assert_eq!(apply_case("một triệu hai trăm", CaseSwitch::Caps), "Một Triệu Hai Trăm");
