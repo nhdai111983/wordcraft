@@ -323,6 +323,36 @@ impl NumFormat {
     }
 }
 
+impl NumFormat {
+    /// [`NumFormat::format`] in the language `lang` (a `w:lang` tag such as `vi-VN`) of the
+    /// text the number is written in: the word formats (CardText, OrdText) use that language's
+    /// words where WordCraft has them (Vietnamese), English otherwise. Every other format is
+    /// the same in every language.
+    pub fn format_in(self, n: u32, lang: Option<&str>) -> String {
+        match self {
+            NumFormat::CardinalText => cardinal_text_in(u64::from(n), lang),
+            NumFormat::OrdinalText => ordinal_text_in(u64::from(n), lang),
+            _ => self.format(n),
+        }
+    }
+}
+
+/// Whether a `w:lang` tag is Vietnamese (`vi`, any region).
+pub fn is_vietnamese(lang: Option<&str>) -> bool {
+    lang.and_then(|l| l.split(['-', '_']).next()).is_some_and(|l| l.eq_ignore_ascii_case("vi"))
+}
+
+/// Cardinal words for `n` in `lang`: Vietnamese ([`crate::vi_numbers::cardinal`], any `u64`), else
+/// English ([`cardinal_text`], which stops at 999,999).
+pub fn cardinal_text_in(n: u64, lang: Option<&str>) -> String {
+    if is_vietnamese(lang) { crate::vi_numbers::cardinal(n) } else { cardinal_text(u32::try_from(n).unwrap_or(u32::MAX)) }
+}
+
+/// Ordinal words for `n` in `lang` (see [`cardinal_text_in`]).
+pub fn ordinal_text_in(n: u64, lang: Option<&str>) -> String {
+    if is_vietnamese(lang) { crate::vi_numbers::ordinal(n) } else { ordinal_text(u32::try_from(n).unwrap_or(u32::MAX)) }
+}
+
 /// Chicago Manual of Style note marks: *, †, ‡, §, then doubled (**, ††, …) and so on.
 fn chicago(n: u32) -> String {
     const MARKS: [char; 4] = ['*', '\u{2020}', '\u{2021}', '\u{a7}'];
@@ -880,6 +910,26 @@ impl SectionProps {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// CardText and OrdText follow the language of the text they are written in: Vietnamese in a
+    /// `vi` run, English (unchanged) everywhere else.
+    #[test]
+    fn word_formats_follow_the_language() {
+        assert_eq!(NumFormat::CardinalText.format_in(21, Some("vi-VN")), "hai mươi mốt");
+        assert_eq!(NumFormat::CardinalText.format_in(15, Some("vi")), "mười lăm");
+        assert_eq!(NumFormat::OrdinalText.format_in(4, Some("VI_vn")), "thứ tư");
+        assert_eq!(cardinal_text_in(1_250_000, Some("vi-VN")), "một triệu hai trăm năm mươi nghìn");
+        assert_eq!(ordinal_text_in(1, Some("vi-VN")), "thứ nhất");
+        // English keeps its output, other languages and no language too.
+        for lang in [None, Some("en-US"), Some("fr-FR"), Some("vie"), Some("")] {
+            assert_eq!(NumFormat::CardinalText.format_in(21, lang), "Twenty-One", "{lang:?}");
+            assert_eq!(NumFormat::OrdinalText.format_in(112, lang), "One Hundred Twelfth", "{lang:?}");
+        }
+        assert_eq!(cardinal_text_in(u64::MAX, None), cardinal_text(u32::MAX));
+        // Other formats ignore the language.
+        assert_eq!(NumFormat::UpperRoman.format_in(4, Some("vi-VN")), "IV");
+        assert!(!is_vietnamese(Some("vie")) && is_vietnamese(Some("vi")) && !is_vietnamese(None));
+    }
 
     #[test]
     fn number_formats() {
