@@ -14,7 +14,7 @@ use wordcraft_doc::{Document, Paragraph};
 use wordcraft_fonts::FaceRef;
 
 use crate::NumeralMode;
-use crate::fields::{FIELD_SHADING, FieldCtx, field_code_text, field_text_on, reference_link};
+use crate::fields::{FIELD_SHADING, FieldCtx, field_code_text, field_text_in, reference_link};
 
 /// How a run set in one of Word's symbol fonts (Symbol, Wingdings, Wingdings 2/3, Webdings)
 /// shows its characters. Those fonts are proprietary and usually missing: a substitute has other
@@ -1658,7 +1658,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                                 match wordcraft_doc::eq::parse_overstrike(instr) {
                                     Some(o) => overstrike(&mut b, &o, instr, start, end, &rc, &mut enclosures),
                                     None => {
-                                        let (t, page_dep) = field_text_on(instr, result, env.fields, env.fields.page_at(start));
+                                        let (t, page_dep) = field_text_in(instr, result, env.fields, env.fields.page_at(start), rc.lang.as_deref());
                                         has_page_fields |= page_dep;
                                         let rc = if rc.link.is_none()
                                             && let Some(link) = reference_link(instr)

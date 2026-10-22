@@ -153,6 +153,63 @@ pub fn format_switch(instr: &str) -> Option<NumFormat> {
     None
 }
 
+/// A `\*` switch that changes the case of a field's result.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CaseSwitch {
+    /// `\* Upper`: all capitals.
+    Upper,
+    /// `\* Lower`: all lower case.
+    Lower,
+    /// `\* Caps`: the first letter of each word a capital.
+    Caps,
+    /// `\* FirstCap`: the first letter of the result a capital.
+    FirstCap,
+}
+
+/// The case switch (`\* Upper`, `\* Lower`, `\* Caps`, `\* FirstCap`) of a field, the last one
+/// when it has several.
+pub fn case_switch(instr: &str) -> Option<CaseSwitch> {
+    let mut found = None;
+    let mut it = instr.split_whitespace();
+    while let Some(w) = it.next() {
+        let Some(rest) = w.strip_prefix("\\*") else { continue };
+        let Some(v) = (if rest.is_empty() { it.next() } else { Some(rest) }) else { break };
+        let v = v.split('\\').next().unwrap_or(v);
+        found = match v.to_ascii_lowercase().as_str() {
+            "upper" => Some(CaseSwitch::Upper),
+            "lower" => Some(CaseSwitch::Lower),
+            "caps" => Some(CaseSwitch::Caps),
+            "firstcap" => Some(CaseSwitch::FirstCap),
+            _ => found,
+        };
+    }
+    found
+}
+
+/// `text` in the case `case` asks for (letters of any script, `ộ` → `Ộ`).
+pub fn apply_case(text: &str, case: CaseSwitch) -> String {
+    match case {
+        CaseSwitch::Upper => text.to_uppercase(),
+        CaseSwitch::Lower => text.to_lowercase(),
+        CaseSwitch::Caps | CaseSwitch::FirstCap => {
+            let mut out = String::with_capacity(text.len());
+            let mut up = true;
+            for c in text.chars() {
+                if up && !c.is_whitespace() {
+                    out.extend(c.to_uppercase());
+                    up = false;
+                } else {
+                    out.push(c);
+                }
+                if case == CaseSwitch::Caps && c.is_whitespace() {
+                    up = true;
+                }
+            }
+            out
+        }
+    }
+}
+
 /// The light grey behind a field shown as its code.
 pub const FIELD_SHADING: wordcraft_doc::props::Rgb = wordcraft_doc::props::Rgb(0xD9, 0xD9, 0xD9);
 
@@ -168,15 +225,22 @@ pub fn field_text(instr: &str, result: &str, ctx: &FieldCtx) -> (String, bool) {
 
 /// Display text for a field on page `page` (see [`field_text`]).
 pub fn field_text_on(instr: &str, result: &str, ctx: &FieldCtx, page: u32) -> (String, bool) {
+    field_text_in(instr, result, ctx, page, None)
+}
+
+/// Display text for a field on page `page` written in language `lang` (the `w:lang` of its
+/// run): `\* CardText` and `\* OrdText` write the number in that language's words (see
+/// [`NumFormat::format_in`]).
+pub fn field_text_in(instr: &str, result: &str, ctx: &FieldCtx, page: u32, lang: Option<&str>) -> (String, bool) {
     let name = field_name(instr);
     let fmt = format_switch(instr);
     match name.as_str() {
-        "PAGE" => (fmt.unwrap_or(ctx.page_format).format(page), true),
-        "NUMPAGES" => (fmt.unwrap_or(NumFormat::Decimal).format(ctx.pages), true),
-        "SECTIONPAGES" => (fmt.unwrap_or(NumFormat::Decimal).format(ctx.section_pages), true),
-        "SECTION" => (fmt.unwrap_or(NumFormat::Decimal).format(ctx.section), true),
+        "PAGE" => (fmt.unwrap_or(ctx.page_format).format_in(page, lang), true),
+        "NUMPAGES" => (fmt.unwrap_or(NumFormat::Decimal).format_in(ctx.pages, lang), true),
+        "SECTIONPAGES" => (fmt.unwrap_or(NumFormat::Decimal).format_in(ctx.section_pages, lang), true),
+        "SECTION" => (fmt.unwrap_or(NumFormat::Decimal).format_in(ctx.section, lang), true),
         "PAGEREF" => match pageref_page(instr, ctx) {
-            Some((n, page_format)) => (fmt.unwrap_or(page_format).format(n), true),
+            Some((n, page_format)) => (fmt.unwrap_or(page_format).format_in(n, lang), true),
             None => (result.to_string(), false),
         },
         "TITLE" if result.is_empty() => (ctx.title.to_string(), false),
@@ -280,6 +344,31 @@ mod tests {
         assert_eq!(field_name("=SUM(ABOVE)"), "SUM(ABOVE)");
         assert_eq!(field_code_text(" PAGE \\* ROMAN "), "{ PAGE \\* ROMAN }");
         assert_eq!(field_code_text(""), "{  }");
+    }
+
+    /// C-14b: PAGE and NUMPAGES with `\\* CardText` in a Vietnamese footer write Vietnamese words.
+    #[test]
+    fn page_words_follow_the_runs_language() {
+        let ctx = FieldCtx { page: 4, pages: 21, ..Default::default() };
+        assert_eq!(field_text_in("PAGE \\* CardText", "", &ctx, 4, Some("vi-VN")).0, "bốn");
+        assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &ctx, 4, Some("vi-VN")).0, "hai mươi mốt");
+        assert_eq!(field_text_in("PAGE \\* OrdText", "", &ctx, 4, Some("vi-VN")).0, "thứ tư");
+        assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &ctx, 4, Some("en-GB")).0, "Twenty-One");
+        assert_eq!(field_text_in("PAGE", "", &ctx, 4, Some("vi-VN")).0, "4");
+    }
+
+    #[test]
+    fn case_switches() {
+        assert_eq!(case_switch("MERGEFIELD Name \\* Upper"), Some(CaseSwitch::Upper));
+        assert_eq!(case_switch("= 5 \\* CardText \\* FirstCap \\* MERGEFORMAT"), Some(CaseSwitch::FirstCap));
+        assert_eq!(case_switch("= 5 \\*caps"), Some(CaseSwitch::Caps));
+        assert_eq!(case_switch("= 5 \\* CardText"), None);
+        assert_eq!(case_switch("= 5 \\*"), None);
+        assert_eq!(apply_case("một triệu hai trăm", CaseSwitch::FirstCap), "Một triệu hai trăm");
+        assert_eq!(apply_case("một triệu hai trăm", CaseSwitch::Caps), "Một Triệu Hai Trăm");
+        assert_eq!(apply_case("một triệu", CaseSwitch::Upper), "MỘT TRIỆU");
+        assert_eq!(apply_case("Twenty-One", CaseSwitch::Lower), "twenty-one");
+        assert_eq!(apply_case("", CaseSwitch::Caps), "");
     }
 
     /// #1765: ASK and SET only assign text to a bookmark; they show nothing, whatever result is stored.
