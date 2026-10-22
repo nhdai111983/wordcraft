@@ -902,7 +902,7 @@ pub fn update_seq(s: &mut Session) -> Result<(), CmdError> {
                         n.0 = n.0.saturating_add(1);
                     }
                     let fmt = wordcraft_layout::fields::format_switch(instr).unwrap_or_default();
-                    updates.push((k, if f.has('h') { String::new() } else { fmt.format(n.0) }));
+                    updates.push((k, if f.has('h') { String::new() } else { fmt.format_in(n.0, field_lang(s, p, k).as_deref()) }));
                 }
                 "STYLEREF" => {
                     let ix = styles.get_or_insert_with(|| wordcraft_layout::styleref::StyleIndex::build(&s.doc));
@@ -978,17 +978,22 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
         let mut updates: Vec<(usize, String)> = Vec::new();
         for (k, o) in p.objects.iter().enumerate() {
             let InlineObject::Field { instr, locked: false, .. } = o else { continue };
-            // A table formula reads the cells around its own cell again.
+            // A table formula reads the cells around its own cell again; outside a table a
+            // formula is plain arithmetic (`{ = 1250000 \* CardText }`), in the field's language.
             if instr.trim_start().starts_with('=') {
-                if let Some((tp, r, c)) = path.cell()
+                let evaluated = if let Some((tp, r, c)) = path.cell()
                     && let Some(t) = s.doc.table(StoryRef::Body, &tp)
                 {
                     let default_lang = super::default_lang(s);
-                    let text = match super::table_formula::evaluate_field_with(t, Some(&s.doc), default_lang.as_deref(), r, c, instr) {
-                        Ok(text) => text,
-                        Err(e) => format!("!{e}"),
-                    };
-                    updates.push((k, text));
+                    Some(super::table_formula::evaluate_field_with(t, Some(&s.doc), default_lang.as_deref(), r, c, instr))
+                } else if path.cell().is_none() {
+                    let lang = field_lang(s, p, k);
+                    Some(super::table_formula::evaluate_free_field(Some(&s.doc), lang.as_deref(), instr))
+                } else {
+                    None
+                };
+                if let Some(evaluated) = evaluated {
+                    updates.push((k, evaluated.unwrap_or_else(|e| format!("!{e}"))));
                 }
                 continue;
             }
@@ -1006,7 +1011,7 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
                     } else if !has_switch(instr, 'p') {
                         pages.get(target).map(|(num, page_fmt)| {
                             let fmt = wordcraft_layout::fields::format_switch(instr).unwrap_or(*page_fmt);
-                            fmt.format(*num)
+                            fmt.format_in(*num, field_lang(s, p, k).as_deref())
                         })
                     } else {
                         None
@@ -1052,6 +1057,21 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
     }
     super::citations::update_citations(s)?;
     update_toc(s)
+}
+
+/// The language a field's result is written in: that of the field's run (its `w:lang`, through
+/// its paragraph's style and the document defaults), else the editing language (as
+/// [`super::default_lang`]). `k` is the field's index among the paragraph's objects.
+pub(crate) fn field_lang(s: &Session, p: &wordcraft_doc::Paragraph, k: usize) -> Option<String> {
+    match p.object_offsets().get(k) {
+        Some(off) => lang_at(s, p, *off),
+        None => s.doc.styles.resolve_char(p.props.style.as_deref(), &p.mark).lang.or_else(|| super::default_lang(s)),
+    }
+}
+
+/// The language of the text at byte `off` of `p` (see [`field_lang`]).
+pub(crate) fn lang_at(s: &Session, p: &wordcraft_doc::Paragraph, off: usize) -> Option<String> {
+    s.doc.styles.resolve_char(p.props.style.as_deref(), p.props_of_char(off)).lang.or_else(|| super::default_lang(s))
 }
 
 /// Refresh every unlocked `DATE` and `TIME` field to now, as Word does whenever it shows,
@@ -1150,6 +1170,86 @@ pub fn bookmark_text(doc: &wordcraft_doc::Document, name: &str) -> Option<String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A field's result after inserting `instr` at the end of a document in language `lang`.
+    fn free_formula(lang: Option<&str>, instr: &str) -> String {
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        if let Some(lang) = lang {
+            s.run("review.language", &json!({"lang": lang, "default": true})).unwrap();
+        }
+        s.run("text.insert", &json!({"text": "Amount: "})).unwrap();
+        s.run("insert.field", &json!({"instr": instr})).unwrap();
+        update_fields(&mut s).unwrap();
+        fields(&s).pop().unwrap().1
+    }
+
+    /// C-14b: a `=` formula field outside a table is worked out (it showed nothing before), in
+    /// the language of its text: `\* CardText` writes Vietnamese words in a `vi-VN` document.
+    #[test]
+    fn formula_fields_outside_tables_evaluate() {
+        let vi = Some("vi-VN");
+        assert_eq!(free_formula(vi, r"= 1250000 \* CardText"), "một triệu hai trăm năm mươi nghìn");
+        assert_eq!(free_formula(vi, r"= 21 \* CardText"), "hai mươi mốt");
+        assert_eq!(free_formula(vi, r"=105 \* CardText \* MERGEFORMAT"), "một trăm linh năm");
+        assert_eq!(free_formula(vi, r"= 1250000 \* CardText \* FirstCap"), "Một triệu hai trăm năm mươi nghìn");
+        assert_eq!(free_formula(vi, r"= 4 \* OrdText"), "thứ tư");
+        assert_eq!(free_formula(vi, r"= 2000000000 + 5 \* CardText"), "hai tỷ không trăm linh năm");
+        // No switch: the number as the language writes it; a picture; English words.
+        assert_eq!(free_formula(vi, "= 1250000"), "1250000");
+        assert_eq!(free_formula(vi, "= 5 / 2"), "2,50");
+        assert_eq!(free_formula(None, "= 2 * 3 + 1"), "7");
+        assert_eq!(free_formula(None, r##"= 1234.5 \# "#,##0.00""##), "1,234.50");
+        assert_eq!(free_formula(Some("en-US"), r"= 21 \* CardText"), "Twenty-One");
+        assert_eq!(free_formula(None, r"= 21 \* CardText \* Upper"), "TWENTY-ONE");
+    }
+
+    /// Outside a table there are no cells: ABOVE, LEFT, cell references and ranges are errors
+    /// (shown as `!…` like any formula error), and a junk formula is one too, never a panic.
+    #[test]
+    fn formula_fields_outside_tables_have_no_cells() {
+        for (instr, what) in
+            [("=SUM(ABOVE)", "ABOVE"), ("=SUM(LEFT)", "LEFT"), ("=A1*2", "A1"), ("=SUM(A1:B2)", "a range of cells"), ("=AVERAGE(BELOW)", "BELOW")]
+        {
+            let r = free_formula(None, instr);
+            assert!(r.starts_with('!') && r.contains(what) && r.contains("not in a table"), "{instr}: {r}");
+        }
+        // DEFINED tells whether a cell can be read: it can't.
+        assert_eq!(free_formula(None, "=DEFINED(A1)"), "0");
+        for instr in [
+            "=1/0",
+            "=",
+            "=(((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))",
+            "=10^400",
+            r"=-5 \* CardText",
+            r"=99999999999999999999999999 \* CardText",
+            r"=1e999 \* OrdText",
+            "=1 \\# \"#####################################################################\"",
+            r"=1 \*",
+            r"= \* CardText",
+        ] {
+            let r = free_formula(Some("vi-VN"), instr);
+            assert!(!r.is_empty(), "{instr}");
+        }
+        // Not representable in words: the plain number stays.
+        assert_eq!(free_formula(Some("vi-VN"), r"=-5 \* CardText"), "-5");
+        assert_eq!(free_formula(Some("vi-VN"), r"=0-0.4 \* CardText"), "không");
+        assert_eq!(free_formula(Some("vi-VN"), "=1/0"), "!division by zero");
+    }
+
+    /// A formula inside a table still reads its cells (ABOVE), and now takes `\*` switches.
+    #[test]
+    fn table_formulas_take_number_word_switches() {
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();
+        s.run("insert.table", &json!({"rows": 3, "cols": 1})).unwrap();
+        s.run("text.insert", &json!({"text": "20"})).unwrap();
+        s.run("caret.down", &json!({})).unwrap();
+        s.run("text.insert", &json!({"text": "5"})).unwrap();
+        s.run("caret.down", &json!({})).unwrap();
+        s.run("insert.field", &json!({"instr": r"=SUM(ABOVE) \* CardText"})).unwrap();
+        update_fields(&mut s).unwrap();
+        assert_eq!(fields(&s).pop().unwrap().1, "hai mươi lăm");
+    }
 
     fn fields(s: &Session) -> Vec<(String, String)> {
         let mut out = Vec::new();

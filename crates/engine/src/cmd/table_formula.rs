@@ -36,6 +36,20 @@ pub fn evaluate_with(
     c: usize,
     formula: &str,
 ) -> Result<f64, CmdError> {
+    evaluate_in(t, true, doc, default_lang, r, c, formula)
+}
+
+/// [`evaluate_with`]; `in_table` false for a formula field outside a table, where `t` is empty
+/// and cell references and ABOVE/LEFT/RIGHT/BELOW are errors (there are no cells to read).
+fn evaluate_in(
+    t: &Table,
+    in_table: bool,
+    doc: Option<&wordcraft_doc::Document>,
+    default_lang: Option<&str>,
+    r: usize,
+    c: usize,
+    formula: &str,
+) -> Result<f64, CmdError> {
     if formula.len() > MAX_FORMULA {
         return Err(syntax(format!("the formula is longer than {MAX_FORMULA} characters")));
     }
@@ -46,7 +60,7 @@ pub fn evaluate_with(
     if parser.pos != parser.toks.len() {
         return Err(syntax("unexpected text after the formula".into()));
     }
-    let here = Here { t, doc, default_lang, r, c, g: t.grid_col(r, c), visits: std::cell::Cell::new(0) };
+    let here = Here { t, in_table, doc, default_lang, r, c, g: t.grid_col(r, c), visits: std::cell::Cell::new(0) };
     match eval(&expr, &here)? {
         Val::Num(x) => finite(x),
         Val::List(_) => Err(syntax("a range or ABOVE/LEFT/RIGHT/BELOW needs a function, such as SUM".into())),
@@ -74,44 +88,100 @@ pub fn evaluate_field_with(
 ) -> Result<String, CmdError> {
     let (formula, switch) = split_switch(instr);
     let value = evaluate_with(t, doc, default_lang, r, c, formula)?;
-    Ok(match switch.and_then(picture_of) {
-        Some(picture) => format_picture(value, &picture),
-        None => {
-            let out_lang = doc
-                .and_then(|d| {
-                    t.rows.get(r).and_then(|row| row.cells.get(c)).and_then(|cl| {
-                        cl.blocks.iter().filter_map(|b| b.as_para()).find(|p| !p.plain_text().trim().is_empty()).and_then(|p| super::para_lang(d, p))
-                    })
+    let out_lang = doc
+        .and_then(|d| {
+            t.rows.get(r).and_then(|row| row.cells.get(c)).and_then(|cl| {
+                cl.blocks.iter().filter_map(|b| b.as_para()).find(|p| !p.plain_text().trim().is_empty()).and_then(|p| super::para_lang(d, p))
+            })
+        })
+        .or_else(|| {
+            doc.and_then(|d| {
+                t.rows.iter().flat_map(|row| row.cells.iter()).take(100).find_map(|cl| {
+                    cl.blocks.iter().filter_map(|b| b.as_para()).find(|p| !p.plain_text().trim().is_empty()).and_then(|p| super::para_lang(d, p))
                 })
-                .or_else(|| {
-                    doc.and_then(|d| {
-                        t.rows.iter().flat_map(|row| row.cells.iter()).take(100).find_map(|cl| {
-                            cl.blocks
-                                .iter()
-                                .filter_map(|b| b.as_para())
-                                .find(|p| !p.plain_text().trim().is_empty())
-                                .and_then(|p| super::para_lang(d, p))
-                        })
-                    })
-                })
-                .or_else(|| default_lang.map(str::to_string));
-            wordcraft_doc::locale_number::format_number(value, out_lang.as_deref())
-        }
-    })
+            })
+        })
+        .or_else(|| default_lang.map(str::to_string));
+    Ok(format_value(value, switch, out_lang.as_deref()))
 }
 
-/// Splits a field's `\#` switch off its formula: `=SUM(ABOVE) \# "0.00"` gives the formula and the
-/// switch text (from the `\#` on).
+/// The text a formula field outside a table shows (`{ = 1250000 \* CardText }`): its formula
+/// worked out with no cells to read, so a cell reference or ABOVE/LEFT/RIGHT/BELOW is an error,
+/// then formatted as [`format_value`] says in the field's language `lang`.
+pub fn evaluate_free_field(doc: Option<&wordcraft_doc::Document>, lang: Option<&str>, instr: &str) -> Result<String, CmdError> {
+    let (formula, switch) = split_switch(instr);
+    let none = Table::default();
+    let value = evaluate_in(&none, false, doc, lang, 0, 0, formula)?;
+    Ok(format_value(value, switch, lang))
+}
+
+/// The text of a field's numeric result `value` under its switches (`switches` from the first
+/// `\` on), in the language `lang` of the field's text:
+/// - a `\*` number format writes it that way: CardText and OrdText in words of that language
+///   (Vietnamese or English, see [`wordcraft_doc::section::cardinal_text_in`]), Ordinal, roman,
+///   alphabetic, Arabic. The value is rounded to a whole number first; a negative value or one
+///   too large for the format keeps the plain number, as there are no words for it;
+/// - otherwise a `\#` numeric picture ([`format_picture`]);
+/// - otherwise the plain number as the language writes it;
+/// - then `\* Upper`/`Lower`/`Caps`/`FirstCap` set the case.
+pub fn format_value(value: f64, switches: Option<&str>, lang: Option<&str>) -> String {
+    let switches = switches.unwrap_or("");
+    let text = number_switch_text(value, switches, lang).unwrap_or_else(|| wordcraft_doc::locale_number::format_number(value, lang));
+    apply_case_switch(text, switches)
+}
+
+/// `value` under the `\*` number format or else the `\#` picture among `switches` (see
+/// [`format_value`]); `None` when neither applies.
+pub fn number_switch_text(value: f64, switches: &str, lang: Option<&str>) -> Option<String> {
+    if let Some(fmt) = wordcraft_layout::fields::format_switch(switches)
+        && let Some(text) = number_in_format(value, fmt, lang)
+    {
+        return Some(text);
+    }
+    picture_of(switches).map(|picture| format_picture(value, &picture))
+}
+
+/// `text` in the case a `\*` switch among `switches` asks for (unchanged without one).
+pub fn apply_case_switch(text: String, switches: &str) -> String {
+    match wordcraft_layout::fields::case_switch(switches) {
+        Some(case) => wordcraft_layout::fields::apply_case(&text, case),
+        None => text,
+    }
+}
+
+/// `value` in a `\*` number format, or `None` when the format has no form for it (negative,
+/// not finite, past `u64`, or past `u32` for the formats other than words and Arabic).
+fn number_in_format(value: f64, fmt: wordcraft_doc::section::NumFormat, lang: Option<&str>) -> Option<String> {
+    use wordcraft_doc::section::{NumFormat, cardinal_text_in, ordinal_text_in};
+    /// 2^64: the first whole number a `u64` can't hold (exactly representable as an `f64`).
+    const PAST_U64: f64 = 18_446_744_073_709_551_616.0;
+    let n = value.round();
+    if !(0.0..PAST_U64).contains(&n) {
+        return None;
+    }
+    // In range and whole, so the conversion is exact (it saturates in any case).
+    let n = n as u64;
+    match fmt {
+        NumFormat::CardinalText => Some(cardinal_text_in(n, lang)),
+        NumFormat::OrdinalText => Some(ordinal_text_in(n, lang)),
+        NumFormat::Decimal => Some(n.to_string()),
+        _ => u32::try_from(n).ok().map(|n| fmt.format_in(n, lang)),
+    }
+}
+
+/// Splits a field's switches off its formula: `=SUM(ABOVE) \# "0.00"` gives the formula and the
+/// switch text (from the first `\` on; a formula has no backslash of its own).
 pub fn split_switch(instr: &str) -> (&str, Option<&str>) {
-    match instr.find("\\#") {
-        Some(at) => (instr[..at].trim_end(), Some(&instr[at..])),
+    match instr.find('\\') {
+        Some(at) => (instr.get(..at).unwrap_or("").trim_end(), instr.get(at..)),
         None => (instr, None),
     }
 }
 
-/// The picture a `\#` switch names: a quoted one (`"#,##0.00"`) or a single word.
-fn picture_of(switch: &str) -> Option<String> {
-    let rest = switch.strip_prefix("\\#")?.trim_start();
+/// The picture a `\#` switch among `switches` names: a quoted one (`"#,##0.00"`) or a single word.
+fn picture_of(switches: &str) -> Option<String> {
+    let at = switches.find("\\#")?;
+    let rest = switches.get(at..)?.strip_prefix("\\#")?.trim_start();
     let picture = match rest.strip_prefix('"') {
         Some(quoted) => quoted.split('"').next().unwrap_or_default(),
         None => rest.split_whitespace().next().unwrap_or_default(),
@@ -289,6 +359,22 @@ enum Side {
     Left,
     Right,
     Below,
+}
+
+impl Side {
+    fn keyword(self) -> &'static str {
+        match self {
+            Side::Above => "ABOVE",
+            Side::Left => "LEFT",
+            Side::Right => "RIGHT",
+            Side::Below => "BELOW",
+        }
+    }
+}
+
+/// The error of a formula outside a table that refers to table cells (`what`).
+fn not_in_table(what: &str) -> CmdError {
+    CmdError::Failed(format!("{what} refers to table cells, and this formula is not in a table"))
 }
 
 #[derive(Clone, Debug)]
@@ -481,6 +567,8 @@ fn cell_ref(name: &str) -> Option<(usize, usize)> {
 /// Where the formula's cell sits.
 struct Here<'a> {
     t: &'a Table,
+    /// False for a formula field outside a table: there are no cells to refer to.
+    in_table: bool,
     doc: Option<&'a wordcraft_doc::Document>,
     default_lang: Option<&'a str>,
     r: usize,
@@ -534,6 +622,9 @@ enum Val {
 fn eval(e: &Expr, here: &Here) -> Result<Val, CmdError> {
     Ok(match e {
         Expr::Num(x) => Val::Num(*x),
+        Expr::Cell(_, _, name) if !here.in_table => return Err(not_in_table(name)),
+        Expr::Range(..) if !here.in_table => return Err(not_in_table("a range of cells")),
+        Expr::Side(side) if !here.in_table => return Err(not_in_table(side.keyword())),
         Expr::Cell(row, col, name) => {
             let x = here.number_at(*row, *col)?.ok_or_else(|| CmdError::Failed(format!("{name} doesn't hold a number")))?;
             Val::Num(x)
