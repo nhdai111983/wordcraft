@@ -658,6 +658,93 @@ pub fn contains_text(haystack: &str, needle: &str) -> bool {
     false
 }
 
+/// Most marks after a letter that [`equivalent_spellings`] expands (at most 4! = 24 orders).
+const MAX_SPELLING_MARKS: usize = 4;
+
+/// Whether `c` is Cyrillic (U+0400–U+04FF), the script of the `COMPOSE` pairs outside the tables.
+fn is_cyrillic(c: char) -> bool {
+    ('\u{400}'..='\u{4ff}').contains(&c)
+}
+
+/// Every way to write `letter` (a base character and the combining marks after it) that is
+/// canonically equivalent to it, `letter` itself first: precomposed (`ệ`), half-composed
+/// (`ê` U+0323, `ẹ` U+0302) and decomposed with the marks in any order that keeps their meaning
+/// (`e` U+0323 U+0302 and `e` U+0302 U+0323, but not reordering two marks of one combining class).
+/// Case is kept. It covers the Latin letters of the canonical tables (U+00C0–U+024F,
+/// U+1E00–U+1EFF, marks U+0300–U+036F) and Cyrillic `ё` and `й`; any other letter, a letter with
+/// more than four marks, or a `letter` holding more than one base character has only itself. Find
+/// builds its pattern from this, so a search typed one way finds text written another way while
+/// the text itself is never changed.
+pub fn equivalent_spellings(letter: &str) -> Vec<String> {
+    let canon = |s: &str| compose_outside_tables(collate_ucd::canonical(s));
+    let mut out = vec![letter.to_string()];
+    let target = canon(letter);
+    // Fully decomposed: the tables, then the Cyrillic pairs.
+    let mut full: Vec<char> = Vec::new();
+    for c in collate_ucd::canonical(letter).chars() {
+        match COMPOSE.iter().find(|(_, _, k)| *k == c && is_cyrillic(c)) {
+            Some(&(b, m, _)) => full.extend([b, m]),
+            None => full.push(c),
+        }
+    }
+    let Some((&base, marks)) = full.split_first() else { return out };
+    if marks.len() > MAX_SPELLING_MARKS || !marks.iter().all(|&m| is_mark(m)) {
+        return out;
+    }
+    // Heads: the base alone, or a precomposed character whose decomposition is the base and some
+    // of the marks.
+    let mut heads: Vec<(char, Vec<char>)> = vec![(base, marks.to_vec())];
+    let tables = collate_ucd::decompositions().map(|(c, d)| (c, d.chars().collect::<Vec<char>>()));
+    let pairs = COMPOSE.iter().filter(|(b, _, k)| *b == base && is_cyrillic(*k)).map(|&(b, m, k)| (k, vec![b, m]));
+    for (c, d) in tables.chain(pairs) {
+        if let Some((&b, used)) = d.split_first()
+            && b == base
+            && !used.is_empty()
+            && let Some(rest) = without(marks, used)
+        {
+            heads.push((c, rest));
+        }
+    }
+    for (head, rest) in heads {
+        for order in orders(&rest) {
+            let spelling: String = std::iter::once(head).chain(order).collect();
+            if canon(&spelling) == target && !out.contains(&spelling) {
+                out.push(spelling);
+            }
+        }
+    }
+    out
+}
+
+/// `marks` with each of `used` taken out once, or `None` when one of them isn't there.
+fn without(marks: &[char], used: &[char]) -> Option<Vec<char>> {
+    let mut rest = marks.to_vec();
+    for u in used {
+        let i = rest.iter().position(|m| m == u)?;
+        rest.remove(i);
+    }
+    Some(rest)
+}
+
+/// Every distinct order of `items` (at most [`MAX_SPELLING_MARKS`] of them, so at most 24).
+fn orders(items: &[char]) -> Vec<Vec<char>> {
+    if items.len() <= 1 {
+        return vec![items.to_vec()];
+    }
+    let mut out: Vec<Vec<char>> = Vec::new();
+    for (i, &first) in items.iter().enumerate() {
+        let mut rest = items.to_vec();
+        rest.remove(i);
+        for tail in orders(&rest) {
+            let order: Vec<char> = std::iter::once(first).chain(tail).collect();
+            if !out.contains(&order) {
+                out.push(order);
+            }
+        }
+    }
+    out
+}
+
 /// Compare two strings in the order of language `lang`, ignoring case.
 pub fn collate(a: &str, b: &str, lang: Option<&str>) -> Ordering {
     sort_key(a, lang).cmp(&sort_key(b, lang))
@@ -724,6 +811,37 @@ fn shown_letter(e: &Elem<'_>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn equivalent_spellings_cover_every_composition_and_mark_order() {
+        let set = |l: &str| {
+            let mut v = equivalent_spellings(l);
+            v.sort();
+            v
+        };
+        let mut expected: Vec<String> = ["ệ", "ê\u{323}", "ẹ\u{302}", "e\u{323}\u{302}", "e\u{302}\u{323}"].iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        // However the letter is typed, the same five spellings, the typed one first.
+        for typed in ["ệ", "ê\u{323}", "e\u{302}\u{323}", "e\u{323}\u{302}"] {
+            assert_eq!(set(typed), expected, "{typed:?}");
+            assert_eq!(equivalent_spellings(typed).first().map(String::as_str), Some(typed));
+        }
+        // Case is kept; one mark gives two spellings; a bare letter or a letter outside the tables one.
+        // Ễ: U+0302 and U+0303 share a combining class, so their order is part of the letter.
+        assert_eq!(set("Ễ"), ["E\u{302}\u{303}", "Ê\u{303}", "Ễ"]);
+        assert_eq!(set("á"), ["a\u{301}", "á"]);
+        assert_eq!(equivalent_spellings("a"), ["a"]);
+        assert_eq!(equivalent_spellings("ά"), ["ά"]);
+        // Two marks of one combining class keep their order (a different letter otherwise).
+        assert_eq!(set("a\u{301}\u{300}"), ["a\u{301}\u{300}", "á\u{300}"]);
+        // Cyrillic ё and й, the tone marks U+0340/U+0341, and inputs that are not one letter.
+        assert_eq!(set("ё"), ["е\u{308}", "ё"]);
+        assert_eq!(set("и\u{306}"), ["и\u{306}", "й"]);
+        assert!(equivalent_spellings("a\u{341}").contains(&"á".to_string()));
+        assert_eq!(equivalent_spellings("ab"), ["ab"]);
+        assert_eq!(equivalent_spellings(""), [""]);
+        assert_eq!(equivalent_spellings("a\u{301}\u{302}\u{303}\u{304}\u{305}").len(), 1);
+    }
 
     fn sorted(words: &[&str], lang: &str) -> Vec<String> {
         let mut v: Vec<String> = words.iter().map(|w| w.to_string()).collect();

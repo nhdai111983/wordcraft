@@ -454,11 +454,13 @@ pub(crate) fn search_full(s: &Session, story: StoryRef, with_rep: bool) -> Resul
     }
     let opts = find_opts(f);
     let c = find_pattern::compile(&f.query, &opts).map_err(CmdError::Params)?;
-    let re = meta::Regex::builder()
-        .syntax(syntax::Config::new().case_insensitive(c.case_insensitive))
-        .configure(meta::Config::new().nfa_size_limit(Some(1 << 20)))
-        .build(&c.pattern)
-        .map_err(|e| CmdError::Params(format!("bad pattern: {e}")))?;
+    let build = |pattern: &str| {
+        meta::Regex::builder()
+            .syntax(syntax::Config::new().case_insensitive(c.case_insensitive))
+            .configure(meta::Config::new().nfa_size_limit(Some(1 << 20)))
+            .build(pattern)
+    };
+    let re = build(&c.pattern).or_else(|e| c.fallback.as_deref().map_or(Err(e), build)).map_err(|e| CmdError::Params(format!("bad pattern: {e}")))?;
     let pieces = with_rep.then(|| find_pattern::parse_replace(&f.replace, &opts));
     let paths = s.doc.para_paths(story);
     // Paragraphs read as one text: consecutive siblings when the pattern spans paragraphs.
@@ -542,6 +544,12 @@ pub(crate) fn search_full(s: &Session, story: StoryRef, with_rep: bool) -> Resul
                 }
                 input.set_start(next);
                 if m.is_empty() {
+                    continue;
+                }
+                if c.whole_letters && hay.get(m.end()..).and_then(|t| t.chars().next()).is_some_and(find_pattern::is_mark) {
+                    // Ends inside a letter; a match may still start within this one.
+                    let after_first = hay.get(m.start()..).and_then(|t| t.chars().next()).map_or(m.start() + 1, |ch| m.start() + ch.len_utf8());
+                    input.set_start(after_first.min(input.end()));
                     continue;
                 }
                 let (Some(a), Some(b)) = (pos_of(m.start(), false), pos_of(m.end(), true)) else { continue };

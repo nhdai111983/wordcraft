@@ -711,6 +711,11 @@ pub(crate) fn ccc(c: char) -> u8 {
     }
 }
 
+/// Every character in the table with its full canonical decomposition, by code point.
+pub(crate) fn decompositions() -> impl Iterator<Item = (char, &'static str)> {
+    DECOMPOSITION.iter().copied()
+}
+
 /// The full canonical decomposition of `c`, or `None` when it has none in the table.
 fn decompose(c: char) -> Option<&'static str> {
     if (c as u32) < DEC_FIRST {

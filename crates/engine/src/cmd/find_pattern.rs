@@ -7,6 +7,13 @@
 //! The search reads a story as text with a paragraph mark (`\r`, [`PARA_MARK`]) between
 //! paragraphs when the pattern can match one, so `^p` finds paragraph ends; a paragraph that ends
 //! a section ends with [`SECT_MARK`] instead (`^b`).
+//!
+//! The normal and literal searches match a letter however it is written: each letter of Find what
+//! (a base character and the combining marks after it) becomes every canonically equivalent
+//! spelling (`ệ`, `ê` U+0323, `e` U+0302 U+0323…, [`wordcraft_doc::collate::equivalent_spellings`]),
+//! so text pasted decomposed is found by a query typed precomposed and the other way round, and
+//! a match must not end inside a letter ([`Compiled::whole_letters`]). Wildcard and regular
+//! expression patterns are the user's own and are not rewritten.
 
 use regex::escape;
 
@@ -45,6 +52,53 @@ pub struct Compiled {
     pub case_insensitive: bool,
     /// The pattern can match a paragraph mark, so the search must read across paragraphs.
     pub spans_paras: bool,
+    /// A match followed by a combining mark (U+0300–U+036F) ends inside a letter and doesn't
+    /// count: `e` does not find the `e` of a decomposed `ễ`, as it doesn't find it in `ễ`. Set for
+    /// the normal and literal searches, not for wildcards or regular expressions.
+    pub whole_letters: bool,
+    /// The pattern with each letter as typed, for when `pattern` (every spelling of every letter)
+    /// is too large for the engine: a very long query of stacked-mark letters still runs, finding
+    /// its own spelling only. `None` when the two are the same.
+    pub fallback: Option<String>,
+}
+
+/// Whether `c` is a combining mark that belongs to the letter before it (U+0300–U+036F).
+pub fn is_mark(c: char) -> bool {
+    ('\u{300}'..='\u{36f}').contains(&c)
+}
+
+/// One letter of Find what as a regex atom: every canonically equivalent spelling of it when
+/// `expand`, else the letter as typed.
+fn letter(letter: &str, expand: bool) -> String {
+    let spellings = if expand { wordcraft_doc::collate::equivalent_spellings(letter) } else { Vec::new() };
+    if spellings.len() <= 1 {
+        return letter.chars().map(lit).collect();
+    }
+    format!("(?:{})", spellings.iter().map(|s| escape(s)).collect::<Vec<_>>().join("|"))
+}
+
+/// The letter starting with `c`: `c` and the marks after it in `chars` from `i`, and the index
+/// after them.
+fn take_letter(c: char, chars: &[char], mut i: usize) -> (String, usize) {
+    let mut out = String::from(c);
+    while let Some(&m) = chars.get(i).filter(|&&m| is_mark(m)) {
+        out.push(m);
+        i += 1;
+    }
+    (out, i)
+}
+
+/// Literal search (no `^` codes), letter by letter.
+fn literal(query: &str, expand: bool) -> String {
+    let chars: Vec<char> = query.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while let Some(&c) = chars.get(i) {
+        let (l, next) = take_letter(c, &chars, i + 1);
+        out.push_str(&letter(&l, expand));
+        i = next;
+    }
+    out
 }
 
 /// What a `^` code stands for in Find what.
@@ -143,14 +197,30 @@ pub fn compile(query: &str, o: &Opts) -> Result<Compiled, String> {
     if query.chars().count() > MAX_PATTERN {
         return Err(format!("the Find what text is longer than {MAX_PATTERN} characters"));
     }
+    let pattern = translate(query, o, true)?;
+    let exact = translate(query, o, false)?;
+    // Word's wildcard search always matches case.
+    let case_insensitive = !o.match_case && (!o.wildcards || o.regex);
+    Ok(Compiled {
+        fallback: (exact.0 != pattern.0).then_some(exact.0),
+        pattern: pattern.0,
+        case_insensitive,
+        spans_paras: pattern.1,
+        whole_letters: !o.regex && !o.wildcards,
+    })
+}
+
+/// The regular expression for `query`, and whether it can match a paragraph mark. With `expand`,
+/// each letter of a normal or literal search is every spelling of it.
+fn translate(query: &str, o: &Opts, expand: bool) -> Result<(String, bool), String> {
     let (pat, spans) = if o.regex {
         (query.to_string(), false)
     } else if o.literal {
-        (escape(query), false)
+        (literal(query, expand), false)
     } else if o.wildcards {
         wildcards(query)?
     } else {
-        special(query, o)
+        special(query, o, expand)
     };
     let wrap = |p: String| format!("(?:{p})");
     let pat = if o.wildcards && !o.regex {
@@ -165,13 +235,11 @@ pub fn compile(query: &str, o: &Opts) -> Result<Compiled, String> {
             (false, false) => pat,
         }
     };
-    // Word's wildcard search always matches case.
-    let case_insensitive = !o.match_case && (!o.wildcards || o.regex);
-    Ok(Compiled { pattern: pat, case_insensitive, spans_paras: spans })
+    Ok((pat, spans))
 }
 
 /// Normal search: literal text with `^` codes, optionally skipping punctuation and white space.
-fn special(query: &str, o: &Opts) -> (String, bool) {
+fn special(query: &str, o: &Opts, expand: bool) -> (String, bool) {
     let chars: Vec<char> = query.chars().collect();
     let mut atoms: Vec<String> = Vec::new();
     let mut spans = false;
@@ -198,7 +266,9 @@ fn special(query: &str, o: &Opts) -> (String, bool) {
         if (o.ignore_punct && is_punct(c)) || (o.ignore_space && is_space(c)) {
             continue;
         }
-        atoms.push(lit(c));
+        let (l, next) = take_letter(c, &chars, i);
+        atoms.push(letter(&l, expand));
+        i = next;
     }
     let filler = match (o.ignore_punct, o.ignore_space) {
         (true, true) => r"[\p{P} \t\x{A0}]*",

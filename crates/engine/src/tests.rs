@@ -760,6 +760,55 @@ fn find_replace_wildcards() {
 }
 
 #[test]
+fn find_matches_precomposed_and_decomposed_letters_alike() {
+    // Text pasted from a PDF or a macOS file name is often decomposed (e + U+0302 + U+0303);
+    // a name typed with an input method is precomposed (ễ). Find, Replace and the Navigation
+    // search treat the two spellings, and the half-composed ones, as the same letter.
+    let nfd = "Nguye\u{302}\u{303}n Thi\u{323} Ngo\u{323}c A\u{301}nh – Phòng Kế toán";
+    let mut s = s();
+    run(&mut s, "document.setText", json!({"text": nfd}));
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Nguyễn Thị Ngọc Ánh"}))["count"], 1);
+    // The selection is the original text, decomposed as it was.
+    assert_eq!(s.sel.ordered().1.off - s.sel.ordered().0.off, "Nguye\u{302}\u{303}n Thi\u{323} Ngo\u{323}c A\u{301}nh".len());
+    // A decomposed query finds precomposed text, and marks of different classes match in either order.
+    run(&mut s, "document.setText", json!({"text": "Tiếng Việt, tiê\u{301}ng Viê\u{323}t, tie\u{323}\u{302}ng Vie\u{302}\u{323}t, Viet"}));
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Vie\u{323}\u{302}t"}))["count"], 3);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Việt"}))["count"], 3);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "tiếng"}))["count"], 2);
+    // Match case still tells VIỆT from Việt, in both spellings.
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "VIỆT", "matchCase": true}))["count"], 0);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "VIỆT", "matchCase": false}))["count"], 3);
+    // Whole letters: `e` and `ê` do not match inside a decomposed ệ, as they don't inside ệ.
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Vie", "matchCase": false}))["count"], 1);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Viê"}))["count"], 0);
+    // Whole words and literal searches too.
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "viet", "wholeWord": true}))["count"], 1);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Việt", "wholeWord": true, "special": false}))["count"], 3);
+    // Replace All changes only the matches; the rest keeps its spelling.
+    let r = run(&mut s, "edit.replaceAll", json!({"text": "Việt", "with": "VIỆT", "wholeWord": false, "special": true}));
+    assert_eq!(r["replaced"], 3);
+    assert_eq!(text(&s), "Tiếng VIỆT, tiê\u{301}ng VIỆT, tie\u{323}\u{302}ng VIỆT, Viet");
+    // Wildcards and regular expressions are the user's own patterns: unchanged.
+    run(&mut s, "document.setText", json!({"text": "Vie\u{302}\u{323}t"}));
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Việt", "wildcards": true}))["count"], 0);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Việt", "wildcards": false, "regex": true}))["count"], 0);
+    // The longest query, all Vietnamese letters with stacked marks, still compiles and runs.
+    run(&mut s, "document.setText", json!({"text": "Nguye\u{302}\u{303}n"}));
+    // A realistic long query (1,024 characters of names) gets every spelling; the longest query of
+    // stacked-mark letters is too large for that and falls back to its own spelling.
+    let names: String = "Nguyễn Thị Ngọc Ánh ".chars().cycle().take(wordcraft_engine_find_max()).collect();
+    assert_eq!(run(&mut s, "edit.find", json!({"text": names}))["count"], 0);
+    let long: String = "ệ".repeat(wordcraft_engine_find_max());
+    run(&mut s, "document.setText", json!({"text": &long}));
+    assert_eq!(run(&mut s, "edit.find", json!({"text": &long, "regex": false}))["count"], 1);
+}
+
+/// Longest Find what text, in characters.
+fn wordcraft_engine_find_max() -> usize {
+    crate::cmd::find_pattern::MAX_PATTERN
+}
+
+#[test]
 fn hostile_find_patterns_are_bounded() {
     let mut s = s();
     run(&mut s, "document.setText", json!({"text": &"a".repeat(5000)}));
