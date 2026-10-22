@@ -784,13 +784,15 @@ fn page_number(s: &mut Session, v: &Value) -> CmdResult {
         return sel_result(s);
     }
     let header = position == "top";
+    let style = if header { "Header" } else { "Footer" };
     let id = hf_part(s, header);
-    let mut para = Paragraph::new().styled(if header { "Header" } else { "Footer" });
+    let mut para = Paragraph::new().styled(style);
     para.props.align = Some(align);
     para.props.tabs = Some(vec![TabStop { pos: 0.0, align: TabAlign::Clear, leader: Default::default() }]);
     if x_of_y {
-        para.insert_text(0, "Page  of ", &CharProps::default())?;
-        para.insert_object(5, field, &CharProps { bold: Some(true), ..Default::default() })?;
+        let (before, between) = page_x_of_y_words(label_lang(s, style).as_deref());
+        para.insert_text(0, &format!("{before}{between}"), &CharProps::default())?;
+        para.insert_object(before.len(), field, &CharProps { bold: Some(true), ..Default::default() })?;
         let end = para.len();
         para.insert_object(
             end,
@@ -802,6 +804,29 @@ fn page_number(s: &mut Session, v: &Value) -> CmdResult {
     }
     s.doc.set_story(StoryRef::Part(id), vec![para_block(para)])?;
     Ok(json!({"story": id}))
+}
+
+/// The words around the numbers of "Page X of Y" in language `lang`: Vietnamese writes
+/// "Trang X / Y" (standard Vietnamese usage; Word's own Vietnamese text is not observed), every
+/// other language English for now.
+fn page_x_of_y_words(lang: Option<&str>) -> (&'static str, &'static str) {
+    if wordcraft_doc::section::is_vietnamese(lang) { ("Trang ", " / ") } else { ("Page ", " of ") }
+}
+
+/// The language a built-in label such as "Page X of Y" is written in, in a paragraph of style
+/// `style`: the paragraph's (the style's, through the document defaults, else the editing
+/// language). When that is only WordCraft's default for new documents — US English, with no
+/// editing language chosen, as in a headless session — the system region's language stands in
+/// for it, as Word writes its gallery text in the language it is set up for (a Vietnamese system
+/// gets "Trang X / Y").
+fn label_lang(s: &Session, style: &str) -> Option<String> {
+    let lang = s.doc.styles.resolve_char(Some(style), &CharProps::default()).lang.or_else(|| super::default_lang(s));
+    let only_the_default = lang.as_deref().is_none_or(|l| l.eq_ignore_ascii_case("en-US"));
+    let region = s.region().language;
+    if only_the_default && s.editing_lang.is_none() && s.prefs.default_language.is_none() && !region.is_empty() {
+        return Some(region);
+    }
+    lang
 }
 
 fn date_time(s: &mut Session, v: &Value) -> CmdResult {
@@ -982,6 +1007,77 @@ fn cover_page(s: &mut Session, v: &Value) -> CmdResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn footer_text(s: &Session) -> String {
+        let id = s.doc.last_section.footers.default.unwrap();
+        s.doc.plain_text(StoryRef::Part(id))
+    }
+
+    /// C-14b: "Page X of Y" is written in the footer's language: "Trang X / Y" in a Vietnamese
+    /// document (or, with none set, on a Vietnamese system), English otherwise.
+    #[test]
+    fn page_x_of_y_follows_the_language() {
+        let x_of_y = json!({"position": "bottom", "format": "x of y"});
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Page 1 of 1");
+
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Trang 1 / 1");
+        let id = s.doc.last_section.footers.default.unwrap();
+        let path = s.doc.para_paths(StoryRef::Part(id)).remove(0);
+        let p = s.doc.para(StoryRef::Part(id), &path).unwrap();
+        let instrs: Vec<&str> =
+            p.objects.iter().filter_map(|o| if let InlineObject::Field { instr, .. } = o { Some(instr.as_str()) } else { None }).collect();
+        assert_eq!(instrs, ["PAGE", "NUMPAGES"]);
+        assert_eq!(p.object_offsets(), [6, 12]);
+
+        // No language anywhere: the system region's.
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.system_region = wordcraft_geom::Region::from_tag("vi_VN.UTF-8");
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Trang 1 / 1");
+        // A language the document chose wins over the region's; US English, the language every
+        // blank document starts in when no editing language is set, doesn't.
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.system_region = wordcraft_geom::Region::from_tag("vi-VN");
+        s.run("review.language", &json!({"lang": "en-GB", "default": true})).unwrap();
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Page 1 of 1");
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.system_region = wordcraft_geom::Region::from_tag("vi-VN");
+        s.set_editing_language(Some("en-US"));
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Page 1 of 1", "an English editing language");
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.system_region = wordcraft_geom::Region::from_tag("fr-FR");
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Page 1 of 1", "languages other than Vietnamese are English for now");
+    }
+
+    /// PAGE and NUMPAGES with `\* CardText` in a Vietnamese footer are drawn in Vietnamese words.
+    #[test]
+    fn page_words_in_a_vietnamese_footer() {
+        let mut s = Session::new(wordcraft_doc::Document::from_text("One"));
+        s.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();
+        s.run("insert.pageBreak", &json!({})).unwrap();
+        s.run("insert.editFooter", &json!({})).unwrap();
+        s.run("insert.field", &json!({"instr": r"PAGE \* CardText"})).unwrap();
+        s.run("text.insert", &json!({"text": " / "})).unwrap();
+        s.run("insert.field", &json!({"instr": r"NUMPAGES \* CardText"})).unwrap();
+        s.run("insert.closeHeader", &json!({})).unwrap();
+        let l = s.layout();
+        // The field results drawn in page 2's footer.
+        let mut shown_results = Vec::new();
+        for it in l.pages.get(1).map(|p| p.footer.as_slice()).unwrap_or_default() {
+            if let wordcraft_layout::Placed::Lines { para, .. } = it {
+                shown_results.extend(para.shown.iter().map(|(_, shown, _)| shown.clone()));
+            }
+        }
+        assert_eq!(shown_results, ["hai", "hai"]);
+    }
 
     /// Closing the header or footer (Esc, the ribbon) puts the caret back where it was in the
     /// body, not on page 1 (#3331).
