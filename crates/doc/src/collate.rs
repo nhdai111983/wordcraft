@@ -401,10 +401,18 @@ const COMPOSE: &[(char, char, char)] = &[
     ('z', '\u{30c}', 'ž'),
     ('е', '\u{308}', 'ё'),
     ('и', '\u{306}', 'й'),
+    ('Е', '\u{308}', 'Ё'),
+    ('И', '\u{306}', 'Й'),
 ];
 
 /// Whether `c` is a combining mark the key attaches to the element before it.
 fn is_mark(c: char) -> bool {
+    is_combining_mark(c)
+}
+
+/// Whether `c` is a combining mark of U+0300–U+036F, the marks that belong to the letter before
+/// them here: collation keys, whole-letter matches and [`equivalent_spellings`].
+pub fn is_combining_mark(c: char) -> bool {
     ('\u{300}'..='\u{36f}').contains(&c)
 }
 
@@ -420,16 +428,13 @@ fn lower_canonical(s: &str) -> String {
 /// the canonical tables cover Latin only, so the precomposed `ё` and `й` stay as they are and
 /// the decomposed spellings must compose to match them (rule 1).
 fn compose_outside_tables(text: String) -> String {
-    if !text.chars().any(|c| ('\u{400}'..='\u{4ff}').contains(&c)) {
+    if !text.chars().any(is_cyrillic) {
         return text;
     }
     let mut out = String::with_capacity(text.len());
     let mut base = None;
     for c in text.chars() {
-        let composed = base
-            .take()
-            .filter(|b| ('\u{400}'..='\u{4ff}').contains(b))
-            .and_then(|b| COMPOSE.iter().find(|(x, m, _)| *x == b && *m == c).map(|(_, _, k)| *k));
+        let composed = base.take().filter(|&b| is_cyrillic(b)).and_then(|b| COMPOSE.iter().find(|(x, m, _)| *x == b && *m == c).map(|(_, _, k)| *k));
         if let Some(k) = composed {
             out.pop();
             out.push(k);
@@ -671,8 +676,10 @@ fn is_cyrillic(c: char) -> bool {
 /// (`ê` U+0323, `ẹ` U+0302) and decomposed with the marks in any order that keeps their meaning
 /// (`e` U+0323 U+0302 and `e` U+0302 U+0323, but not reordering two marks of one combining class).
 /// Case is kept. It covers the Latin letters of the canonical tables (U+00C0–U+024F,
-/// U+1E00–U+1EFF, marks U+0300–U+036F) and Cyrillic `ё` and `й`; any other letter, a letter with
-/// more than four marks, or a `letter` holding more than one base character has only itself. Find
+/// U+1E00–U+1EFF, marks U+0300–U+036F) and Cyrillic `ё`, `й`, `Ё`, `Й`; any other letter, a letter
+/// with more than four marks, or a `letter` holding more than one base character has only itself.
+/// The deprecated marks U+0340, U+0341, U+0343 and U+0344 are read as the marks they stand for but
+/// are not offered as spellings, so `á` does not find `a` U+0341. Find
 /// builds its pattern from this, so a search typed one way finds text written another way while
 /// the text itself is never changed.
 pub fn equivalent_spellings(letter: &str) -> Vec<String> {
@@ -688,7 +695,7 @@ pub fn equivalent_spellings(letter: &str) -> Vec<String> {
         }
     }
     let Some((&base, marks)) = full.split_first() else { return out };
-    if marks.len() > MAX_SPELLING_MARKS || !marks.iter().all(|&m| is_mark(m)) {
+    if marks.is_empty() || marks.len() > MAX_SPELLING_MARKS || !marks.iter().all(|&m| is_mark(m)) {
         return out;
     }
     // Heads: the base alone, or a precomposed character whose decomposition is the base and some
@@ -837,6 +844,8 @@ mod tests {
         // Cyrillic ё and й, the tone marks U+0340/U+0341, and inputs that are not one letter.
         assert_eq!(set("ё"), ["е\u{308}", "ё"]);
         assert_eq!(set("и\u{306}"), ["и\u{306}", "й"]);
+        assert_eq!(set("Ё"), ["Ё", "Е\u{308}"]);
+        assert_eq!(set("И\u{306}"), ["И\u{306}", "Й"]);
         assert!(equivalent_spellings("a\u{341}").contains(&"á".to_string()));
         assert_eq!(equivalent_spellings("ab"), ["ab"]);
         assert_eq!(equivalent_spellings(""), [""]);

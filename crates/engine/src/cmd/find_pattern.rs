@@ -16,6 +16,7 @@
 //! expression patterns are the user's own and are not rewritten.
 
 use regex::escape;
+use wordcraft_doc::collate::{equivalent_spellings, is_combining_mark as is_mark};
 
 /// A paragraph mark in the searched text.
 pub const PARA_MARK: char = '\r';
@@ -25,8 +26,11 @@ pub const SECT_MARK: char = '\u{1D}';
 pub const MAX_PATTERN: usize = 1024;
 /// Largest count in `{n,m}`.
 const MAX_COUNT: u32 = 1000;
-/// Any character except a paragraph mark (`?`, `^?`, `*`).
+/// Any character except a paragraph mark (`?`, `*` with wildcards).
 const ANY: &str = r"[^\r\x{1D}]";
+/// Any character except a paragraph mark, with the combining marks written after it (`^?`), so a
+/// decomposed letter counts as one character.
+const ANY_LETTER: &str = r"[^\r\x{1D}][\x{300}-\x{36F}]*";
 
 /// How the Find what text is read.
 #[derive(Clone, Copy, Debug, Default)]
@@ -62,15 +66,21 @@ pub struct Compiled {
     pub fallback: Option<String>,
 }
 
-/// Whether `c` is a combining mark that belongs to the letter before it (U+0300–U+036F).
-pub fn is_mark(c: char) -> bool {
-    ('\u{300}'..='\u{36f}').contains(&c)
-}
-
 /// One letter of Find what as a regex atom: every canonically equivalent spelling of it when
-/// `expand`, else the letter as typed.
-fn letter(letter: &str, expand: bool) -> String {
-    let spellings = if expand { wordcraft_doc::collate::equivalent_spellings(letter) } else { Vec::new() };
+/// `expand`, else the letter as typed. When the search ignores case, the spellings of the
+/// letter's other case join in: a precomposed letter may exist in one case only (`ẘ` but no
+/// capital), and `W` U+030A must still find it.
+fn letter(letter: &str, expand: bool, any_case: bool) -> String {
+    let mut spellings = if expand { equivalent_spellings(letter) } else { Vec::new() };
+    if expand && any_case && letter.chars().count() > 1 {
+        for other in [letter.to_lowercase(), letter.to_uppercase()] {
+            for sp in equivalent_spellings(&other) {
+                if !spellings.contains(&sp) {
+                    spellings.push(sp);
+                }
+            }
+        }
+    }
     if spellings.len() <= 1 {
         return letter.chars().map(lit).collect();
     }
@@ -89,13 +99,13 @@ fn take_letter(c: char, chars: &[char], mut i: usize) -> (String, usize) {
 }
 
 /// Literal search (no `^` codes), letter by letter.
-fn literal(query: &str, expand: bool) -> String {
+fn literal(query: &str, expand: bool, any_case: bool) -> String {
     let chars: Vec<char> = query.chars().collect();
     let mut out = String::new();
     let mut i = 0;
     while let Some(&c) = chars.get(i) {
         let (l, next) = take_letter(c, &chars, i + 1);
-        out.push_str(&letter(&l, expand));
+        out.push_str(&letter(&l, expand, any_case));
         i = next;
     }
     out
@@ -107,9 +117,10 @@ fn find_code(c: char) -> Option<&'static str> {
         'p' => r"\r",
         'b' => r"\x{1D}",
         't' => r"\t",
-        '?' => ANY,
+        '?' => ANY_LETTER,
         '#' => "[0-9]",
-        '$' => r"\p{L}",
+        // A letter with the marks written after it, so a decomposed letter is one letter too.
+        '$' => r"\p{L}[\x{300}-\x{36F}]*",
         '^' => r"\^",
         'l' => r"\n",
         'm' => r"\x{0C}",
@@ -216,7 +227,7 @@ fn translate(query: &str, o: &Opts, expand: bool) -> Result<(String, bool), Stri
     let (pat, spans) = if o.regex {
         (query.to_string(), false)
     } else if o.literal {
-        (literal(query, expand), false)
+        (literal(query, expand, !o.match_case), false)
     } else if o.wildcards {
         wildcards(query)?
     } else {
@@ -257,8 +268,10 @@ fn special(query: &str, o: &Opts, expand: bool) -> (String, bool) {
             }
             if let Some((ch, used)) = numeric_code(&chars, i) {
                 spans |= ch == PARA_MARK;
-                atoms.push(lit(ch));
-                i += used;
+                // A letter typed by its code (`^u7879`, ệ) is a letter like any other.
+                let (l, next) = take_letter(ch, &chars, i + used);
+                atoms.push(letter(&l, expand, !o.match_case));
+                i = next;
                 continue;
             }
             // Not a code: the caret itself.
@@ -267,7 +280,7 @@ fn special(query: &str, o: &Opts, expand: bool) -> (String, bool) {
             continue;
         }
         let (l, next) = take_letter(c, &chars, i);
-        atoms.push(letter(&l, expand));
+        atoms.push(letter(&l, expand, !o.match_case));
         i = next;
     }
     let filler = match (o.ignore_punct, o.ignore_space) {

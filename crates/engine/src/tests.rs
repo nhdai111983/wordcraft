@@ -792,20 +792,31 @@ fn find_matches_precomposed_and_decomposed_letters_alike() {
     run(&mut s, "document.setText", json!({"text": "Vie\u{302}\u{323}t"}));
     assert_eq!(run(&mut s, "edit.find", json!({"text": "Việt", "wildcards": true}))["count"], 0);
     assert_eq!(run(&mut s, "edit.find", json!({"text": "Việt", "wildcards": false, "regex": true}))["count"], 0);
-    // The longest query, all Vietnamese letters with stacked marks, still compiles and runs.
-    run(&mut s, "document.setText", json!({"text": "Nguye\u{302}\u{303}n"}));
-    // A realistic long query (1,024 characters of names) gets every spelling; the longest query of
-    // stacked-mark letters is too large for that and falls back to its own spelling.
-    let names: String = "Nguyễn Thị Ngọc Ánh ".chars().cycle().take(wordcraft_engine_find_max()).collect();
-    assert_eq!(run(&mut s, "edit.find", json!({"text": names}))["count"], 0);
-    let long: String = "ệ".repeat(wordcraft_engine_find_max());
+    // `^$` (any letter), `^?` (any character) and a letter typed by its code take a decomposed
+    // letter whole.
+    run(&mut s, "document.setText", json!({"text": "Việt Vie\u{302}\u{323}t"}));
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Vi^$t", "regex": false}))["count"], 2);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Vi^?t"}))["count"], 2);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Vi^u7879t"}))["count"], 2);
+    // Capital Cyrillic Ё and Й; and a capital typed decomposed finds a letter precomposed only in
+    // lower case (ẘ) when case is ignored.
+    run(&mut s, "document.setText", json!({"text": "Е\u{308}лкин Ёлкин И\u{306}орк ẘ"}));
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Ёлкин", "matchCase": true}))["count"], 2);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "ёлкин", "matchCase": false}))["count"], 2);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "ЁЛКИН"}))["count"], 2);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "Йорк", "matchCase": true}))["count"], 1);
+    assert_eq!(run(&mut s, "edit.find", json!({"text": "W\u{30a}", "matchCase": false}))["count"], 1);
+    // The longest query of names (1,024 characters) still gets every spelling: it finds the names
+    // written decomposed.
+    let max = crate::cmd::find_pattern::MAX_PATTERN;
+    let names: String = "Nguyễn Thị Ngọc Ánh ".chars().cycle().take(max).collect();
+    let decomposed: String = "Nguye\u{302}\u{303}n Thi\u{323} Ngo\u{323}c A\u{301}nh ".chars().cycle().take(max * 2).collect();
+    run(&mut s, "document.setText", json!({"text": &decomposed}));
+    assert!(run(&mut s, "edit.find", json!({"text": &names}))["count"].as_u64().is_some_and(|n| n >= 1));
+    // A query too large to expand (1,024 stacked-mark letters) falls back to its own spelling.
+    let long: String = "ệ".repeat(max);
     run(&mut s, "document.setText", json!({"text": &long}));
     assert_eq!(run(&mut s, "edit.find", json!({"text": &long, "regex": false}))["count"], 1);
-}
-
-/// Longest Find what text, in characters.
-fn wordcraft_engine_find_max() -> usize {
-    crate::cmd::find_pattern::MAX_PATTERN
 }
 
 #[test]

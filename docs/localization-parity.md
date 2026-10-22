@@ -163,7 +163,8 @@ not unified yet. Sorting never
 changes the text itself. Find, Replace and the Navigation search match a letter however it is
 written (precomposed, half-composed or decomposed, marks of different classes in either order;
 the same letters as above), and a match never ends inside a letter, so `e` does not find the `e` of
-a decomposed `ễ`; Use wildcards and regular-expression patterns are matched as typed. Sort accepts a Sorting language (Table › Sort
+a decomposed `ễ`; `^$` (any letter), `^?` (any character) and a letter typed by its `^u` code take
+a decomposed letter whole. Use wildcards and regular-expression patterns are matched as typed. Sort accepts a Sorting language (Table › Sort
 dialog, or `lang` on `table.sort` and `para.sort`; Column language, the first language marked on
 the column's cells, by default) and Case sensitive (lower case before upper case among
 otherwise equal texts). Mail merge "contains" conditions match whole letters, so `e` does not
