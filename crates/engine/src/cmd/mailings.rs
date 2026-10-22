@@ -755,6 +755,29 @@ fn mergefield_name(instr: &str) -> Option<String> {
     Some(name.to_string())
 }
 
+/// A MERGEFIELD's switches: its text after the field name (`\* CardText`, `\# "#,##0"`).
+fn mergefield_switches(instr: &str) -> &str {
+    let Some(rest) = instr.trim().strip_prefix("MERGEFIELD") else { return "" };
+    let rest = rest.trim_start();
+    let after = match rest.strip_prefix('"') {
+        Some(r) => r.find('"').and_then(|i| r.get(i + 1..)),
+        None => rest.find(char::is_whitespace).and_then(|i| rest.get(i..)),
+    };
+    after.unwrap_or("")
+}
+
+/// A record's `raw` value as a MERGEFIELD with `instr` shows it in language `lang`: a number
+/// under a `\*` number format (`\* CardText` writes words in that language) or a `\#` picture,
+/// then the case switches (`\* Upper`…). Text that isn't a number keeps its words.
+fn merge_value_text(raw: String, instr: &str, lang: Option<&str>) -> String {
+    let switches = mergefield_switches(instr);
+    if !switches.contains('\\') {
+        return raw;
+    }
+    let numbered = super::table_formula::parse_number(&raw, lang).and_then(|x| super::table_formula::number_switch_text(x, switches, lang));
+    super::table_formula::apply_case_switch(numbered.unwrap_or(raw), switches)
+}
+
 /// Which columns hold address parts.
 fn address_map(headers: &[String]) -> Value {
     let find = |names: &[&str]| headers.iter().find(|h| names.iter().any(|n| h.replace([' ', '_'], "").eq_ignore_ascii_case(n))).cloned();
@@ -838,10 +861,10 @@ fn keyword(instr: &str) -> String {
 }
 
 /// Evaluate a merge-related field for a record (None = not a merge field).
-fn act(s: &Session, instr: &str, row: usize) -> Option<Act> {
+fn act(s: &Session, instr: &str, row: usize, lang: Option<&str>) -> Option<Act> {
     let t = instr.trim();
     if let Some(n) = mergefield_name(t) {
-        return Some(Act::Text(value(s, row, &n)));
+        return Some(Act::Text(merge_value_text(value(s, row, &n), t, lang)));
     }
     Some(match keyword(t).as_str() {
         "ADDRESSBLOCK" => Act::Text(address_block(s, row)),
@@ -902,9 +925,10 @@ pub fn refresh(s: &mut Session) {
                         if !preview {
                             return Some((k, shown));
                         }
+                        let lang = super::references::field_lang(s, p, k);
                         Some((
                             k,
-                            match act(s, instr, cur) {
+                            match act(s, instr, cur, lang.as_deref()) {
                                 Some(Act::Text(t)) => t,
                                 Some(Act::Next) => {
                                     cur = cur.saturating_add(1).min(last);
@@ -1085,7 +1109,8 @@ fn merge_blocks(s: &Session, blocks: &mut Blocks, cur: &mut usize, end: usize, d
                 for off in p.object_offsets() {
                     let Some(InlineObject::Field { instr, .. }) = p.object_at(off) else { continue };
                     let row = if *cur < end { *cur } else { s.merge.rows.len() };
-                    match act(s, instr, row) {
+                    let lang = super::references::lang_at(s, p, off);
+                    match act(s, instr, row, lang.as_deref()) {
                         Some(Act::Text(t)) => repl.push((off, t)),
                         Some(Act::Next) => {
                             *cur = cur.saturating_add(1).min(end);
@@ -1547,6 +1572,63 @@ mod tests {
         s.run("mailings.insertField", &json!({"field": "Name"})).unwrap();
         s.run("mailings.finish", &json!({})).unwrap();
         s.doc.plain_text(StoryRef::Body)
+    }
+
+    /// The merged text of one MERGEFIELD `instr` over `rows`, in a document in language `lang`.
+    fn merged_with(lang: Option<&str>, instr: &str, rows: Value) -> String {
+        let mut s = Session::new(Document::new());
+        if let Some(lang) = lang {
+            s.run("review.language", &json!({"lang": lang, "default": true})).unwrap();
+        }
+        s.run("mailings.recipients", &json!({ "rows": rows })).unwrap();
+        s.run("mailings.start", &json!({"kind": "directory"})).unwrap();
+        s.run("insert.field", &json!({"instr": instr})).unwrap();
+        s.run("mailings.finish", &json!({})).unwrap();
+        s.doc.plain_text(StoryRef::Body)
+    }
+
+    /// C-14b: a MERGEFIELD's `\*` and `\#` switches format the record's value: CardText in the
+    /// field's language, numeric pictures, case switches. Text that isn't a number is kept.
+    #[test]
+    fn mergefield_switches_format_the_value() {
+        let rows = json!([{"Số tiền": "1250000"}, {"Số tiền": "21000000"}, {"Số tiền": "105"}, {"Số tiền": "abc"}, {"Số tiền": "-7"}]);
+        let vi = Some("vi-VN");
+        assert_eq!(
+            merged_with(vi, r#"MERGEFIELD "Số tiền" \* CardText"#, rows.clone()),
+            "một triệu hai trăm năm mươi nghìn\nhai mươi mốt triệu\nmột trăm linh năm\nabc\n-7"
+        );
+        assert_eq!(
+            merged_with(vi, r#"MERGEFIELD "Số tiền" \* CardText \* FirstCap"#, rows.clone()),
+            "Một triệu hai trăm năm mươi nghìn\nHai mươi mốt triệu\nMột trăm linh năm\nAbc\n-7"
+        );
+        assert_eq!(merged_with(None, r##"MERGEFIELD "Số tiền" \# "#,##0""##, rows.clone()), "1,250,000\n21,000,000\n105\nabc\n-7");
+        assert_eq!(merged_with(None, r#"MERGEFIELD "Số tiền""#, rows.clone()), "1250000\n21000000\n105\nabc\n-7");
+        let rows = json!([{"N": "21", "Name": "ada"}, {"N": "3", "Name": "bo lin"}]);
+        assert_eq!(merged_with(None, r"MERGEFIELD N \* CardText", rows.clone()), "Twenty-One\nThree");
+        assert_eq!(merged_with(None, r"MERGEFIELD N \* Ordinal", rows.clone()), "21st\n3rd");
+        assert_eq!(merged_with(None, r"MERGEFIELD Name \* Upper", rows.clone()), "ADA\nBO LIN");
+        assert_eq!(merged_with(None, r"MERGEFIELD Name \* Caps", rows), "Ada\nBo Lin");
+        // Junk values and switches never panic.
+        let junk = json!([{"N": "1e400"}, {"N": "99999999999999999999999"}, {"N": "NaN"}, {"N": ""}, {"N": "1.250.000"}]);
+        for instr in [
+            r"MERGEFIELD N \* CardText",
+            r"MERGEFIELD N \* OrdText \* Caps",
+            r#"MERGEFIELD N \# "0000000000000000000000000000""#,
+            r"MERGEFIELD N \*",
+            r#"MERGEFIELD "N"#,
+        ] {
+            merged_with(vi, instr, junk.clone());
+        }
+        assert_eq!(merged_with(vi, r"MERGEFIELD N \* CardText", json!([{"N": "1.250.000"}])), "một triệu hai trăm năm mươi nghìn");
+    }
+
+    #[test]
+    fn mergefield_switch_text() {
+        assert_eq!(mergefield_switches(r#"MERGEFIELD "Số tiền" \* CardText"#), r" \* CardText");
+        assert_eq!(mergefield_switches(r"MERGEFIELD SoTien \# 0"), r" \# 0");
+        assert_eq!(mergefield_switches("MERGEFIELD SoTien"), "");
+        assert_eq!(mergefield_switches(r#"MERGEFIELD "unterminated \* x"#), "");
+        assert_eq!(mergefield_switches("IF x"), "");
     }
 
     /// #427: SKIPIF leaves out the recipients that match its condition.
