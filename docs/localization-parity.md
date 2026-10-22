@@ -1,6 +1,6 @@
 # Localization parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-23 · **Change:** minor (Vietnamese numbers in words for CardText/OrdText fields, `=` fields outside tables, MERGEFIELD switches and "Trang X / Y"; previously trivial: Slovenian interface catalog: every key of every other catalog, 2,614 entries; previously minor: Romanian interface catalog; previously trivial: the File › Home greeting is translated in every catalog; previously trivial: Japanese row: ruby (Phonetic Guide) is supported and HTML export/import keeps it, #1681; previously trivial: Russian sorting keeps ё with е and recognises decomposed ё/й; previously minor: English dialects: en-GB, en-CA, en-AU and the other British-spelling Englishes proof their own spellings and flag the other dialect's, #1281, #1045; previously minor: how to install the Hunspell dictionaries on Windows, macOS and Linux: `docs/spelling-dictionaries.md`; previously minor: Read Aloud speaks each sentence in its own language, #1843; previously minor: Indonesian proofing: id-ID spelling from the installed Hunspell dictionary, dictionary-driven suggestions, generic checks with Indonesian messages, #498; previously trivial: print-area strings translated in every catalog; previously trivial: Italian: the interface audit checks the Italian catalog, `Privacy Settings` wording; previously trivial: Italian grammar: `po'`, `qual è`, `È`, `un`/`un'` rules; more elisions and truncations in spelling; previously trivial: Czech interface catalog completed, 2,447 entries; previously trivial: interface audit runs in CI again: size labels translated, 20 strings in every catalog, Read Aloud error race fixed, #1128; previously trivial: Review › Language reaches every language again — Set Proofing Language… and Set As Default, #860; previously minor: Italian proofing: it-IT spelling from the installed Hunspell dictionary, accent-first suggestions, conservative grammar with Italian messages; previously minor: Portuguese proofing; previously trivial: Turkish interface catalog completed, 2,325 entries, #774; previously minor: Hungarian interface added; previously trivial: sorting and table numbers follow the text's language, #836, #837; previously minor: Polish interface; Polish proofing — spelling, grammar, hyphenation — and a proofing language per run; previously minor: Turkish interface added; previously major: first version; catalogs measured from `crates/ui-egui/src/i18n`, Word's languages from its bundle listing) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-23 · **Change:** trivial (review fixes to Vietnamese number fields: bookmarks in formulas, English past 999,999, Trang X / Y only in new documents, case and chained switches; previously minor: Vietnamese numbers in words for CardText/OrdText fields, `=` fields outside tables, MERGEFIELD switches and "Trang X / Y"; previously trivial: Slovenian interface catalog: every key of every other catalog, 2,614 entries; previously minor: Romanian interface catalog; previously trivial: the File › Home greeting is translated in every catalog; previously trivial: Japanese row: ruby (Phonetic Guide) is supported and HTML export/import keeps it, #1681; previously trivial: Russian sorting keeps ё with е and recognises decomposed ё/й; previously minor: English dialects: en-GB, en-CA, en-AU and the other British-spelling Englishes proof their own spellings and flag the other dialect's, #1281, #1045; previously minor: how to install the Hunspell dictionaries on Windows, macOS and Linux: `docs/spelling-dictionaries.md`; previously minor: Read Aloud speaks each sentence in its own language, #1843; previously minor: Indonesian proofing: id-ID spelling from the installed Hunspell dictionary, dictionary-driven suggestions, generic checks with Indonesian messages, #498; previously trivial: print-area strings translated in every catalog; previously trivial: Italian: the interface audit checks the Italian catalog, `Privacy Settings` wording; previously trivial: Italian grammar: `po'`, `qual è`, `È`, `un`/`un'` rules; more elisions and truncations in spelling; previously trivial: Czech interface catalog completed, 2,447 entries; previously trivial: interface audit runs in CI again: size labels translated, 20 strings in every catalog, Read Aloud error race fixed, #1128; previously trivial: Review › Language reaches every language again — Set Proofing Language… and Set As Default, #860; previously minor: Italian proofing: it-IT spelling from the installed Hunspell dictionary, accent-first suggestions, conservative grammar with Italian messages; previously minor: Portuguese proofing; previously trivial: Turkish interface catalog completed, 2,325 entries, #774; previously minor: Hungarian interface added; previously trivial: sorting and table numbers follow the text's language, #836, #837; previously minor: Polish interface; Polish proofing — spelling, grammar, hyphenation — and a proofing language per run; previously minor: Turkish interface added; previously major: first version; catalogs measured from `crates/ui-egui/src/i18n`, Word's languages from its bundle listing) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 Interface languages, script support and proofing per language. How translation works (catalog
 format, adding a language, clean-room rule): `crates/ui-egui/src/i18n/mod.rs`.
@@ -166,26 +166,44 @@ Russian (`ru`) sorting keeps ё with е (a secondary diaeresis difference), befo
 ### Numbers in words and "Page X of Y" (Vietnamese)
 
 Field results follow the language of the field's run (its `w:lang`, through the paragraph style
-and the document defaults, else the editing language). `\* CardText` and `\* OrdText` write
-Vietnamese words in a `vi` run (any region) and English everywhere else, unchanged
-(`crates/doc/src/vi_numbers.rs`, `NumFormat::format_in`): on `PAGE`, `NUMPAGES`, `SECTIONPAGES`,
-`SECTION`, `PAGEREF` and `SEQ`, on `=` formula fields (in a table or, since C-14b, anywhere in the
-text: `{ = 1250000 \* CardText }` → "một triệu hai trăm năm mươi nghìn") and on `MERGEFIELD`
-results in Finish & Merge and Preview Results. Vietnamese covers every `u64`; English stops at
-999,999 as before. A negative or fractional value is rounded to a whole number first; a negative
-one keeps its digits. The Vietnamese words are **chosen from standard orthography, not observed
-from Word** (Word's output for a `vi-VN` run has not been observed yet): lower case; "mốt" for 1
-after "mươi"; "lăm" for 5 after "mười"/"mươi"; "tư" for 4 after "mươi" ("mười bốn", "linh
-bốn"); "linh" for a zero tens digit (105 = "một trăm linh năm"); "không trăm" inside larger
-numbers (1 005 = "một nghìn không trăm linh năm"); "nghìn", "triệu", "tỷ", and "tỷ" repeating
-past it (10^12 = "một nghìn tỷ"); ordinals "thứ nhất", "thứ tư", then "thứ" + the cardinal.
-`\* Upper`, `\* Lower`, `\* Caps` and `\* FirstCap` change the case of `=` and `MERGEFIELD`
-results ("Một triệu…" with FirstCap). Outside a table a formula has no cells: ABOVE, LEFT, cell
-references and ranges give an error result (`!ABOVE refers to table cells…`).
+and the document defaults; Update Field also falls back to the editing language when nothing in
+the document names one, which layout can't, so a document with no `w:lang` anywhere can show
+English words on the page for PAGE while a stored result is in the editing language — new
+documents always name a language). `\* CardText` and `\* OrdText` write Vietnamese words in a
+`vi` run (any region) and English everywhere else (`crates/doc/src/vi_numbers.rs`,
+`NumFormat::format_in`): on `PAGE`, `NUMPAGES`, `SECTIONPAGES`, `SECTION`, `PAGEREF` and `SEQ`, on
+`=` formula fields (in a table or, since C-14b, anywhere in the text:
+`{ = 1250000 \* CardText }` → "một triệu hai trăm năm mươi nghìn") and on `MERGEFIELD` results in
+Finish & Merge and Preview Results. Vietnamese covers every `u64`. English has words up to
+999,999 (unchanged there); a larger number keeps its digits (`1250000`) instead of the words for
+999,999 it showed before — Word shows an error there, which WordCraft doesn't copy. A fractional
+value is rounded to the nearest whole number before it is written in words or another `\*`
+number format (`= 2.5 \* Arabic` → 3, a merged `12.5` with CardText → "mười ba"): a choice, Word
+not observed. A negative value keeps its digits. List and page numbers in the `vietnameseCounting`
+format are Vietnamese words too ("một", "hai", …).
+
+The Vietnamese words are **chosen from standard orthography, not observed from Word** (Word's
+output for a `vi-VN` run has not been observed yet): lower case; "mốt" for 1 after "mươi"; "lăm"
+for 5 after "mười"/"mươi"; "tư" for 4 after "mươi" ("mười bốn", "linh bốn"); "linh" for a zero
+tens digit (105 = "một trăm linh năm"); "không trăm" inside larger numbers (1 005 = "một nghìn
+không trăm linh năm"); "nghìn", "triệu", "tỷ", and "tỷ" repeating past it (10^12 = "một nghìn
+tỷ"); ordinals "thứ nhất", "thứ tư", then "thứ" + the cardinal.
+
+`\* Upper`, `\* Lower`, `\* Caps` and `\* FirstCap` change the case of `=`, `MERGEFIELD`, page
+number (`PAGE`, `NUMPAGES`, `SECTIONPAGES`, `SECTION`, `PAGEREF`) and `SEQ` results ("Một
+triệu…" with FirstCap); switches run together without spaces (`\*CardText\*Upper`) count too.
+A formula reads a bookmark name as the number its text holds (`{ = Total * 2 }`, names matched
+whatever their case). Outside a table a formula has no cells: ABOVE, LEFT, cell references and
+ranges give an error result (`!ABOVE refers to table cells…`). A formula outside a table that
+WordCraft can't work out (an unknown bookmark, a construct it doesn't know) keeps the result
+saved in the file rather than replacing it with an error; one with no saved result shows the error.
 
 Insert › Page Number with "x of y" writes "Trang X / Y" when the footer's language is Vietnamese
-(its style or the document default, else the editing language; when that is only the US English every blank document starts in and no editing language is chosen, as in a headless session, the system region's language), "Page X
-of Y" otherwise; other languages are still English.
+(its style or the document default, else the editing language), "Page X of Y" otherwise; other
+languages are still English. One exception: a new document (not opened from a file) that is only
+in the US English WordCraft gives every blank document when no editing language is chosen — a
+headless session — takes the system region's language, as Word writes this text in the language
+it is set up for. An opened file always follows its own language.
 
 ## Region conventions (#838)
 
@@ -234,6 +252,7 @@ WordCraft keeps 2,54 cm).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | trivial | Review fixes: bookmarks in formulas and saved results kept; English words stop at 999,999 (digits past it); "Trang X / Y" region fallback only for new documents; case switches on page numbers and SEQ, chained switches; fractions rounded (documented); `vietnameseCounting` in Vietnamese words |
 | 2026-10-23 | minor | Vietnamese CardText/OrdText in the field's language (orthography-based, not observed from Word); `=` formula fields evaluate outside tables; MERGEFIELD honours `\*` and `\#`; "Page X of Y" is "Trang X / Y" in Vietnamese (NexusOffices C-14b) |
 | 2026-10-21 | trivial | Japanese row: ruby (Phonetic Guide) is supported over its base text and HTML export/import keeps it (#1681); the row had listed ruby as missing |
 | 2026-10-20 | trivial | Russian sorting keeps ё with е and recognises decomposed ё/й; synthetic ordering, case and index-heading regressions; broader parity estimates unchanged |
