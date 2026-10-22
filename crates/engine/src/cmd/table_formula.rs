@@ -60,7 +60,7 @@ fn evaluate_in(
     if parser.pos != parser.toks.len() {
         return Err(syntax("unexpected text after the formula".into()));
     }
-    let here = Here { t, in_table, doc, default_lang, r, c, g: t.grid_col(r, c), visits: std::cell::Cell::new(0) };
+    let here = Here { t, in_table, doc, default_lang, r, c, g: t.grid_col(r, c), visits: std::cell::Cell::new(0), bookmarks: Default::default() };
     match eval(&expr, &here)? {
         Val::Num(x) => finite(x),
         Val::List(_) => Err(syntax("a range or ABOVE/LEFT/RIGHT/BELOW needs a function, such as SUM".into())),
@@ -316,11 +316,13 @@ fn tokenize(s: &str) -> Result<Vec<Tok>, CmdError> {
             }
             let x = lit.parse::<f64>().map_err(|_| syntax(format!("`{lit}` isn't a number")))?;
             out.push(Tok::Num(x));
-        } else if ch.is_ascii_alphabetic() {
+        } else if ch.is_alphabetic() {
+            // A function, keyword, cell reference or bookmark name (letters of any script,
+            // digits and underscores, as Word allows in bookmark names).
             let mut name = String::new();
             while let Some(&d) = chars.peek() {
-                if d.is_ascii_alphanumeric() {
-                    name.push(d.to_ascii_uppercase());
+                if d.is_alphanumeric() || d == '_' {
+                    name.extend(d.to_uppercase());
                     chars.next();
                 } else {
                     break;
@@ -382,6 +384,8 @@ enum Expr {
     Num(f64),
     /// A cell: (row, grid column).
     Cell(usize, usize, String),
+    /// A bookmark whose text is a number (`= Total * 2`), by its upper-cased name.
+    Bookmark(String),
     /// A rectangle of cells: (row0, grid col0, row1, grid col1), inclusive.
     Range(usize, usize, usize, usize),
     Side(Side),
@@ -535,7 +539,12 @@ impl Parser {
                 if matches!(name.as_str(), "TRUE" | "FALSE") {
                     return Ok(Expr::Call(name, Vec::new()));
                 }
-                let (row, col) = cell_ref(&name).ok_or_else(|| syntax(format!("`{name}` isn't a cell reference or a function")))?;
+                let Some((row, col)) = cell_ref(&name) else {
+                    if self.peek_op(':') {
+                        return Err(syntax(format!("`{name}` isn't a cell reference")));
+                    }
+                    return Ok(Expr::Bookmark(name));
+                };
                 if self.eat_op(':') {
                     let Some(Tok::Name(other)) = self.toks.get(self.pos).cloned() else {
                         return Err(syntax("a range ends with a cell reference, such as B4".into()));
@@ -576,6 +585,8 @@ struct Here<'a> {
     g: usize,
     /// Cells read so far in this evaluation (see [`MAX_CELL_VISITS`]).
     visits: std::cell::Cell<usize>,
+    /// The document's bookmark names, listed on the first bookmark the formula reads.
+    bookmarks: std::cell::OnceCell<Vec<String>>,
 }
 
 impl Here<'_> {
@@ -591,6 +602,19 @@ impl Here<'_> {
             c.blocks.iter().filter_map(|b| b.as_para()).find(|p| !p.plain_text().trim().is_empty()).and_then(|p| super::para_lang(doc, p))
         });
         para_lang.or_else(|| self.default_lang.map(str::to_string))
+    }
+
+    /// The number bookmark `name` (upper-cased, as the formula holds it; bookmark names are
+    /// matched without regard to case) marks, read in the formula's language: Word reads a
+    /// bookmark in a formula as the number its text holds.
+    fn bookmark_number(&self, name: &str) -> Result<f64, CmdError> {
+        self.visit(1)?;
+        let not_found = || CmdError::Failed(format!("{name} is not a bookmark that holds a number"));
+        let doc = self.doc.ok_or_else(not_found)?;
+        let names = self.bookmarks.get_or_init(|| doc.bookmarks().into_iter().map(|(n, _)| n).collect());
+        let real = names.iter().find(|n| n.to_uppercase() == name).ok_or_else(not_found)?;
+        let text = super::references::bookmark_text(doc, real).ok_or_else(not_found)?;
+        parse_number(&text, self.default_lang).ok_or_else(not_found)
     }
 
     fn cell_number(&self, c: &Cell) -> Option<f64> {
@@ -622,7 +646,12 @@ enum Val {
 fn eval(e: &Expr, here: &Here) -> Result<Val, CmdError> {
     Ok(match e {
         Expr::Num(x) => Val::Num(*x),
-        Expr::Cell(_, _, name) if !here.in_table => return Err(not_in_table(name)),
+        // Outside a table a name like `A1` can only be a bookmark.
+        Expr::Cell(_, _, name) if !here.in_table => match here.bookmark_number(name) {
+            Ok(x) => Val::Num(x),
+            Err(_) => return Err(not_in_table(name)),
+        },
+        Expr::Bookmark(name) => Val::Num(here.bookmark_number(name)?),
         Expr::Range(..) if !here.in_table => return Err(not_in_table("a range of cells")),
         Expr::Side(side) if !here.in_table => return Err(not_in_table(side.keyword())),
         Expr::Cell(row, col, name) => {

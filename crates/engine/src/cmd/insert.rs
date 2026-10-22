@@ -815,15 +815,18 @@ fn page_x_of_y_words(lang: Option<&str>) -> (&'static str, &'static str) {
 
 /// The language a built-in label such as "Page X of Y" is written in, in a paragraph of style
 /// `style`: the paragraph's (the style's, through the document defaults, else the editing
-/// language). When that is only WordCraft's default for new documents — US English, with no
-/// editing language chosen, as in a headless session — the system region's language stands in
-/// for it, as Word writes its gallery text in the language it is set up for (a Vietnamese system
-/// gets "Trang X / Y").
+/// language). One exception: a new document (not opened from a file) whose language is only the
+/// US English WordCraft writes new documents in when no editing language is chosen — a headless
+/// session — takes the system region's language instead, as Word writes its gallery text in the
+/// language it is set up for (a Vietnamese system gets "Trang X / Y"). An opened file, or a
+/// session with an editing language, always follows the paragraph.
 fn label_lang(s: &Session, style: &str) -> Option<String> {
     let lang = s.doc.styles.resolve_char(Some(style), &CharProps::default()).lang.or_else(|| super::default_lang(s));
+    let new_document = s.path.is_none();
+    let no_language_chosen = s.editing_lang.is_none() && s.prefs.default_language.is_none();
     let only_the_default = lang.as_deref().is_none_or(|l| l.eq_ignore_ascii_case("en-US"));
     let region = s.region().language;
-    if only_the_default && s.editing_lang.is_none() && s.prefs.default_language.is_none() && !region.is_empty() {
+    if new_document && no_language_chosen && only_the_default && !region.is_empty() {
         return Some(region);
     }
     lang
@@ -1051,20 +1054,31 @@ mod tests {
         s.set_editing_language(Some("en-US"));
         s.run("insert.pageNumber", &x_of_y).unwrap();
         assert_eq!(footer_text(&s), "Page 1 of 1", "an English editing language");
+        // A DOCX that says it is US English stays English on a Vietnamese system.
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.run("review.language", &json!({"lang": "en-US", "default": true})).unwrap();
+        let bytes = crate::io::save_bytes("us.docx", &s.doc).unwrap();
+        let mut s = Session::new(wordcraft_doc::Document::new());
+        s.system_region = wordcraft_geom::Region::from_tag("vi-VN");
+        s.run("file.open", &json!({"path": "us.docx", "data": base64_encode(&bytes)})).unwrap();
+        assert_eq!(s.doc.styles.default_chr.lang.as_deref(), Some("en-US"));
+        s.run("insert.pageNumber", &x_of_y).unwrap();
+        assert_eq!(footer_text(&s), "Page 1 of 1", "an opened file follows its own language");
         let mut s = Session::new(wordcraft_doc::Document::new());
         s.system_region = wordcraft_geom::Region::from_tag("fr-FR");
         s.run("insert.pageNumber", &x_of_y).unwrap();
         assert_eq!(footer_text(&s), "Page 1 of 1", "languages other than Vietnamese are English for now");
     }
 
-    /// PAGE and NUMPAGES with `\* CardText` in a Vietnamese footer are drawn in Vietnamese words.
+    /// PAGE and NUMPAGES with `\* CardText` in a Vietnamese footer are drawn in Vietnamese words,
+    /// in the case a `\* FirstCap` switch asks for.
     #[test]
     fn page_words_in_a_vietnamese_footer() {
         let mut s = Session::new(wordcraft_doc::Document::from_text("One"));
         s.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();
         s.run("insert.pageBreak", &json!({})).unwrap();
         s.run("insert.editFooter", &json!({})).unwrap();
-        s.run("insert.field", &json!({"instr": r"PAGE \* CardText"})).unwrap();
+        s.run("insert.field", &json!({"instr": r"PAGE \* CardText \* FirstCap"})).unwrap();
         s.run("text.insert", &json!({"text": " / "})).unwrap();
         s.run("insert.field", &json!({"instr": r"NUMPAGES \* CardText"})).unwrap();
         s.run("insert.closeHeader", &json!({})).unwrap();
@@ -1076,7 +1090,7 @@ mod tests {
                 shown_results.extend(para.shown.iter().map(|(_, shown, _)| shown.clone()));
             }
         }
-        assert_eq!(shown_results, ["hai", "hai"]);
+        assert_eq!(shown_results, ["Hai", "hai"]);
     }
 
     /// Closing the header or footer (Esc, the ribbon) puts the caret back where it was in the

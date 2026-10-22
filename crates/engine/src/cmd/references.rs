@@ -882,6 +882,7 @@ pub fn update_seq(s: &mut Session) -> Result<(), CmdError> {
             *count = count.saturating_add(1);
         }
         let mut updates: Vec<(usize, String)> = Vec::new();
+        let offsets = p.object_offsets();
         for (k, o) in p.objects.iter().enumerate() {
             let InlineObject::Field { instr, locked: false, .. } = o else { continue };
             let f = FieldCode::parse(instr);
@@ -902,7 +903,14 @@ pub fn update_seq(s: &mut Session) -> Result<(), CmdError> {
                         n.0 = n.0.saturating_add(1);
                     }
                     let fmt = wordcraft_layout::fields::format_switch(instr).unwrap_or_default();
-                    updates.push((k, if f.has('h') { String::new() } else { fmt.format_in(n.0, field_lang(s, p, k).as_deref()) }));
+                    updates.push((
+                        k,
+                        if f.has('h') {
+                            String::new()
+                        } else {
+                            wordcraft_layout::fields::cased(fmt.format_in(n.0, field_lang(s, p, &offsets, k).as_deref()), instr)
+                        },
+                    ));
                 }
                 "STYLEREF" => {
                     let ix = styles.get_or_insert_with(|| wordcraft_layout::styleref::StyleIndex::build(&s.doc));
@@ -976,8 +984,9 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
             continue;
         }
         let mut updates: Vec<(usize, String)> = Vec::new();
+        let offsets = p.object_offsets();
         for (k, o) in p.objects.iter().enumerate() {
-            let InlineObject::Field { instr, locked: false, .. } = o else { continue };
+            let InlineObject::Field { instr, result: cached, locked: false, .. } = o else { continue };
             // A table formula reads the cells around its own cell again; outside a table a
             // formula is plain arithmetic (`{ = 1250000 \* CardText }`), in the field's language.
             if instr.trim_start().starts_with('=') {
@@ -987,8 +996,13 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
                     let default_lang = super::default_lang(s);
                     Some(super::table_formula::evaluate_field_with(t, Some(&s.doc), default_lang.as_deref(), r, c, instr))
                 } else if path.cell().is_none() {
-                    let lang = field_lang(s, p, k);
-                    Some(super::table_formula::evaluate_free_field(Some(&s.doc), lang.as_deref(), instr))
+                    let lang = field_lang(s, p, &offsets, k);
+                    match super::table_formula::evaluate_free_field(Some(&s.doc), lang.as_deref(), instr) {
+                        // A formula WordCraft can't work out (a construct it doesn't know yet)
+                        // keeps the result Word saved rather than replacing it with an error.
+                        Err(_) if !cached.is_empty() => None,
+                        r => Some(r),
+                    }
                 } else {
                     None
                 };
@@ -1011,7 +1025,7 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
                     } else if !has_switch(instr, 'p') {
                         pages.get(target).map(|(num, page_fmt)| {
                             let fmt = wordcraft_layout::fields::format_switch(instr).unwrap_or(*page_fmt);
-                            fmt.format_in(*num, field_lang(s, p, k).as_deref())
+                            wordcraft_layout::fields::cased(fmt.format_in(*num, field_lang(s, p, &offsets, k).as_deref()), instr)
                         })
                     } else {
                         None
@@ -1061,9 +1075,11 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
 
 /// The language a field's result is written in: that of the field's run (its `w:lang`, through
 /// its paragraph's style and the document defaults), else the editing language (as
-/// [`super::default_lang`]). `k` is the field's index among the paragraph's objects.
-pub(crate) fn field_lang(s: &Session, p: &wordcraft_doc::Paragraph, k: usize) -> Option<String> {
-    match p.object_offsets().get(k) {
+/// [`super::default_lang`]). `k` is the field's index among the paragraph's objects, and
+/// `offsets` the paragraph's [`wordcraft_doc::Paragraph::object_offsets`] (worked out once per
+/// paragraph by the caller).
+pub(crate) fn field_lang(s: &Session, p: &wordcraft_doc::Paragraph, offsets: &[usize], k: usize) -> Option<String> {
+    match offsets.get(k) {
         Some(off) => lang_at(s, p, *off),
         None => s.doc.styles.resolve_char(p.props.style.as_deref(), &p.mark).lang.or_else(|| super::default_lang(s)),
     }
@@ -1200,6 +1216,11 @@ mod tests {
         assert_eq!(free_formula(None, "= 2 * 3 + 1"), "7");
         assert_eq!(free_formula(None, r##"= 1234.5 \# "#,##0.00""##), "1,234.50");
         assert_eq!(free_formula(Some("en-US"), r"= 21 \* CardText"), "Twenty-One");
+        // English has words up to 999,999; past that the digits, not words for another number.
+        assert_eq!(free_formula(Some("en-US"), r"= 999999 \* CardText"), "Nine Hundred Ninety-Nine Thousand Nine Hundred Ninety-Nine");
+        assert_eq!(free_formula(Some("en-US"), r"= 1250000 \* CardText"), "1250000");
+        assert_eq!(free_formula(Some("en-US"), r"= 1250000 \* OrdText"), "1250000");
+        assert_eq!(free_formula(Some("vi-VN"), r"= 12.5 \* CardText"), "mười ba", "rounded first (a choice; Word not observed)");
         assert_eq!(free_formula(None, r"= 21 \* CardText \* Upper"), "TWENTY-ONE");
     }
 
@@ -1234,6 +1255,64 @@ mod tests {
         assert_eq!(free_formula(Some("vi-VN"), r"=-5 \* CardText"), "-5");
         assert_eq!(free_formula(Some("vi-VN"), r"=0-0.4 \* CardText"), "không");
         assert_eq!(free_formula(Some("vi-VN"), "=1/0"), "!division by zero");
+    }
+
+    /// A DOCX (in `lang`) whose body paragraph holds `body` (raw WordprocessingML runs).
+    fn docx_with(lang: &str, body: &str) -> Vec<u8> {
+        let ns = r#"xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#;
+        let doc = format!(r#"<?xml version="1.0" encoding="UTF-8"?><w:document {ns}><w:body>{body}<w:sectPr/></w:body></w:document>"#);
+        let styles = format!(
+            r#"<w:styles {ns}><w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="{lang}"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>"#
+        );
+        let root = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>"#;
+        let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name, text) in
+            [("_rels/.rels", root), ("word/document.xml", doc.as_str()), ("word/_rels/document.xml.rels", rels), ("word/styles.xml", styles.as_str())]
+        {
+            zw.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+            std::io::Write::write_all(&mut zw, text.as_bytes()).unwrap();
+        }
+        zw.finish().unwrap().into_inner()
+    }
+
+    /// A bookmark around `text`, then a field `instr` with the cached result `cached`.
+    fn bookmark_and_field(name: &str, text: &str, instr: &str, cached: &str) -> String {
+        format!(
+            r#"<w:p><w:bookmarkStart w:id="0" w:name="{name}"/><w:r><w:t>{text}</w:t></w:r><w:bookmarkEnd w:id="0"/><w:r><w:t xml:space="preserve"> → </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> {instr} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>{cached}</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#
+        )
+    }
+
+    /// Review M1: a `=` field outside a table reads bookmarks as numbers, as Word does
+    /// (`{ = Total * 2 }`), and one WordCraft can't work out keeps the result Word saved instead
+    /// of turning into an error when fields update (any edit that inserts a field updates them).
+    #[test]
+    fn formula_fields_read_bookmarks_and_keep_cached_results() {
+        let body = [
+            bookmark_and_field("Total", "100", "= Total * 2", "200"),
+            bookmark_and_field("TongTien", "1.250.000", r"= TongTien \* CardText", "cached"),
+            bookmark_and_field("Note", "abc", "= Missing * 2 + Note", "42"),
+            bookmark_and_field("Other", "1", "= SUM(ABOVE)", ""),
+        ]
+        .concat();
+        let bytes = docx_with("vi-VN", &body);
+        let mut s = Session::new(crate::io::open_bytes("f.docx", &bytes).unwrap());
+        assert_eq!(fields(&s).iter().map(|f| f.1.as_str()).collect::<Vec<_>>(), ["200", "cached", "42", ""]);
+        update_fields(&mut s).unwrap();
+        let shown: Vec<String> = fields(&s).into_iter().map(|f| f.1).collect();
+        assert_eq!(shown[0], "200", "Total (100) * 2");
+        assert_eq!(shown[1], "một triệu hai trăm năm mươi nghìn");
+        assert_eq!(shown[2], "42", "an unknown bookmark keeps the saved result");
+        assert!(shown[3].starts_with("!ABOVE"), "nothing saved to keep: {}", shown[3]);
+        // Bookmark names are matched whatever their case; the bookmark's number follows edits.
+        s.run("select.text", &json!({"text": "100"})).unwrap();
+        s.run("text.insert", &json!({"text": "21"})).unwrap();
+        s.run("caret.docEnd", &json!({})).unwrap();
+        s.run("insert.field", &json!({"instr": "= total + TOTAL"})).unwrap();
+        let shown: Vec<String> = fields(&s).into_iter().map(|f| f.1).collect();
+        assert_eq!(shown[0], "42");
+        assert_eq!(shown[2], "42");
+        assert_eq!(shown.last().map(String::as_str), Some("42"));
     }
 
     /// A formula inside a table still reads its cells (ABOVE), and now takes `\*` switches.

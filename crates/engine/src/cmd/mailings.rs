@@ -915,30 +915,32 @@ pub fn refresh(s: &mut Session) {
         let mut cur = s.merge.record;
         for path in s.doc.para_paths(story) {
             let updates: Vec<(usize, String)> = match s.doc.para(story, &path) {
-                Some(p) => p
-                    .objects
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(k, o)| {
-                        let InlineObject::Field { instr, .. } = o else { return None };
-                        let shown = placeholder(instr)?;
-                        if !preview {
-                            return Some((k, shown));
-                        }
-                        let lang = super::references::field_lang(s, p, k);
-                        Some((
-                            k,
-                            match act(s, instr, cur, lang.as_deref()) {
-                                Some(Act::Text(t)) => t,
-                                Some(Act::Next) => {
-                                    cur = cur.saturating_add(1).min(last);
-                                    String::new()
-                                }
-                                Some(Act::Skip) | None => String::new(),
-                            },
-                        ))
-                    })
-                    .collect(),
+                Some(p) => {
+                    let offsets = if preview { p.object_offsets() } else { Vec::new() };
+                    p.objects
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(k, o)| {
+                            let InlineObject::Field { instr, .. } = o else { return None };
+                            let shown = placeholder(instr)?;
+                            if !preview {
+                                return Some((k, shown));
+                            }
+                            let lang = super::references::field_lang(s, p, &offsets, k);
+                            Some((
+                                k,
+                                match act(s, instr, cur, lang.as_deref()) {
+                                    Some(Act::Text(t)) => t,
+                                    Some(Act::Next) => {
+                                        cur = cur.saturating_add(1).min(last);
+                                        String::new()
+                                    }
+                                    Some(Act::Skip) | None => String::new(),
+                                },
+                            ))
+                        })
+                        .collect()
+                }
                 None => continue,
             };
             if updates.is_empty() {
