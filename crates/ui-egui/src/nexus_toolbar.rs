@@ -417,6 +417,18 @@ mod tests {
         }
     }
 
+    /// Vietnamese is a language text can be marked in (Review › Language), and the status bar
+    /// names it instead of showing the tag "vi-VN" (NexusOffice writes new documents in it).
+    #[test]
+    fn vietnamese_is_a_named_document_language() {
+        assert!(crate::dialogs_layout::LANGUAGES.contains(&("vi-VN", "Vietnamese")));
+        assert_eq!(crate::ribbon::language_name(Some("vi-VN")), "Vietnamese");
+        let before = crate::i18n::current();
+        crate::i18n::set_current(crate::i18n::Lang::from_pref("vi"));
+        assert_eq!(crate::tl!("Vietnamese"), "Tiếng Việt");
+        crate::i18n::set_current(before);
+    }
+
     /// The menus are built from any registry slice, so an empty one gives no menu (no panic).
     #[test]
     fn no_commands_no_menus() {
