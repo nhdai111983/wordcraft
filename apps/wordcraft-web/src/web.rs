@@ -62,8 +62,8 @@ pub fn start() {
                     session.system_region = region;
                     let messages = Rc::new(RefCell::new(Vec::new()));
                     let mut app = WordApp::new(session, services(inbox.clone(), cc.egui_ctx.clone(), dirty, saves.clone(), messages.clone()));
-                    // NexusOffice layout: menu bar and one tool row instead of the ribbon.
-                    app.toolbar = true;
+                    // NexusOffice layout in the style of WPS Office (no title bar; tabs and a flat command strip).
+                    app.wps = true;
                     // Pasted pictures wait apart from dropped files: the app inserts one only when the page is the edit target (#1349).
                     app.services.pasted = Some(pasted);
                     app.autosave = false;

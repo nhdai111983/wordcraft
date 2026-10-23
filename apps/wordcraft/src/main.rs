@@ -441,8 +441,8 @@ fn main() -> eframe::Result {
             }
             app.ui.window = restored;
             app.integrated_titlebar = cfg!(target_os = "macos");
-            // NexusOffice layout: menu bar and one tool row instead of the ribbon.
-            app.toolbar = true;
+            // NexusOffice layout in the style of WPS Office (no title bar; tabs and a flat command strip).
+            app.wps = true;
             #[cfg(target_os = "macos")]
             if let Some(bar) = traffic_lights::title_bar() {
                 log::info!("title bar: {bar:?}");
