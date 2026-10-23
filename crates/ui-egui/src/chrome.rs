@@ -16,6 +16,7 @@ fn qat_button(ui: &mut Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, e
     let c = if enabled { t.icon } else { t.text_disabled };
     icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(16.0, 16.0)), icon, c, if enabled { t.accent } else { c });
     let sc = crate::widgets::shortcut_text(app, id);
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, tip));
     let resp = resp.on_hover_text(if sc.is_empty() { tip.to_string() } else { format!("{tip} ({sc})") });
     if resp.clicked() && enabled {
         let _ = app.run(id, json!({}));
@@ -39,7 +40,7 @@ pub(crate) fn qat_enabled(app: &WordApp, id: &str) -> bool {
 
 /// The Quick Access Toolbar (#379): the user's commands (Save, Undo, Redo until customized), each
 /// with a right-click menu, then the menu button that customizes it (#376).
-fn quick_access(ui: &mut Ui, app: &mut WordApp) {
+pub(crate) fn quick_access(ui: &mut Ui, app: &mut WordApp) {
     let ids: Vec<String> = app.session.ribbon.qat().into_iter().map(str::to_string).collect();
     for (index, id) in ids.iter().enumerate() {
         let id = id.as_str();
@@ -74,6 +75,39 @@ fn quick_access(ui: &mut Ui, app: &mut WordApp) {
         ui.set_min_width(220.0);
         qat_menu(ui, app);
     });
+}
+
+/// The AutoSave label and switch (title bar; File's save state menu in the WPS layout).
+pub(crate) fn autosave_switch(ui: &mut Ui, app: &mut WordApp) {
+    let t = Tokens::get(ui.ctx());
+    // AutoSave switch: greyed out, with the reason as its tooltip, when AutoSave can't
+    // cover the document (#196, #176); clicking it then offers Save As where that helps.
+    let block = app.autosave_block();
+    let on = app.autosaves();
+    let label = if block.is_some() { t.text_dim.gamma_multiply(0.6) } else { t.text_dim };
+    ui.label(egui::RichText::new(tl!("AutoSave")).font(regular(11.5)).color(label));
+    let (r, resp) = ui.allocate_exact_size(vec2(30.0, 16.0), Sense::click());
+    let (fill, stroke, knob_fill) = match (&block, on) {
+        (Some(_), _) => (t.input.gamma_multiply(0.5), t.border.gamma_multiply(0.7), t.text_dim.gamma_multiply(0.45)),
+        (None, true) => (t.accent, t.accent, t.on_accent),
+        (None, false) => (t.input, t.border_strong, t.text_dim),
+    };
+    ui.painter().rect(r, 8.0, fill, Stroke::new(1.0, stroke), egui::StrokeKind::Inside);
+    let knob = if on { r.max.x - 8.0 } else { r.min.x + 8.0 };
+    ui.painter().circle_filled(pos2(knob, r.center().y), 5.0, knob_fill);
+    let tip = block.as_ref().map_or_else(|| tl!("AutoSave saves every change to the file (needs a saved document)").to_string(), |b| b.reason());
+    if resp.on_hover_text(tip).clicked() {
+        match block {
+            None => {
+                let _ = app.run("file.autosave", json!({}));
+            }
+            // AutoSave comes on once Save As has saved (maybe on a later frame, #94).
+            Some(b) if b.save_as_helps() => {
+                let _ = app.save_as(crate::file_dialogs::AfterSave::AutoSave);
+            }
+            Some(b) => app.status(b.reason()),
+        }
+    }
 }
 
 /// The Undo button's drop-down arrow (#701), which opens [`undo_list`].
@@ -249,36 +283,7 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
             let mut right_start = full.max.x;
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
-                // AutoSave switch: greyed out, with the reason as its tooltip, when AutoSave can't
-                // cover the document (#196, #176); clicking it then offers Save As where that helps.
-                let block = app.autosave_block();
-                let on = app.autosaves();
-                let label = if block.is_some() { t.text_dim.gamma_multiply(0.6) } else { t.text_dim };
-                ui.label(egui::RichText::new(tl!("AutoSave")).font(regular(11.5)).color(label));
-                let (r, resp) = ui.allocate_exact_size(vec2(30.0, 16.0), Sense::click());
-                let (fill, stroke, knob_fill) = match (&block, on) {
-                    (Some(_), _) => (t.input.gamma_multiply(0.5), t.border.gamma_multiply(0.7), t.text_dim.gamma_multiply(0.45)),
-                    (None, true) => (t.accent, t.accent, t.on_accent),
-                    (None, false) => (t.input, t.border_strong, t.text_dim),
-                };
-                ui.painter().rect(r, 8.0, fill, Stroke::new(1.0, stroke), egui::StrokeKind::Inside);
-                let knob = if on { r.max.x - 8.0 } else { r.min.x + 8.0 };
-                ui.painter().circle_filled(pos2(knob, r.center().y), 5.0, knob_fill);
-                let tip = block
-                    .as_ref()
-                    .map_or_else(|| tl!("AutoSave saves every change to the file (needs a saved document)").to_string(), |b| b.reason());
-                if resp.on_hover_text(tip).clicked() {
-                    match block {
-                        None => {
-                            let _ = app.run("file.autosave", json!({}));
-                        }
-                        // AutoSave comes on once Save As has saved (maybe on a later frame, #94).
-                        Some(b) if b.save_as_helps() => {
-                            let _ = app.save_as(crate::file_dialogs::AfterSave::AutoSave);
-                        }
-                        Some(b) => app.status(b.reason()),
-                    }
-                }
+                autosave_switch(ui, app);
                 ui.add_space(8.0);
                 quick_access(ui, app);
                 qat_end = ui.min_rect().max.x;
@@ -397,7 +402,8 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
 pub fn status_bar(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::bottom("status")
-        .exact_size(26.0)
+        // NexusOffice WPS layout: 28 pt, as in its mockup.
+        .exact_size(if app.wps { 28.0 } else { 26.0 })
         .frame(
             egui::Frame::NONE
                 .fill(t.status_bar)

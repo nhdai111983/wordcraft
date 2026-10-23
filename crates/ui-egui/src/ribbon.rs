@@ -25,7 +25,7 @@ pub fn has_shape_selected(s: &wordcraft_engine::Session) -> bool {
 }
 
 /// Reading controls replace editing tabs entirely. All settings are transient view controls.
-fn reading_toolbar(app: &mut WordApp, ui: &mut Ui, t: Tokens) {
+pub(crate) fn reading_toolbar(app: &mut WordApp, ui: &mut Ui, t: Tokens) {
     egui::Panel::top("reading_toolbar")
         .exact_size(46.0)
         .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(12, 6)).stroke(Stroke::new(1.0, t.border)))
@@ -170,6 +170,18 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         reading_toolbar(app, ui, t);
         return;
     }
+    let (tabs, user_tabs) = sync_tabs(app);
+    tab_strip(app, ui, &t, &tabs);
+    if app.ui.ribbon_collapsed {
+        return;
+    }
+    ribbon_panel(app, ui, &t, &user_tabs);
+}
+
+/// The tabs shown now, after the contextual ones came or went (File first), and the user's tab
+/// list (Customize Ribbon). Switches to the Equation or Outlining tab and back as the selection or
+/// view asks, and away from a tab that is no longer shown.
+pub(crate) fn sync_tabs(app: &mut WordApp) -> (Vec<(String, bool)>, Vec<wordcraft_engine::ribbon::TabEntry>) {
     // Editing an equation brings up the Equation tab; leaving it goes back.
     if app.session.math.is_some() {
         if app.equation_prev_tab.is_none() {
@@ -213,7 +225,11 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             app.ui.tab = next.to_string();
         }
     }
-    // Tab strip.
+    (tabs, user_tabs)
+}
+
+fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]) {
+    let t = *t;
     egui::Panel::top("tabs")
         .exact_size(30.0)
         .frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 }))
@@ -343,9 +359,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 });
             });
         });
-    if app.ui.ribbon_collapsed {
-        return;
-    }
+}
+
+fn ribbon_panel(app: &mut WordApp, ui: &mut Ui, t: &Tokens, user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
+    let t = *t;
     egui::Panel::top("ribbon")
         .exact_size(CONTENT_H + LABEL_H + 10.0)
         .frame(
@@ -360,42 +377,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             }
             let bg = ui.interact(ui.max_rect(), ui.id().with("ribbon_background"), Sense::click());
             bg.context_menu(|ui| crate::widgets::customize_menu_items(ui, app));
-            let entry = user_tabs.iter().find(|e| e.name == app.ui.tab);
             let scroll = egui::ScrollArea::horizontal().scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
                 ui.horizontal_top(|ui| {
                     ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
-                    match entry {
-                        // Every tab hidden: nothing to show.
-                        Some(e) if e.hidden => return,
-                        Some(e) if e.custom => return custom_groups(app, ui, &e.groups),
-                        _ => {}
-                    }
-                    match app.ui.tab.as_str() {
-                        "Home" => home(app, ui),
-                        "Insert" => insert(app, ui),
-                        "Draw" => draw(app, ui),
-                        "Design" => design(app, ui),
-                        "Layout" => layout(app, ui),
-                        "References" => references(app, ui),
-                        "Mailings" => mailings(app, ui),
-                        "Review" => review(app, ui),
-                        "View" => view(app, ui),
-                        "Developer" => developer(app, ui),
-                        "Zotero" => zotero(app, ui),
-                        "Help" => help(app, ui),
-                        "Table Design" => table_design(app, ui),
-                        "Table Layout" => table_layout(app, ui),
-                        "Equation" if app.session.math.is_some() => crate::equation_tab::show(app, ui),
-                        "Picture Format" => picture_format(app, ui),
-                        "Shape Format" => shape_format(app, ui),
-                        "SmartArt Design" => smart_art_design(app, ui),
-                        "Outlining" => outlining(app, ui),
-                        "Chart Design" => chart_design(app, ui),
-                        _ => home(app, ui),
-                    }
-                    if let Some(e) = entry {
-                        custom_groups(app, ui, &e.groups);
-                    }
+                    tab_groups(app, ui, user_tabs);
                 });
             });
             // The bar is hidden, so a row wider than the window would be clipped with no sign. Edge chevrons show
@@ -425,6 +410,44 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         });
 }
 
+/// The current tab's groups, left to right (each through [`crate::widgets::group`]), then the
+/// user's custom groups on it.
+pub(crate) fn tab_groups(app: &mut WordApp, ui: &mut Ui, user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
+    let entry = user_tabs.iter().find(|e| e.name == app.ui.tab);
+    match entry {
+        // Every tab hidden: nothing to show.
+        Some(e) if e.hidden => return,
+        Some(e) if e.custom => return custom_groups(app, ui, &e.groups),
+        _ => {}
+    }
+    match app.ui.tab.as_str() {
+        "Home" => home(app, ui),
+        "Insert" => insert(app, ui),
+        "Draw" => draw(app, ui),
+        "Design" => design(app, ui),
+        "Layout" => layout(app, ui),
+        "References" => references(app, ui),
+        "Mailings" => mailings(app, ui),
+        "Review" => review(app, ui),
+        "View" => view(app, ui),
+        "Developer" => developer(app, ui),
+        "Zotero" => zotero(app, ui),
+        "Help" => help(app, ui),
+        "Table Design" => table_design(app, ui),
+        "Table Layout" => table_layout(app, ui),
+        "Equation" if app.session.math.is_some() => crate::equation_tab::show(app, ui),
+        "Picture Format" => picture_format(app, ui),
+        "Shape Format" => shape_format(app, ui),
+        "SmartArt Design" => smart_art_design(app, ui),
+        "Outlining" => outlining(app, ui),
+        "Chart Design" => chart_design(app, ui),
+        _ => home(app, ui),
+    }
+    if let Some(e) = entry {
+        custom_groups(app, ui, &e.groups);
+    }
+}
+
 /// Custom groups (Customize Ribbon, #379): up to three commands as large buttons, more as small
 /// labelled buttons in columns of three. Each shows the command's own icon and label.
 fn custom_groups(app: &mut WordApp, ui: &mut Ui, groups: &[wordcraft_engine::ribbon::CustomGroup]) {
@@ -450,7 +473,7 @@ fn custom_groups(app: &mut WordApp, ui: &mut Ui, groups: &[wordcraft_engine::rib
 }
 
 /// A large button's label on two lines when it is long (broken at the space nearest the middle).
-fn two_lines(label: &str) -> String {
+pub(crate) fn two_lines(label: &str) -> String {
     let n = label.chars().count();
     if n <= 10 {
         return label.to_string();
@@ -473,6 +496,10 @@ fn edge_cue(ui: &mut Ui, rect: Rect, glyph: &str, hint: &str, t: &Tokens) -> boo
 }
 
 fn stack(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    // NexusOffice WPS strip: two rows, the third control starting a new column.
+    if crate::nexus_wps::compact(ui) {
+        return crate::nexus_wps::compact_stack(ui, add);
+    }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
         add(ui);
@@ -992,6 +1019,21 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
         crate::previews::style_gallery(app, ui, &st);
     });
     group(ui, "Editing", None, app, |ui, app| {
+        // NexusOffice WPS layout: Find and Replace and Select as large buttons, as in its mockup.
+        if app.wps {
+            menu_button(ui, app, "find", Some(&two_lines(tl!("Find and Replace"))), "Find and Replace", true, "edit.find", |ui, app| {
+                mi(ui, app, "Find", "edit.find", json!({}));
+                mi(ui, app, "Replace", "ui.dialog", json!({"name": "replace"}));
+                mi(ui, app, "Advanced Find…", "edit.advancedFind", json!({}));
+                mi(ui, app, "Go To…", "ui.dialog", json!({"name": "goto"}));
+            });
+            menu_button(ui, app, "select", Some("Select"), "Select", true, "select.all", |ui, app| {
+                mi(ui, app, "Select All", "select.all", json!({}));
+                mi(ui, app, "Select Paragraph", "select.paragraph", json!({}));
+                mi(ui, app, "Select Sentence", "select.sentence", json!({}));
+            });
+            return;
+        }
         stack(ui, |ui| {
             menu_button(ui, app, "find", Some("Find"), "Find", false, "edit.find", |ui, app| {
                 // As in Word: Find searches in the Navigation pane; Advanced Find is the dialog (#712).
@@ -1263,7 +1305,7 @@ fn update_gallery_pen(app: &mut WordApp, custom: Option<usize>, tool: wordcraft_
 fn gallery_pen(ui: &mut Ui, app: &mut WordApp, i: usize, pen: wordcraft_engine::cmd::draw::CustomPen, active: bool) {
     use wordcraft_doc::freeform::InkTool;
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(34.0, CONTENT_H), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(34.0, crate::widgets::content_h(ui)), Sense::click());
     crate::widgets::bg(ui, r, &resp, active, &t);
     let icon = match pen.kind {
         InkTool::Pen => "pen",
@@ -1298,7 +1340,7 @@ fn gallery_pen(ui: &mut Ui, app: &mut WordApp, i: usize, pen: wordcraft_engine::
 /// the thumbnails (#638). Returns the box and the space the thumbnails used.
 fn style_set_box(app: &mut WordApp, ui: &mut Ui) -> (Rect, Rect) {
     ui.add_space(4.0);
-    let (gallery, _) = ui.allocate_exact_size(vec2(crate::previews::STYLE_SET_GALLERY_W, CONTENT_H), Sense::hover());
+    let (gallery, _) = ui.allocate_exact_size(vec2(crate::previews::STYLE_SET_GALLERY_W, crate::widgets::content_h(ui)), Sense::hover());
     let mut gui = ui.new_child(egui::UiBuilder::new().max_rect(gallery).layout(egui::Layout::left_to_right(egui::Align::Min)));
     gui.set_clip_rect(gallery.intersect(ui.clip_rect()));
     gui.spacing_mut().item_spacing = vec2(1.0, 1.0);
@@ -1473,32 +1515,52 @@ fn layout(app: &mut WordApp, ui: &mut Ui) {
                 ui.label(text);
             });
         };
+        // NexusOffice WPS strip: two rows only, so each field is named by an icon (and its
+        // tooltip) instead of a header row and a label.
+        let compact = crate::nexus_wps::compact(ui);
+        let ink = Tokens::get(ui.ctx());
+        let field_label = |ui: &mut Ui, text: &str, icon: &str, tip: &str, gap: f32| {
+            if compact {
+                ui.horizontal(|ui| {
+                    ui.add_space(gap);
+                    let (r, resp) = ui.allocate_exact_size(vec2(18.0, FIELD.y), Sense::hover());
+                    icons::paint(ui.painter(), r.shrink(1.0), icon, ink.icon, ink.accent);
+                    resp.on_hover_text(tl!(tip));
+                });
+            } else if gap > 0.0 {
+                spaced(ui, egui::RichText::new(tl!(text)).small());
+            } else {
+                ui.label(egui::RichText::new(tl!(text)).small());
+            }
+        };
         egui::Grid::new("layout_para").spacing(vec2(4.0, 1.5)).min_row_height(FIELD.y).show(ui, |ui| {
-            ui.label(egui::RichText::new(tl!("Indent")).small().strong());
-            ui.label("");
-            spaced(ui, egui::RichText::new(tl!("Spacing")).small().strong());
-            ui.end_row();
+            if !compact {
+                ui.label(egui::RichText::new(tl!("Indent")).small().strong());
+                ui.label("");
+                spaced(ui, egui::RichText::new(tl!("Spacing")).small().strong());
+                ui.end_row();
+            }
             // Indents in the File › Options unit.
             let u = crate::options::unit();
             let k = u.pt_per_unit();
             let mut l = rp.indent_left / k;
             let mut b = rp.space_before;
-            ui.label(egui::RichText::new(tl!("Left:")).small());
+            field_label(ui, "Left:", "indentLeft", "Indent Left", 0.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut l).speed(3.6 / k).range(-792.0 / k..=1584.0 / k).measure(u).max_decimals(2)).changed() {
                 let _ = app.run("para.indents", json!({"left": l * k}));
             }
-            spaced(ui, egui::RichText::new(tl!("Before:")).small());
+            field_label(ui, "Before:", "spaceBefore", "Spacing Before", 8.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut b).speed(1.0).range(0.0..=1584.0).suffix(format!(" {}", tl!("pt")))).changed() {
                 let _ = app.run("para.spacing", json!({"before": b}));
             }
             ui.end_row();
             let mut r = rp.indent_right / k;
             let mut a = rp.space_after;
-            ui.label(egui::RichText::new(tl!("Right:")).small());
+            field_label(ui, "Right:", "indentRight", "Indent Right", 0.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut r).speed(3.6 / k).range(-792.0 / k..=1584.0 / k).measure(u).max_decimals(2)).changed() {
                 let _ = app.run("para.indents", json!({"right": r * k}));
             }
-            spaced(ui, egui::RichText::new(tl!("After:")).small());
+            field_label(ui, "After:", "spaceAfter", "Spacing After", 8.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut a).speed(1.0).range(0.0..=1584.0).suffix(format!(" {}", tl!("pt")))).changed() {
                 let _ = app.run("para.spacing", json!({"after": a}));
             }
@@ -2457,16 +2519,21 @@ fn table_design(app: &mut WordApp, ui: &mut Ui) {
     let look = app.session.sel.focus.path.cell().and_then(|(tp, _, _)| app.session.doc.table(app.session.sel.focus.story, &tp).map(|t| t.props.look));
     group(ui, "Table Style Options", None, app, |ui, app| {
         let Some(l) = look else { return };
-        egui::Grid::new("look").show(ui, |ui| {
-            for (row, items) in [
-                [("Header Row", "headerRow", l.header_row), ("First Column", "firstColumn", l.first_column)],
-                [("Total Row", "totalRow", l.total_row), ("Last Column", "lastColumn", l.last_column)],
-                [("Banded Rows", "bandedRows", l.banded_rows), ("Banded Columns", "bandedColumns", l.banded_columns)],
-            ]
-            .iter()
-            .enumerate()
-            {
-                let _ = row;
+        let options = [
+            [("Header Row", "headerRow", l.header_row), ("First Column", "firstColumn", l.first_column)],
+            [("Total Row", "totalRow", l.total_row), ("Last Column", "lastColumn", l.last_column)],
+            [("Banded Rows", "bandedRows", l.banded_rows), ("Banded Columns", "bandedColumns", l.banded_columns)],
+        ];
+        // NexusOffice WPS strip: two rows of three (the banded options last) instead of three of two.
+        let rows: Vec<Vec<(&str, &str, bool)>> = if crate::nexus_wps::compact(ui) {
+            let [a, b, c] = options;
+            vec![vec![a[0], a[1], c[0]], vec![b[0], b[1], c[1]]]
+        } else {
+            options.iter().map(|r| r.to_vec()).collect()
+        };
+        let spacing = if crate::nexus_wps::compact(ui) { vec2(10.0, 4.0) } else { ui.spacing().item_spacing };
+        egui::Grid::new("look").spacing(spacing).show(ui, |ui| {
+            for items in &rows {
                 for (label, key, val) in items {
                     let mut v = *val;
                     if ui.checkbox(&mut v, tl!(label)).changed() {
@@ -2489,6 +2556,10 @@ fn table_design(app: &mut WordApp, ui: &mut Ui) {
             .map(|s| (s.builtin, s.id.clone(), crate::i18n::style_name(s)))
             .collect();
         styles.sort_by_key(|(builtin, _, _)| *builtin);
+        // NexusOffice WPS strip: the scroll bar floats over the tiles instead of under them.
+        if crate::nexus_wps::compact(ui) {
+            ui.spacing_mut().scroll = egui::style::ScrollStyle::floating();
+        }
         egui::ScrollArea::horizontal().max_width(420.0).show(ui, |ui| {
             ui.horizontal(|ui| {
                 for (_, id, name) in styles {

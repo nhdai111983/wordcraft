@@ -11,7 +11,7 @@ use wordcraft_engine::math_gallery::{BUILT_INS, STRUCTURES, SYMBOL_SETS, Templat
 
 use crate::WordApp;
 use crate::theme::{Tokens, regular, semibold};
-use crate::widgets::{BIG_ICON_Y, BIG_LABEL_Y, CONTENT_H, LABEL_PITCH, group, small};
+use crate::widgets::{LABEL_PITCH, group, small};
 
 /// What each structure button shows.
 pub(crate) fn button_picture(id: &str) -> &'static str {
@@ -49,18 +49,20 @@ fn paint_math(app: &mut WordApp, ui: &Ui, r: Rect, key: &str, linear: &str, node
 fn math_menu_button(ui: &mut Ui, app: &mut WordApp, picture: &str, label: &str, menu: impl FnOnce(&mut Ui, &mut WordApp)) {
     let label = tl!(label);
     let t = Tokens::get(ui.ctx());
-    let galley_w =
-        label.split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
+    // The WPS strip ([`crate::nexus_wps`]) is shorter: a smaller picture over one label line.
+    let g = crate::widgets::big_layout(ui);
+    let joined = label.replace('\n', " ");
+    let lines: Vec<&str> = if g.one_line { vec![joined.as_str()] } else { label.split('\n').collect() };
+    let galley_w = lines.iter().map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
     let w = (galley_w + 22.0).max(46.0);
-    let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(w, crate::widgets::content_h(ui)), Sense::click());
     if resp.hovered() {
         ui.painter().rect_filled(r, 4.0, t.hover);
     }
-    let pic = Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(40.0, 32.0));
+    let pic = Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon * 1.25, g.icon));
     ui.painter().rect_filled(pic, 3.0, t.input);
     paint_math(app, ui, pic, &format!("btn:{picture}"), picture, None, false, 12.0);
-    let lines: Vec<&str> = label.split('\n').collect();
-    let mut y = r.min.y + BIG_LABEL_Y;
+    let mut y = r.min.y + g.label_y;
     for (i, l) in lines.iter().enumerate() {
         crate::widgets::label_line(ui, r.center().x, y, l, regular(11.5), t.text, i + 1 == lines.len());
         y += LABEL_PITCH;
@@ -151,9 +153,10 @@ pub fn insert_button(ui: &mut Ui, app: &mut WordApp) {
     let t = Tokens::get(ui.ctx());
     let label = tl!("Equation");
     let w = (ui.ctx().fonts_mut(|f| f.layout_no_wrap(label.to_string(), regular(11.5), t.text).size().x) + 22.0).max(48.0);
-    let (r, _) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::hover());
-    let top = Rect::from_min_max(r.min, pos2(r.max.x, r.min.y + BIG_LABEL_Y - 2.0));
-    let bottom = Rect::from_min_max(pos2(r.min.x, r.min.y + BIG_LABEL_Y - 2.0), r.max);
+    let g = crate::widgets::big_layout(ui);
+    let (r, _) = ui.allocate_exact_size(vec2(w, crate::widgets::content_h(ui)), Sense::hover());
+    let top = Rect::from_min_max(r.min, pos2(r.max.x, r.min.y + g.label_y - 2.0));
+    let bottom = Rect::from_min_max(pos2(r.min.x, r.min.y + g.label_y - 2.0), r.max);
     let rt = ui.interact(top, ui.id().with("eq_insert_top"), Sense::click());
     let rb = ui.interact(bottom, ui.id().with("eq_insert_bottom"), Sense::click());
     for (rr, resp) in [(top, &rt), (bottom, &rb)] {
@@ -163,12 +166,12 @@ pub fn insert_button(ui: &mut Ui, app: &mut WordApp) {
     }
     crate::icons::paint(
         ui.painter(),
-        Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0)),
+        Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon, g.icon)),
         "equation",
         t.icon,
         t.accent,
     );
-    crate::widgets::label_line(ui, r.center().x, r.min.y + BIG_LABEL_Y, label, regular(11.5), t.text, true);
+    crate::widgets::label_line(ui, r.center().x, r.min.y + g.label_y, label, regular(11.5), t.text, true);
     if rt.on_hover_text(tl!("Insert a new equation (Alt+=)")).clicked() {
         let _ = app.run("insert.equation", json!({}));
         app.canvas.want_focus = true;

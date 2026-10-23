@@ -64,6 +64,7 @@ pub mod keytips;
 pub mod mini_toolbar;
 pub mod nexus;
 pub mod nexus_toolbar;
+pub mod nexus_wps;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -458,6 +459,11 @@ pub struct WordApp {
     /// NexusOffice layout: a menu bar and one tool row instead of the ribbon
     /// ([`nexus_toolbar`]). The Nexus apps turn it on; off keeps upstream's ribbon.
     pub toolbar: bool,
+    /// NexusOffice layout in the style of WPS Office ([`nexus_wps`]): no title bar; one row with
+    /// File, the Quick Access Toolbar, the ribbon tabs, the save state, Search, Comments and Share;
+    /// under it the current tab's groups as one flat strip whose trailing groups fold into a "…"
+    /// menu. Wins over [`toolbar`](Self::toolbar). Off keeps upstream's title bar and ribbon.
+    pub wps: bool,
     /// Menus a host program adds to the menu bar after the app's own (the NexusOffice window adds
     /// its "Nexus AI" menu this way): `(title, contents)`. Empty in the stand-alone app.
     pub host_menus: Vec<(String, Box<dyn FnMut(&mut egui::Ui)>)>,
@@ -604,6 +610,7 @@ impl WordApp {
             previews: previews::Previews::default(),
             integrated_titlebar: false,
             toolbar: false,
+            wps: false,
             host_menus: Vec::new(),
             embedded: false,
             mac_titlebar: chrome::MacTitleBar::default(),
@@ -2062,21 +2069,29 @@ impl WordApp {
             backstage::show(self, ui);
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
-            chrome::title_bar(self, ui);
-            if self.toolbar {
-                nexus_toolbar::show(self, ui)
+            if self.wps {
+                nexus_wps::show(self, ui, true);
             } else {
-                ribbon::show(self, ui)
+                chrome::title_bar(self, ui);
+                if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
             }
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
-            chrome::title_bar(self, ui);
-            if !self.session.view.focus_mode {
-                if self.toolbar {
-                    nexus_toolbar::show(self, ui)
+            let full = !self.session.view.focus_mode;
+            if self.wps {
+                // Focus keeps the WPS layout's top row, as it keeps the title bar.
+                nexus_wps::show(self, ui, full);
+            } else {
+                chrome::title_bar(self, ui);
+            }
+            if full {
+                if self.wps {
+                    // Drawn above with the top row.
+                } else if self.toolbar {
+                    nexus_toolbar::show(self, ui);
                 } else {
-                    ribbon::show(self, ui)
+                    ribbon::show(self, ui);
                 }
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
