@@ -882,7 +882,8 @@ pub fn update_seq(s: &mut Session) -> Result<(), CmdError> {
             *count = count.saturating_add(1);
         }
         let mut updates: Vec<(usize, String)> = Vec::new();
-        let offsets = p.object_offsets();
+        // Worked out for the first SEQ field that needs its language (most paragraphs have none).
+        let mut offsets: Option<Vec<usize>> = None;
         for (k, o) in p.objects.iter().enumerate() {
             let InlineObject::Field { instr, locked: false, .. } = o else { continue };
             let f = FieldCode::parse(instr);
@@ -908,7 +909,8 @@ pub fn update_seq(s: &mut Session) -> Result<(), CmdError> {
                         if f.has('h') {
                             String::new()
                         } else {
-                            wordcraft_layout::fields::cased(fmt.format_in(n.0, field_lang(s, p, &offsets, k).as_deref()), instr)
+                            let offsets = offsets.get_or_insert_with(|| p.object_offsets());
+                            wordcraft_layout::fields::cased(fmt.format_in(n.0, field_lang(s, p, offsets, k).as_deref()), instr)
                         },
                     ));
                 }
@@ -976,6 +978,8 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
             .unwrap_or((1, NumFormat::Decimal));
         pages.entry(name).or_insert(page_info);
     }
+    // Bookmarks formula fields read, found once for the whole pass.
+    let marks = super::table_formula::BookmarkTexts::default();
     let stories: Vec<StoryRef> =
         if all { std::iter::once(StoryRef::Body).chain(s.doc.parts.keys().map(|k| StoryRef::Part(*k))).collect() } else { vec![caret_story] };
     for (story, path) in stories.into_iter().flat_map(|st| s.doc.para_paths(st).into_iter().map(move |p| (st, p))).collect::<Vec<_>>() {
@@ -994,10 +998,10 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
                     && let Some(t) = s.doc.table(StoryRef::Body, &tp)
                 {
                     let default_lang = super::default_lang(s);
-                    Some(super::table_formula::evaluate_field_with(t, Some(&s.doc), default_lang.as_deref(), r, c, instr))
+                    Some(super::table_formula::evaluate_field_in(t, Some(&s.doc), default_lang.as_deref(), r, c, instr, &marks))
                 } else if path.cell().is_none() {
                     let lang = field_lang(s, p, &offsets, k);
-                    match super::table_formula::evaluate_free_field(Some(&s.doc), lang.as_deref(), instr) {
+                    match super::table_formula::evaluate_free_field(Some(&s.doc), lang.as_deref(), instr, &marks) {
                         // A formula WordCraft can't work out (a construct it doesn't know yet)
                         // keeps the result Word saved rather than replacing it with an error.
                         Err(_) if !cached.is_empty() => None,
@@ -1174,13 +1178,18 @@ pub fn date_picture(instr: &str) -> Option<String> {
 /// the paragraph's end. `None` when there is no such bookmark.
 pub fn bookmark_text(doc: &wordcraft_doc::Document, name: &str) -> Option<String> {
     let (_, start) = doc.bookmarks().into_iter().find(|(n, _)| n == name)?;
+    bookmark_text_at(doc, name, &start)
+}
+
+/// The text of bookmark `name` that starts at `start` (see [`bookmark_text`]).
+pub fn bookmark_text_at(doc: &wordcraft_doc::Document, name: &str, start: &Pos) -> Option<String> {
     let para = doc.para(start.story, &start.path)?;
     let end = para
         .object_offsets()
         .into_iter()
         .find(|o| *o > start.off && matches!(para.object_at(*o), Some(InlineObject::BookmarkEnd { name: n }) if n == name))
         .unwrap_or(para.len());
-    Some(doc.copy_range(&start, &Pos { off: end, ..start.clone() }).plain_text().trim().to_string())
+    Some(doc.copy_range(start, &Pos { off: end, ..start.clone() }).plain_text().trim().to_string())
 }
 
 #[cfg(test)]
@@ -1313,6 +1322,45 @@ mod tests {
         assert_eq!(shown[0], "42");
         assert_eq!(shown[2], "42");
         assert_eq!(shown.last().map(String::as_str), Some("42"));
+    }
+
+    /// Review follow-up: formulas reading bookmarks in a long document find the bookmarks once
+    /// per Update Fields pass, not once per reference (a walk of the whole body each), and still
+    /// read the right number.
+    #[test]
+    fn many_bookmark_references_in_a_long_document_are_fast() {
+        use wordcraft_doc::{CharProps, Paragraph};
+        const PARAS: usize = 4000;
+        const FIELDS: usize = 200;
+        let mut blocks = Vec::new();
+        let mut first = Paragraph::with_text("2", CharProps::default());
+        first.insert_object(0, InlineObject::BookmarkStart { name: "Amount".into() }, &CharProps::default()).unwrap();
+        let end = first.len();
+        first.insert_object(end, InlineObject::BookmarkEnd { name: "Amount".into() }, &CharProps::default()).unwrap();
+        blocks.push(first);
+        for i in 1..PARAS {
+            blocks.push(Paragraph::with_text(&format!("Line {i} of a long report."), CharProps::default()));
+        }
+        // `=A+A+…` as long as a formula may be: 73 references to the bookmark (`AMOUNT`, any case).
+        let formula = format!("={}", vec!["amount"; 73].join("+"));
+        assert!(formula.len() <= super::super::table_formula::MAX_FORMULA);
+        for p in blocks.iter_mut().rev().take(FIELDS) {
+            let end = p.len();
+            let field =
+                InlineObject::Field { instr: formula.clone(), result: String::new(), locked: false, dirty: false, code: false, form: String::new() };
+            p.insert_object(end, field, &CharProps::default()).unwrap();
+        }
+        let mut doc = wordcraft_doc::Document::new();
+        doc.body = blocks.into_iter().map(|p| std::sync::Arc::new(wordcraft_doc::Block::Para(p))).collect();
+        let mut s = Session::new(doc);
+        let t = std::time::Instant::now();
+        update_fields(&mut s).unwrap();
+        let elapsed = t.elapsed();
+        let shown = fields(&s);
+        assert_eq!(shown.len(), FIELDS);
+        assert!(shown.iter().all(|f| f.1 == "146"), "{:?}", shown.first());
+        // About 0.1 s here; reading the bookmarks once per reference took 10 s or more.
+        assert!(elapsed.as_secs() < 5, "Update Fields took {elapsed:?}");
     }
 
     /// A formula inside a table still reads its cells (ABOVE), and now takes `\*` switches.

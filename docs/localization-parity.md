@@ -203,7 +203,9 @@ Insert › Page Number with "x of y" writes "Trang X / Y" when the footer's lang
 languages are still English. One exception: a new document (not opened from a file) that is only
 in the US English WordCraft gives every blank document when no editing language is chosen — a
 headless session — takes the system region's language, as Word writes this text in the language
-it is set up for. An opened file always follows its own language.
+it is set up for. An opened file always follows its own language. The choice is made when the page
+number is inserted (into a never-saved document): text already inserted stays as it is when the
+document is later saved under a name (Save As).
 
 ## Region conventions (#838)
 
@@ -252,6 +254,7 @@ WordCraft keeps 2,54 cm).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | trivial | "Trang X / Y" region fallback: decided when the page number is inserted, unchanged by Save As; formulas reading many bookmarks find them once per Update Fields |
 | 2026-10-23 | trivial | Review fixes: bookmarks in formulas and saved results kept; English words stop at 999,999 (digits past it); "Trang X / Y" region fallback only for new documents; case switches on page numbers and SEQ, chained switches; fractions rounded (documented); `vietnameseCounting` in Vietnamese words |
 | 2026-10-23 | minor | Vietnamese CardText/OrdText in the field's language (orthography-based, not observed from Word); `=` formula fields evaluate outside tables; MERGEFIELD honours `\*` and `\#`; "Page X of Y" is "Trang X / Y" in Vietnamese (NexusOffices C-14b) |
 | 2026-10-21 | trivial | Japanese row: ruby (Phonetic Guide) is supported over its base text and HTML export/import keeps it (#1681); the row had listed ruby as missing |

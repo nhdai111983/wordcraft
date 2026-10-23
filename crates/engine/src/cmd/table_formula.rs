@@ -36,11 +36,47 @@ pub fn evaluate_with(
     c: usize,
     formula: &str,
 ) -> Result<f64, CmdError> {
-    evaluate_in(t, true, doc, default_lang, r, c, formula)
+    evaluate_in(t, true, doc, default_lang, r, c, formula, &BookmarkTexts::default())
+}
+
+/// The texts of the bookmarks formulas read, by upper-cased name (bookmark names are matched
+/// whatever their case). The document's bookmarks are listed with one walk the first time a
+/// formula reads one, and each bookmark's text is read once; one value serves a whole Update
+/// Fields pass, so N formulas reading bookmarks in a long document cost one walk, not N.
+/// Texts are read as they are when first asked for in the pass.
+#[derive(Default)]
+pub struct BookmarkTexts {
+    at: std::cell::OnceCell<std::collections::HashMap<String, (String, wordcraft_doc::Pos)>>,
+    texts: std::cell::RefCell<std::collections::HashMap<String, Option<String>>>,
+}
+
+impl BookmarkTexts {
+    /// The text of the bookmark named `upper` (upper-cased) in `doc`.
+    fn text(&self, doc: &wordcraft_doc::Document, upper: &str) -> Option<String> {
+        if let Ok(texts) = self.texts.try_borrow()
+            && let Some(known) = texts.get(upper)
+        {
+            return known.clone();
+        }
+        let at = self.at.get_or_init(|| {
+            let mut at = std::collections::HashMap::new();
+            for (name, pos) in doc.bookmarks() {
+                // The first of two names that differ only in case, as a lookup in order finds it.
+                at.entry(name.to_uppercase()).or_insert((name, pos));
+            }
+            at
+        });
+        let text = at.get(upper).and_then(|(name, pos)| super::references::bookmark_text_at(doc, name, pos));
+        if let Ok(mut texts) = self.texts.try_borrow_mut() {
+            texts.insert(upper.to_string(), text.clone());
+        }
+        text
+    }
 }
 
 /// [`evaluate_with`]; `in_table` false for a formula field outside a table, where `t` is empty
 /// and cell references and ABOVE/LEFT/RIGHT/BELOW are errors (there are no cells to read).
+#[allow(clippy::too_many_arguments)]
 fn evaluate_in(
     t: &Table,
     in_table: bool,
@@ -49,6 +85,7 @@ fn evaluate_in(
     r: usize,
     c: usize,
     formula: &str,
+    marks: &BookmarkTexts,
 ) -> Result<f64, CmdError> {
     if formula.len() > MAX_FORMULA {
         return Err(syntax(format!("the formula is longer than {MAX_FORMULA} characters")));
@@ -60,7 +97,7 @@ fn evaluate_in(
     if parser.pos != parser.toks.len() {
         return Err(syntax("unexpected text after the formula".into()));
     }
-    let here = Here { t, in_table, doc, default_lang, r, c, g: t.grid_col(r, c), visits: std::cell::Cell::new(0), bookmarks: Default::default() };
+    let here = Here { t, in_table, doc, default_lang, r, c, g: t.grid_col(r, c), visits: std::cell::Cell::new(0), marks };
     match eval(&expr, &here)? {
         Val::Num(x) => finite(x),
         Val::List(_) => Err(syntax("a range or ABOVE/LEFT/RIGHT/BELOW needs a function, such as SUM".into())),
@@ -86,8 +123,21 @@ pub fn evaluate_field_with(
     c: usize,
     instr: &str,
 ) -> Result<String, CmdError> {
+    evaluate_field_in(t, doc, default_lang, r, c, instr, &BookmarkTexts::default())
+}
+
+/// [`evaluate_field_with`], reading bookmarks through `marks` (shared by an Update Fields pass).
+pub fn evaluate_field_in(
+    t: &Table,
+    doc: Option<&wordcraft_doc::Document>,
+    default_lang: Option<&str>,
+    r: usize,
+    c: usize,
+    instr: &str,
+    marks: &BookmarkTexts,
+) -> Result<String, CmdError> {
     let (formula, switch) = split_switch(instr);
-    let value = evaluate_with(t, doc, default_lang, r, c, formula)?;
+    let value = evaluate_in(t, true, doc, default_lang, r, c, formula, marks)?;
     let out_lang = doc
         .and_then(|d| {
             t.rows.get(r).and_then(|row| row.cells.get(c)).and_then(|cl| {
@@ -107,11 +157,17 @@ pub fn evaluate_field_with(
 
 /// The text a formula field outside a table shows (`{ = 1250000 \* CardText }`): its formula
 /// worked out with no cells to read, so a cell reference or ABOVE/LEFT/RIGHT/BELOW is an error,
-/// then formatted as [`format_value`] says in the field's language `lang`.
-pub fn evaluate_free_field(doc: Option<&wordcraft_doc::Document>, lang: Option<&str>, instr: &str) -> Result<String, CmdError> {
+/// then formatted as [`format_value`] says in the field's language `lang`. Bookmarks are read
+/// through `marks`.
+pub fn evaluate_free_field(
+    doc: Option<&wordcraft_doc::Document>,
+    lang: Option<&str>,
+    instr: &str,
+    marks: &BookmarkTexts,
+) -> Result<String, CmdError> {
     let (formula, switch) = split_switch(instr);
     let none = Table::default();
-    let value = evaluate_in(&none, false, doc, lang, 0, 0, formula)?;
+    let value = evaluate_in(&none, false, doc, lang, 0, 0, formula, marks)?;
     Ok(format_value(value, switch, lang))
 }
 
@@ -585,8 +641,8 @@ struct Here<'a> {
     g: usize,
     /// Cells read so far in this evaluation (see [`MAX_CELL_VISITS`]).
     visits: std::cell::Cell<usize>,
-    /// The document's bookmark names, listed on the first bookmark the formula reads.
-    bookmarks: std::cell::OnceCell<Vec<String>>,
+    /// The bookmarks the formula reads (see [`BookmarkTexts`]).
+    marks: &'a BookmarkTexts,
 }
 
 impl Here<'_> {
@@ -611,9 +667,7 @@ impl Here<'_> {
         self.visit(1)?;
         let not_found = || CmdError::Failed(format!("{name} is not a bookmark that holds a number"));
         let doc = self.doc.ok_or_else(not_found)?;
-        let names = self.bookmarks.get_or_init(|| doc.bookmarks().into_iter().map(|(n, _)| n).collect());
-        let real = names.iter().find(|n| n.to_uppercase() == name).ok_or_else(not_found)?;
-        let text = super::references::bookmark_text(doc, real).ok_or_else(not_found)?;
+        let text = self.marks.text(doc, name).ok_or_else(not_found)?;
         parse_number(&text, self.default_lang).ok_or_else(not_found)
     }
 
