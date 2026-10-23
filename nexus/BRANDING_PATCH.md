@@ -43,6 +43,7 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/ui-egui/src/previews.rs` | Giao diện NexusOffices: mẫu Kiểu tối đa `STYLE_SAMPLE_MAX_PT` cho vừa ô; số ô theo chiều rộng còn lại | Một phần (cỡ mẫu có thể PR upstream) |
 | `crates/ui-egui/src/nexus_toolbar.rs` | File mới: bố cục NexusOffice — thanh menu (sinh từ registry lệnh, đủ mọi lệnh theo nhóm) + một hàng công cụ thay ribbon | — (file mới) |
 | `crates/ui-egui/src/lib.rs` (thêm) | `pub mod nexus_toolbar;`, trường `WordApp::toolbar` (mặc định tắt = ribbon upstream), chọn `nexus_toolbar::show` thay `ribbon::show` khi bật | Có — cờ giao diện |
+| `crates/ui-egui/src/lib.rs`, `chrome.rs`, `backstage.rs` (thêm) | Trường `WordApp::embedded` (mặc định tắt): khi app được nhúng làm một tab của cửa sổ NexusOffice, không đặt tiêu đề cửa sổ, không kéo/phóng to cửa sổ từ title bar; test `an_embedded_app_leaves_the_window_title_alone` | Có — cờ nhúng |
 | `apps/wordcraft-web/src/web.rs` | Bật `app.toolbar` cho bản web | Có |
 | `crates/ui-egui/examples/ui_shot.rs` | `{"toolbar": true}` để chụp bố cục NexusOffice | Có |
 | `crates/ui-egui/src/theme.rs` | Màu NexusOffice (DESIGN_SYSTEM.md): ink indigo `#4F46E5`, gradient `#6366F1`→`#06B6D4`→`#10B981`, nền `#F8FAFC`/`#F1F5F9`, viền `#E2E8F0`; màu chủ đạo người dùng chọn (`set_accent`, `with_accent` giữ tương phản 4.5:1) | Có — bảng màu qua biến build |

@@ -397,6 +397,26 @@ mod tests {
         assert_ne!(before, after, "Bold toggled");
     }
 
+    /// Embedded in the NexusOffice window, the app never renames the window; stand-alone, it does.
+    #[test]
+    fn an_embedded_app_leaves_the_window_title_alone() {
+        for embedded in [false, true] {
+            let mut a = WordApp::new(wordcraft_engine::Session::new(wordcraft_engine::sample::sample_document()), crate::Services::default());
+            a.toolbar = true;
+            a.embedded = embedded;
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).build_ui_state(
+                |ui, app: &mut WordApp| {
+                    let ctx = ui.ctx().clone();
+                    app.logic(&ctx);
+                    app.ui(ui);
+                },
+                a,
+            );
+            h.run_steps(4);
+            assert_eq!(h.state().sent_title.is_empty(), embedded, "embedded = {embedded}");
+        }
+    }
+
     /// The menus are built from any registry slice, so an empty one gives no menu (no panic).
     #[test]
     fn no_commands_no_menus() {

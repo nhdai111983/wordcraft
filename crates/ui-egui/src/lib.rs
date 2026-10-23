@@ -458,6 +458,10 @@ pub struct WordApp {
     /// Menus a host program adds to the menu bar after the app's own (the NexusOffice window adds
     /// its "Nexus AI" menu this way): `(title, contents)`. Empty in the stand-alone app.
     pub host_menus: Vec<(String, Box<dyn FnMut(&mut egui::Ui)>)>,
+    /// Drawn inside another program's window (a tab of the NexusOffice window): the app leaves
+    /// the window alone (no title, no dragging or maximizing it from the title bar); the host
+    /// names its tabs. Off in the stand-alone app.
+    pub embedded: bool,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
@@ -598,6 +602,7 @@ impl WordApp {
             integrated_titlebar: false,
             toolbar: false,
             host_menus: Vec::new(),
+            embedded: false,
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
             shot_token: 0,
@@ -2087,7 +2092,7 @@ impl WordApp {
         } else {
             nexus::APP_NAME.to_string()
         };
-        if title != self.sent_title {
+        if title != self.sent_title && !self.embedded {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.sent_title = title;
         }
