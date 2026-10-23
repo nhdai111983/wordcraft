@@ -37,6 +37,21 @@ pub const ATTRIBUTION: (&str, &str) = (
 /// without branding).
 pub const UPSTREAM_COPYRIGHT: &str = "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team and the WordCraft contributors.";
 
+/// The NexusOffices look (a lighter ribbon in the style of WPS Office, Henry 2026-10-23): what
+/// differs from upstream's Word-style layout, in one place. Colours are in `theme.rs`.
+pub mod look {
+    /// Group titles under the ribbon groups ("Clipboard", "Font"…). Off: the ribbon is one row of
+    /// controls with dividers, 18 pt shorter, and a group's dialog launcher sits at the bottom
+    /// right of its controls. The title stays in the launcher's tooltip and the accessibility tree.
+    pub const GROUP_TITLES: bool = false;
+    /// Ribbon tabs centred in the tab strip (File stays at the left edge).
+    pub const CENTRED_TABS: bool = true;
+    /// The largest text size (points) the Home › Styles gallery draws a style's sample in, so a
+    /// Title or Heading 1 sample fits its tile instead of being cut off. Font, weight, colour and
+    /// the smaller sizes are drawn as the style has them.
+    pub const STYLE_SAMPLE_MAX_PT: f32 = 15.0;
+}
+
 /// The About page's first tab: name, version, what it is, where the source is, the attribution
 /// and the copyright notices.
 pub fn about_ui(ui: &mut egui::Ui) {

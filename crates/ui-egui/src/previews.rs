@@ -513,7 +513,10 @@ pub fn style_gallery(app: &mut WordApp, ui: &mut Ui, state: &Value) {
     let skey = app.previews.styles_key(&app.session.doc, rev);
     let ppp = ui.ctx().pixels_per_point();
     let start = ui.data(|d| d.get_temp::<usize>(egui::Id::new("gallery_start"))).unwrap_or(0).min(styles.len().saturating_sub(1));
-    let visible = 6usize;
+    // NexusOffices look: as many tiles (1 to 6) as leave room for the Editing group after the
+    // gallery, so a narrow window shows whole tiles and Find/Replace instead of a cut-off tile.
+    let room = ui.available_width() - 18.0 - 190.0;
+    let visible = if room.is_finite() { (room / 76.0).floor().clamp(1.0, 6.0) as usize } else { 6 };
     let (area, _) = ui.allocate_exact_size(vec2(visible as f32 * 76.0 + 18.0, crate::widgets::CONTENT_H), Sense::hover());
     ui.painter().rect(area.shrink(1.0), 4.0, t.input, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     for (k, (id, name)) in styles.iter().skip(start).take(visible).enumerate() {
@@ -532,7 +535,12 @@ pub fn style_gallery(app: &mut WordApp, ui: &mut Ui, state: &Value) {
         let doc = &app.session.doc;
         let tex = app.previews.get_or(ui.ctx(), &key, || {
             // Sample letters in the interface's script (`АаБбВвГг` in Russian).
-            let mut p = Paragraph::with_text(tl!("AaBbCcDd"), CharProps::default()).styled(id);
+            // NexusOffices look: a large style (Title, Heading 1) is drawn at a size that fits
+            // the tile rather than cut off; its font, weight and colour stay its own.
+            let size = doc.styles.resolve_char(Some(id), &CharProps::default()).size;
+            let cap = crate::nexus::look::STYLE_SAMPLE_MAX_PT;
+            let run = CharProps { size: (size.is_finite() && size > cap).then_some(cap), ..CharProps::default() };
+            let mut p = Paragraph::with_text(tl!("AaBbCcDd"), run).styled(id);
             p.props.space_before = Some(0.0);
             p.props.align = Some(wordcraft_doc::Align::Left);
             // Keep hanging indents (bullets) but start the first line at the tile's left edge.

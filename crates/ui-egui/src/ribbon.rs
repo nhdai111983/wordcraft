@@ -218,6 +218,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         .exact_size(30.0)
         .frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 }))
         .show(ui, |ui| {
+            let strip = ui.max_rect();
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -275,7 +276,19 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                             })
                             .collect();
                         let fits = fit_tabs(&widths, ui.available_width(), MORE_TABS_W + 2.0);
-                        for ((tab, custom), _) in tabs.iter().zip(&fits).filter(|(_, fits)| **fits) {
+                        // NexusOffices look: File at the left edge, the other tabs centred in the
+                        // strip as far as the room left of Comments/Editing/Share allows.
+                        let centre_gap = {
+                            let shown: Vec<f32> = widths.iter().zip(&fits).filter(|(_, f)| **f).map(|((w, _), _)| *w).collect();
+                            let rest = shown.iter().skip(1).sum::<f32>() + if fits.iter().all(|f| *f) { 0.0 } else { MORE_TABS_W + 2.0 };
+                            let after_file = ui.cursor().min.x + shown.first().copied().unwrap_or(0.0);
+                            let room = ui.available_width() - shown.iter().sum::<f32>() - (rest - shown.iter().skip(1).sum::<f32>());
+                            (strip.center().x - rest / 2.0 - after_file).min(room).max(0.0)
+                        };
+                        for (i, ((tab, custom), _)) in tabs.iter().zip(&fits).filter(|(_, fits)| **fits).enumerate() {
+                            if i == 1 && crate::nexus::look::CENTRED_TABS {
+                                ui.add_space(centre_gap);
+                            }
                             let (tab, custom) = (tab.as_str(), *custom);
                             let contextual = !custom && wordcraft_engine::ribbon::CONTEXTUAL_TABS.contains(&tab);
                             // A custom tab's name is the user's own text: shown as typed.

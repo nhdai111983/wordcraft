@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use egui::{Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Stroke, Visuals};
 
-/// WordCraft's app colour (and its darker ink for text on light backgrounds).
-pub const APP_COLOR: Color32 = Color32::from_rgb(0x3B, 0x5B, 0xDB);
-pub const APP_INK: Color32 = Color32::from_rgb(0x2B, 0x47, 0xB5);
+/// The app colour (and its darker ink for text on light backgrounds): Nexus Docs' teal, the
+/// colour of its icon (`nexus/assets/nexus-docs.svg`).
+pub const APP_COLOR: Color32 = Color32::from_rgb(0x0F, 0x76, 0x6E);
+pub const APP_INK: Color32 = Color32::from_rgb(0x11, 0x5E, 0x59);
 
 /// The interface theme setting (File › Options › General, View › Interface Theme): a fixed light or
 /// dark palette, or `System`, which follows the OS light/dark appearance live (#115). Dark page
@@ -282,20 +283,22 @@ impl Tokens {
     pub fn light() -> Self {
         Tokens {
             dark: false,
-            title_bar: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            ribbon: Color32::from_rgb(0xF9, 0xF9, 0xF9),
-            tab_strip: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            canvas: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-            panel: Color32::from_rgb(0xFA, 0xFA, 0xFA),
-            border: Color32::from_rgb(0xE1, 0xE1, 0xE1),
-            border_strong: Color32::from_rgb(0xC8, 0xC8, 0xC8),
+            // NexusOffices look (WPS-like): a grey title bar over one white band of tabs and
+            // ribbon, and a cool grey desk around the pages.
+            title_bar: Color32::from_rgb(0xF2, 0xF3, 0xF5),
+            ribbon: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            tab_strip: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            canvas: Color32::from_rgb(0xE8, 0xEB, 0xEE),
+            panel: Color32::from_rgb(0xFA, 0xFB, 0xFC),
+            border: Color32::from_rgb(0xE3, 0xE6, 0xEA),
+            border_strong: Color32::from_rgb(0xC8, 0xCD, 0xD4),
             text: Color32::from_rgb(0x24, 0x24, 0x24),
             text_dim: Color32::from_rgb(0x61, 0x61, 0x61),
             text_disabled: Color32::from_rgb(0xA8, 0xA8, 0xA8),
             icon: Color32::from_rgb(0x42, 0x42, 0x42),
-            hover: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-            pressed: Color32::from_rgb(0xD6, 0xD6, 0xD6),
-            checked: Color32::from_rgb(0xDD, 0xE3, 0xF8),
+            hover: Color32::from_rgb(0xEC, 0xEF, 0xF2),
+            pressed: Color32::from_rgb(0xDE, 0xE3, 0xE8),
+            checked: Color32::from_rgb(0xD6, 0xEF, 0xEB),
             accent: APP_COLOR,
             accent_text: APP_INK,
             on_accent: Color32::WHITE,
@@ -305,8 +308,8 @@ impl Tokens {
             ruler: Color32::from_rgb(0xFF, 0xFF, 0xFF),
             ruler_margin: Color32::from_rgb(0xD4, 0xD4, 0xD4),
             ruler_tick: Color32::from_rgb(0x70, 0x70, 0x70),
-            status_bar: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            selection: Color32::from_rgba_unmultiplied(0x3B, 0x5B, 0xDB, 0x48),
+            status_bar: Color32::from_rgb(0xF2, 0xF3, 0xF5),
+            selection: Color32::from_rgba_unmultiplied(0x0F, 0x76, 0x6E, 0x40),
             find_highlight: Color32::from_rgba_unmultiplied(0xFF, 0xE0, 0x3D, 0x90),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x22),
             handle: Color32::WHITE,
@@ -337,11 +340,11 @@ impl Tokens {
             icon: Color32::from_rgb(0xDD, 0xDD, 0xDD),
             hover: Color32::from_rgb(0x3D, 0x3D, 0x3D),
             pressed: Color32::from_rgb(0x4A, 0x4A, 0x4A),
-            checked: Color32::from_rgb(0x2E, 0x3A, 0x66),
-            accent: Color32::from_rgb(0x7A, 0x93, 0xF0),
-            accent_text: Color32::from_rgb(0x9C, 0xB0, 0xF5),
-            // Dark text on the light dark-theme accent: white on #7a93f0 is only 2.9:1 (#655).
-            on_accent: Color32::from_rgb(0x11, 0x16, 0x2E),
+            checked: Color32::from_rgb(0x13, 0x4E, 0x4A),
+            accent: Color32::from_rgb(0x2D, 0xBF, 0xAD),
+            accent_text: Color32::from_rgb(0x5E, 0xEA, 0xD4),
+            // Dark text on the light dark-theme accent (#655).
+            on_accent: Color32::from_rgb(0x04, 0x2F, 0x2E),
             input: Color32::from_rgb(0x1E, 0x1E, 0x1E),
             input_border: Color32::from_rgb(0x7A, 0x7A, 0x7A),
             group_label: Color32::from_rgb(0xA0, 0xA0, 0xA0),
@@ -350,7 +353,7 @@ impl Tokens {
             ruler_margin: Color32::from_rgb(0x2E, 0x2E, 0x2E),
             ruler_tick: Color32::from_rgb(0xB4, 0xB4, 0xB4),
             status_bar: Color32::from_rgb(0x1F, 0x1F, 0x1F),
-            selection: Color32::from_rgba_unmultiplied(0x7A, 0x93, 0xF0, 0x55),
+            selection: Color32::from_rgba_unmultiplied(0x2D, 0xBF, 0xAD, 0x50),
             find_highlight: Color32::from_rgba_unmultiplied(0xC8, 0xA8, 0x00, 0x70),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x60),
             handle: Color32::from_rgb(0xF2, 0xF2, 0xF2),

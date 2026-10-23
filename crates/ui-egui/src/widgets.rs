@@ -8,8 +8,9 @@ use crate::{WordApp, icons};
 
 /// Height of the ribbon content area (without group labels).
 pub const CONTENT_H: f32 = 66.0;
-/// Height of the group title row under the content.
-pub const LABEL_H: f32 = 18.0;
+/// Height of the group title row under the content (none in the NexusOffices look, see
+/// [`crate::nexus::look::GROUP_TITLES`]).
+pub const LABEL_H: f32 = if crate::nexus::look::GROUP_TITLES { 18.0 } else { 0.0 };
 /// Large buttons: centre of the 32 px icon, top of the first label line, and the pitch and
 /// height of a label line (`regular(11.5)`; a test checks the font's real line height).
 pub const BIG_ICON_Y: f32 = 18.0;
@@ -327,8 +328,11 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
     let t = Tokens::get(ui.ctx());
     let label_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(title.to_string(), regular(11.0), t.group_label).size().x);
     let start = ui.cursor().min;
+    let titles = crate::nexus::look::GROUP_TITLES;
     let inner = ui.vertical(|ui| {
-        ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
+        if titles {
+            ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
+        }
         let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), CONTENT_H), egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = vec2(1.0, 1.0);
             add(ui, app);
@@ -343,9 +347,18 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
     let r = inner.response.rect;
     let r = Rect::from_min_max(start, pos2(r.max.x, start.y + CONTENT_H + LABEL_H));
     let title_y = r.max.y - LABEL_H / 2.0;
-    ui.painter().text(pos2(r.center().x, title_y), Align2::CENTER_CENTER, title, regular(11.0), t.group_label);
+    if titles {
+        ui.painter().text(pos2(r.center().x, title_y), Align2::CENTER_CENTER, title, regular(11.0), t.group_label);
+    }
     if let Some(cmd) = launcher {
-        let lr = Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0));
+        // Without titles the launcher gets its own narrow column right of the controls, level
+        // with their bottom row.
+        let lr = if titles {
+            Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0))
+        } else {
+            let (col, _) = ui.allocate_exact_size(vec2(13.0, CONTENT_H), Sense::hover());
+            Rect::from_center_size(pos2(col.center().x, col.max.y - 7.0), vec2(11.0, 11.0))
+        };
         let resp = ui.interact(lr, ui.id().with(("launch", id_title)), Sense::click());
         if resp.hovered() {
             ui.painter().rect_filled(lr.expand(2.0), 2.0, t.hover);

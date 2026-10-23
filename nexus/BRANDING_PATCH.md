@@ -38,7 +38,10 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/ui-egui/src/lib.rs` | `pub mod nexus;`; tiêu đề cửa sổ = `nexus::APP_NAME`; `ui.discord` không mở Discord ArtCraft; trạng thái engine chỉ qua `tl!` khi là key catalog (`i18n::is_catalog_key`), nên tên file/phông của người dùng giữ nguyên; lỗi "making Nexus Docs the default app…"/"Nexus Docs can't change the default apps…" đổi tại nguồn; test `status_keeps_the_users_file_name`; 3 dòng test theo nhãn mới | Có — `APP_NAME`, `COMMUNITY_URL: Option` |
 | `crates/ui-egui/src/dialogs.rs` | Tab About → `nexus::about_ui` (bỏ link getartcraft/Discord, mô tả "Crafting Apps from the ArtCraft team") | Có |
 | `crates/ui-egui/src/chrome.rs` | Ẩn nút Discord trên title bar; tiêu đề khi không có tài liệu qua `tl!` (→ Nexus Docs) | Có — `COMMUNITY_URL` |
-| `crates/ui-egui/src/ribbon.rs` | Ẩn nút Help › Community Discord | Có — `COMMUNITY_URL` |
+| `crates/ui-egui/src/ribbon.rs` | Ẩn nút Help › Community Discord; giao diện NexusOffices: tab ribbon căn giữa (`nexus::look::CENTRED_TABS`) | Có — `COMMUNITY_URL`; cờ giao diện |
+| `crates/ui-egui/src/widgets.rs` | Giao diện NexusOffices: không có hàng tiêu đề nhóm ribbon, nút mở hộp thoại nhóm ở góc dưới phải (`nexus::look::GROUP_TITLES`) | Có — cờ giao diện |
+| `crates/ui-egui/src/previews.rs` | Giao diện NexusOffices: mẫu Kiểu tối đa `STYLE_SAMPLE_MAX_PT` cho vừa ô; số ô theo chiều rộng còn lại | Một phần (cỡ mẫu có thể PR upstream) |
+| `crates/ui-egui/src/theme.rs` | Màu NexusOffices: teal của icon Nexus Docs (`#0F766E`), ribbon trắng, nền xám lạnh (sáng và tối) | Có — bảng màu qua biến build |
 | `crates/ui-egui/src/backstage.rs` | Ẩn mục "Discord community" trong File | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/options.rs` | Ẩn ô "Show the community button" (nút đã ẩn); test kittest tra nhãn "…when Nexus Docs starts" | Có — `COMMUNITY_URL` |
 | `crates/mcp/src/server.rs` | `serverInfo.title = "Nexus Docs"`, websiteUrl fork; bỏ link Discord/getartcraft khỏi instructions. **`serverInfo.name` giữ `"wordcraft"`** có chủ đích: là định danh máy (test MCP và cấu hình client dựa vào), không phải tên hiển thị | Có |
