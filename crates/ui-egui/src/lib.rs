@@ -63,6 +63,7 @@ pub mod keys;
 pub mod keytips;
 pub mod mini_toolbar;
 pub mod nexus;
+pub mod nexus_toolbar;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -447,6 +448,9 @@ pub struct WordApp {
     pub(crate) dialog_pick: Option<String>,
     /// macOS: the window has no title bar; leave room for the traffic lights.
     pub integrated_titlebar: bool,
+    /// NexusOffice layout: a menu bar and one tool row instead of the ribbon
+    /// ([`nexus_toolbar`]). The Nexus apps turn it on; off keeps upstream's ribbon.
+    pub toolbar: bool,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
@@ -585,6 +589,7 @@ impl WordApp {
             status_msg: None,
             previews: previews::Previews::default(),
             integrated_titlebar: false,
+            toolbar: false,
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
             shot_token: 0,
@@ -2011,13 +2016,13 @@ impl WordApp {
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
             chrome::title_bar(self, ui);
-            ribbon::show(self, ui);
+            if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
             chrome::title_bar(self, ui);
             if !self.session.view.focus_mode {
-                ribbon::show(self, ui);
+                if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
             }

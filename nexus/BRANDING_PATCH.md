@@ -41,7 +41,11 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/ui-egui/src/ribbon.rs` | Ẩn nút Help › Community Discord; giao diện NexusOffices: tab ribbon căn giữa (`nexus::look::CENTRED_TABS`) | Có — `COMMUNITY_URL`; cờ giao diện |
 | `crates/ui-egui/src/widgets.rs` | Giao diện NexusOffices: không có hàng tiêu đề nhóm ribbon, nút mở hộp thoại nhóm ở góc dưới phải (`nexus::look::GROUP_TITLES`) | Có — cờ giao diện |
 | `crates/ui-egui/src/previews.rs` | Giao diện NexusOffices: mẫu Kiểu tối đa `STYLE_SAMPLE_MAX_PT` cho vừa ô; số ô theo chiều rộng còn lại | Một phần (cỡ mẫu có thể PR upstream) |
-| `crates/ui-egui/src/theme.rs` | Màu NexusOffices: teal của icon Nexus Docs (`#0F766E`), ribbon trắng, nền xám lạnh (sáng và tối) | Có — bảng màu qua biến build |
+| `crates/ui-egui/src/nexus_toolbar.rs` | File mới: bố cục NexusOffice — thanh menu (sinh từ registry lệnh, đủ mọi lệnh theo nhóm) + một hàng công cụ thay ribbon | — (file mới) |
+| `crates/ui-egui/src/lib.rs` (thêm) | `pub mod nexus_toolbar;`, trường `WordApp::toolbar` (mặc định tắt = ribbon upstream), chọn `nexus_toolbar::show` thay `ribbon::show` khi bật | Có — cờ giao diện |
+| `apps/wordcraft-web/src/web.rs` | Bật `app.toolbar` cho bản web | Có |
+| `crates/ui-egui/examples/ui_shot.rs` | `{"toolbar": true}` để chụp bố cục NexusOffice | Có |
+| `crates/ui-egui/src/theme.rs` | Màu NexusOffice: indigo SonnyTech (`#4F46E5`), dải gradient indigo→cyan→emerald, ribbon trắng, nền xám lạnh (sáng và tối) | Có — bảng màu qua biến build |
 | `crates/ui-egui/src/backstage.rs` | Ẩn mục "Discord community" trong File | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/options.rs` | Ẩn ô "Show the community button" (nút đã ẩn); test kittest tra nhãn "…when Nexus Docs starts" | Có — `COMMUNITY_URL` |
 | `crates/mcp/src/server.rs` | `serverInfo.title = "Nexus Docs"`, websiteUrl fork; bỏ link Discord/getartcraft khỏi instructions. **`serverInfo.name` giữ `"wordcraft"`** có chủ đích: là định danh máy (test MCP và cấu hình client dựa vào), không phải tên hiển thị | Có |
@@ -49,7 +53,7 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/formats/src/latex.rs` | Dòng đầu LaTeX: bỏ URL getartcraft, "Written by Nexus Docs" | Có — tên app qua biến build |
 | `crates/formats/src/tests.rs` | Test khẳng định dòng đầu LaTeX mới | Đi cùng `latex.rs` |
 | `crates/control-key/src/lib.rs` | Thư mục cấu hình `Nexus Docs` (macOS/Windows) / `nexus-docs` (XDG) — không đụng cấu hình WordCraft gốc (+ test) | Có — tên thư mục qua biến build |
-| `apps/wordcraft/src/main.rs` | Tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log; tên lệnh `nexus-docs` trong USAGE, `--version` và tiền tố stderr | Có |
+| `apps/wordcraft/src/main.rs` | Bật `app.toolbar` (bố cục NexusOffice); tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log; tên lệnh `nexus-docs` trong USAGE, `--version` và tiền tố stderr | Có |
 | `apps/wordcraft/src/logging.rs` | Tiền tố stderr của panic hook `nexus-docs:` (tên file log `wordcraft.log`, log target giữ nguyên) | Có — tên binary qua biến build |
 | `apps/wordcraft/src/print.rs` | Tên lệnh in trong hàng đợi máy in `"Nexus Docs document"` | Có — tên app qua biến build |
 | `apps/wordcraft/tests/help.rs` | Assert USAGE bắt đầu bằng `nexus-docs — ` và không chứa `wordcraft`/`WordCraft` | Đi cùng `main.rs` |

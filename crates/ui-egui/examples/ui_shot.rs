@@ -28,6 +28,8 @@ fn main() {
     };
     let mut app = WordApp::new(Session::new(doc), Services::default()).with_control(rx);
     app.integrated_titlebar = true;
+    // `{"toolbar": true}` on any line: the NexusOffice layout (menu bar and tool row).
+    app.toolbar = lines.iter().any(|l| l.get("toolbar").and_then(|v| v.as_bool()) == Some(true));
     if lines.first().is_some_and(|l| l.get("startScreen").is_some()) {
         app.start_screen();
     }

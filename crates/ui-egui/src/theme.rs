@@ -4,10 +4,14 @@ use std::sync::Arc;
 
 use egui::{Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Stroke, Visuals};
 
-/// The app colour (and its darker ink for text on light backgrounds): Nexus Docs' teal, the
-/// colour of its icon (`nexus/assets/nexus-docs.svg`).
-pub const APP_COLOR: Color32 = Color32::from_rgb(0x0F, 0x76, 0x6E);
-pub const APP_INK: Color32 = Color32::from_rgb(0x11, 0x5E, 0x59);
+/// The app colour (and its darker ink for text on light backgrounds): SonnyTech indigo
+/// (Henry, 2026-10-23: brand palette indigo #4F46E5, cyan #06B6D4, emerald #10B981).
+pub const APP_COLOR: Color32 = Color32::from_rgb(0x4F, 0x46, 0xE5);
+pub const APP_INK: Color32 = Color32::from_rgb(0x43, 0x38, 0xCA);
+/// The SonnyTech brand gradient (indigo → cyan → emerald), drawn as a thin line under the menu
+/// bar of the NexusOffice layout.
+pub const BRAND_GRADIENT: [Color32; 3] =
+    [Color32::from_rgb(0x4F, 0x46, 0xE5), Color32::from_rgb(0x06, 0xB6, 0xD4), Color32::from_rgb(0x10, 0xB9, 0x81)];
 
 /// The interface theme setting (File › Options › General, View › Interface Theme): a fixed light or
 /// dark palette, or `System`, which follows the OS light/dark appearance live (#115). Dark page
@@ -298,7 +302,7 @@ impl Tokens {
             icon: Color32::from_rgb(0x42, 0x42, 0x42),
             hover: Color32::from_rgb(0xEC, 0xEF, 0xF2),
             pressed: Color32::from_rgb(0xDE, 0xE3, 0xE8),
-            checked: Color32::from_rgb(0xD6, 0xEF, 0xEB),
+            checked: Color32::from_rgb(0xE0, 0xE7, 0xFF),
             accent: APP_COLOR,
             accent_text: APP_INK,
             on_accent: Color32::WHITE,
@@ -309,7 +313,7 @@ impl Tokens {
             ruler_margin: Color32::from_rgb(0xD4, 0xD4, 0xD4),
             ruler_tick: Color32::from_rgb(0x70, 0x70, 0x70),
             status_bar: Color32::from_rgb(0xF2, 0xF3, 0xF5),
-            selection: Color32::from_rgba_unmultiplied(0x0F, 0x76, 0x6E, 0x40),
+            selection: Color32::from_rgba_unmultiplied(0x4F, 0x46, 0xE5, 0x40),
             find_highlight: Color32::from_rgba_unmultiplied(0xFF, 0xE0, 0x3D, 0x90),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x22),
             handle: Color32::WHITE,
@@ -340,11 +344,11 @@ impl Tokens {
             icon: Color32::from_rgb(0xDD, 0xDD, 0xDD),
             hover: Color32::from_rgb(0x3D, 0x3D, 0x3D),
             pressed: Color32::from_rgb(0x4A, 0x4A, 0x4A),
-            checked: Color32::from_rgb(0x13, 0x4E, 0x4A),
-            accent: Color32::from_rgb(0x2D, 0xBF, 0xAD),
-            accent_text: Color32::from_rgb(0x5E, 0xEA, 0xD4),
+            checked: Color32::from_rgb(0x31, 0x2E, 0x81),
+            accent: Color32::from_rgb(0x81, 0x8C, 0xF8),
+            accent_text: Color32::from_rgb(0xA5, 0xB4, 0xFC),
             // Dark text on the light dark-theme accent (#655).
-            on_accent: Color32::from_rgb(0x04, 0x2F, 0x2E),
+            on_accent: Color32::from_rgb(0x1E, 0x1B, 0x4B),
             input: Color32::from_rgb(0x1E, 0x1E, 0x1E),
             input_border: Color32::from_rgb(0x7A, 0x7A, 0x7A),
             group_label: Color32::from_rgb(0xA0, 0xA0, 0xA0),
@@ -353,7 +357,7 @@ impl Tokens {
             ruler_margin: Color32::from_rgb(0x2E, 0x2E, 0x2E),
             ruler_tick: Color32::from_rgb(0xB4, 0xB4, 0xB4),
             status_bar: Color32::from_rgb(0x1F, 0x1F, 0x1F),
-            selection: Color32::from_rgba_unmultiplied(0x2D, 0xBF, 0xAD, 0x50),
+            selection: Color32::from_rgba_unmultiplied(0x81, 0x8C, 0xF8, 0x50),
             find_highlight: Color32::from_rgba_unmultiplied(0xC8, 0xA8, 0x00, 0x70),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x60),
             handle: Color32::from_rgb(0xF2, 0xF2, 0xF2),
