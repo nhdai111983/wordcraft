@@ -44,6 +44,7 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/ui-egui/src/nexus_toolbar.rs` | File mới: bố cục NexusOffice — thanh menu (sinh từ registry lệnh, đủ mọi lệnh theo nhóm) + một hàng công cụ thay ribbon | — (file mới) |
 | `crates/ui-egui/src/lib.rs` (thêm) | `pub mod nexus_toolbar;`, trường `WordApp::toolbar` (mặc định tắt = ribbon upstream), chọn `nexus_toolbar::show` thay `ribbon::show` khi bật | Có — cờ giao diện |
 | `crates/ui-egui/src/lib.rs`, `chrome.rs`, `backstage.rs` (thêm) | Trường `WordApp::embedded` (mặc định tắt): khi app được nhúng làm một tab của cửa sổ NexusOffice, không đặt tiêu đề cửa sổ, không kéo/phóng to cửa sổ từ title bar; test `an_embedded_app_leaves_the_window_title_alone` | Có — cờ nhúng |
+| `crates/ui-egui/src/lib.rs` (thêm) | `Services::new_document`: chủ nhà có tab (cửa sổ NexusOffice) nhận File › Mới, Ctrl+N và mẫu văn bản để mở tab mới, tài liệu đang soạn giữ nguyên; không có thì như upstream. Test `new_documents_go_to_the_host_when_it_takes_them` | Có — dịch vụ của chủ nhà |
 | `crates/ui-egui/src/dialogs_layout.rs`, `i18n/vi.tsv`, `i18n/hr.tsv` | Tiếng Việt (`vi-VN`) trong danh sách ngôn ngữ (Xem lại › Ngôn ngữ) và tên trên thanh trạng thái ("Tiếng Việt" thay vì `vi-VN`); `hr.tsv` phải có mọi khoá; test `vietnamese_is_a_named_document_language`. Ứng viên gửi upstream | Không — tính năng tiếng Việt |
 | `apps/wordcraft-web/src/web.rs` | Bật `app.toolbar` cho bản web | Có |
 | `crates/ui-egui/examples/ui_shot.rs` | `{"toolbar": true}` để chụp bố cục NexusOffice | Có |

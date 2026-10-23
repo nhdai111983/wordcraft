@@ -417,6 +417,27 @@ mod tests {
         }
     }
 
+    /// With a host that takes new documents (the NexusOffice window's tabs), File › New and its
+    /// templates go to the host and the document stays; without one New replaces it as upstream.
+    #[test]
+    fn new_documents_go_to_the_host_when_it_takes_them() {
+        let asked = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let seen = asked.clone();
+        let services = crate::Services { new_document: Some(Box::new(move |p| seen.borrow_mut().push(p))), ..Default::default() };
+        let mut a = WordApp::new(wordcraft_engine::Session::new(wordcraft_engine::sample::sample_document()), services);
+        let text = a.session.doc.plain_text(wordcraft_doc::StoryRef::Body);
+        a.session.dirty = true;
+        a.ui.backstage = true;
+        a.run("file.new", json!({"template": "letter"})).unwrap();
+        assert_eq!(*asked.borrow(), vec![json!({"template": "letter"})]);
+        assert_eq!(a.session.doc.plain_text(wordcraft_doc::StoryRef::Body), text, "the document stays");
+        assert!(a.dialog.is_none(), "nothing to ask: nothing is discarded");
+        assert!(!a.ui.backstage);
+        let mut b = WordApp::new(wordcraft_engine::Session::new(wordcraft_engine::sample::sample_document()), crate::Services::default());
+        b.run("file.new", json!({})).unwrap();
+        assert_ne!(b.session.doc.plain_text(wordcraft_doc::StoryRef::Body), text, "stand-alone: New replaces it");
+    }
+
     /// Vietnamese is a language text can be marked in (Review › Language), and the status bar
     /// names it instead of showing the tag "vi-VN" (NexusOffice writes new documents in it).
     #[test]
