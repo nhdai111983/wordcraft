@@ -243,6 +243,9 @@ pub struct UiState {
     pub recent_colors: Vec<String>,
     /// Interface theme: light, dark, or follow the OS appearance (#115).
     pub theme: theme::Appearance,
+    /// NexusOffice: the accent colour the user picked (`#RRGGBB`); `None` = the app's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
     /// Interface size (#475, #822): Auto (the display scale the system reports) or an absolute
     /// size in percent. Junk saved values read as Auto; out-of-range ones are clamped to 50–300 %.
     #[serde(rename = "uiScale")]
@@ -451,6 +454,9 @@ pub struct WordApp {
     /// NexusOffice layout: a menu bar and one tool row instead of the ribbon
     /// ([`nexus_toolbar`]). The Nexus apps turn it on; off keeps upstream's ribbon.
     pub toolbar: bool,
+    /// Menus a host program adds to the menu bar after the app's own (the NexusOffice window adds
+    /// its "Nexus AI" menu this way): `(title, contents)`. Empty in the stand-alone app.
+    pub host_menus: Vec<(String, Box<dyn FnMut(&mut egui::Ui)>)>,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
@@ -590,6 +596,7 @@ impl WordApp {
             previews: previews::Previews::default(),
             integrated_titlebar: false,
             toolbar: false,
+            host_menus: Vec::new(),
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
             shot_token: 0,
@@ -703,6 +710,9 @@ impl WordApp {
         if let Some(dark) = self.ui.legacy_dark.take() {
             self.ui.theme = if dark { theme::Appearance::Dark } else { theme::Appearance::Light };
         }
+        // NexusOffice: the user's accent colour (a junk value reads as the app's own colour).
+        theme::set_accent(self.ui.accent.as_deref().and_then(theme::parse_hex));
+        self.applied_theme = None;
         // A `ui.json` from before #822: its interface size was on top of the display scale, so it
         // becomes absolute on the first frame that knows that scale (`logic`). A chosen `uiScale`
         // (the current key) wins; "auto" can't be told from a missing key, so the old size does.
@@ -1379,6 +1389,26 @@ impl WordApp {
                     }
                 }
                 json!({"theme": self.ui.theme.code(), "dark": self.ui_is_dark()})
+            }
+            "ui.accent" => {
+                // NexusOffice: `#RRGGBB` sets the accent colour, `null` or "" goes back to the
+                // app's own; no value reads it.
+                if let Some(v) = p.get("value") {
+                    let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
+                    match hex.map(theme::parse_hex) {
+                        Some(None) => return Some(Err(format!("unknown colour {v}; use #RRGGBB"))),
+                        Some(Some(c)) => {
+                            self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
+                            theme::set_accent(Some(c));
+                        }
+                        None => {
+                            self.ui.accent = None;
+                            theme::set_accent(None);
+                        }
+                    }
+                    self.applied_theme = None;
+                }
+                json!({"accent": self.ui.accent})
             }
             "ui.interfaceSize" => {
                 // `auto` (the display scale the system reports) or an absolute size in percent,
@@ -2393,6 +2423,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.keytips"
             | "ui.dark"
             | "ui.theme"
+            | "ui.accent"
             | "ui.interfaceSize"
             | "ui.animations"
             | "ui.language"
@@ -5892,6 +5923,10 @@ mod tests {
         }
         let mut a = app();
         assert!(a.run("ui.theme", json!({"value": "purple"})).is_err());
+        // NexusOffice accent: junk is refused and changes nothing; null keeps the app's colour.
+        assert!(a.run("ui.accent", json!({"value": "purple"})).is_err());
+        assert_eq!(a.run("ui.accent", json!({"value": null})).unwrap()["accent"], Value::Null);
+        assert_eq!(a.run("ui.accent", json!({})).unwrap()["accent"], Value::Null);
         assert_eq!(a.run("ui.theme", json!({"value": "dark"})).unwrap()["theme"], "dark");
         assert_eq!(a.run("ui.dark", json!({})).unwrap()["theme"], "light", "ui.dark toggles the manual choice");
         assert_eq!(a.run("ui.theme", json!({})).unwrap()["theme"], "light");

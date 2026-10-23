@@ -112,6 +112,16 @@ fn menu_bar(app: &mut WordApp, ui: &mut Ui) {
                 menu_body(app, ui, m);
             });
         }
+        // Menus the host program adds (the NexusOffice window's "Nexus AI"), after the app's own.
+        let mut host = std::mem::take(&mut app.host_menus);
+        for (title, contents) in &mut host {
+            let resp = menu_title(ui, title, true);
+            egui::Popup::menu(&resp).show(|ui| {
+                ui.set_min_width(220.0);
+                contents(ui);
+            });
+        }
+        app.host_menus = host;
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if !app.has_document() {
                 ui.disable();

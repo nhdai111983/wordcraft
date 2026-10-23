@@ -45,9 +45,9 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/ui-egui/src/lib.rs` (thêm) | `pub mod nexus_toolbar;`, trường `WordApp::toolbar` (mặc định tắt = ribbon upstream), chọn `nexus_toolbar::show` thay `ribbon::show` khi bật | Có — cờ giao diện |
 | `apps/wordcraft-web/src/web.rs` | Bật `app.toolbar` cho bản web | Có |
 | `crates/ui-egui/examples/ui_shot.rs` | `{"toolbar": true}` để chụp bố cục NexusOffice | Có |
-| `crates/ui-egui/src/theme.rs` | Màu NexusOffice: indigo SonnyTech (`#4F46E5`), dải gradient indigo→cyan→emerald, ribbon trắng, nền xám lạnh (sáng và tối) | Có — bảng màu qua biến build |
+| `crates/ui-egui/src/theme.rs` | Màu NexusOffice (DESIGN_SYSTEM.md): ink indigo `#4F46E5`, gradient `#6366F1`→`#06B6D4`→`#10B981`, nền `#F8FAFC`/`#F1F5F9`, viền `#E2E8F0`; màu chủ đạo người dùng chọn (`set_accent`, `with_accent` giữ tương phản 4.5:1) | Có — bảng màu qua biến build |
 | `crates/ui-egui/src/backstage.rs` | Ẩn mục "Discord community" trong File | Có — `COMMUNITY_URL` |
-| `crates/ui-egui/src/options.rs` | Ẩn ô "Show the community button" (nút đã ẩn); test kittest tra nhãn "…when Nexus Docs starts" | Có — `COMMUNITY_URL` |
+| `crates/ui-egui/src/options.rs` | Ẩn ô "Show the community button" (nút đã ẩn); test kittest tra nhãn "…when Nexus Docs starts" | Có — `COMMUNITY_URL`; giao diện NexusOffice: chọn "Màu chủ đạo" (6 màu gợi sẵn + màu tuỳ ý, lệnh `ui.accent`) |
 | `crates/mcp/src/server.rs` | `serverInfo.title = "Nexus Docs"`, websiteUrl fork; bỏ link Discord/getartcraft khỏi instructions. **`serverInfo.name` giữ `"wordcraft"`** có chủ đích: là định danh máy (test MCP và cấu hình client dựa vào), không phải tên hiển thị | Có |
 | `crates/engine/src/sample.rs` | Tài liệu mẫu: creator `Nexus Docs`, link `getartcraft.com` → `example.org` | Có |
 | `crates/formats/src/latex.rs` | Dòng đầu LaTeX: bỏ URL getartcraft, "Written by Nexus Docs" | Có — tên app qua biến build |
