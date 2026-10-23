@@ -130,7 +130,13 @@ fn menu_bar(app: &mut WordApp, ui: &mut Ui) {
             let share_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(share.to_string(), medium(12.0), t.text).size().x);
             let (r, resp) = ui.allocate_exact_size(vec2((share_w + 30.0).max(64.0), 22.0), Sense::click());
             ui.painter().rect_filled(r, 4.0, if resp.hovered() { t.accent_text } else { t.accent });
-            crate::icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(13.0, 13.0)), "share", t.on_accent, t.on_accent);
+            crate::icons::paint(
+                ui.painter(),
+                Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(13.0, 13.0)),
+                "share",
+                t.on_accent,
+                t.on_accent,
+            );
             ui.painter().text(pos2(r.min.x + 23.0, r.center().y), Align2::LEFT_CENTER, share, medium(12.0), t.on_accent);
             if resp.on_hover_text(tl!("Export a copy to share (PDF, Word document)")).clicked() {
                 let _ = app.run("ui.backstage", json!({"value": true, "page": "export"}));
@@ -198,7 +204,9 @@ fn items(app: &mut WordApp, ui: &mut Ui, ids: &[&'static str]) {
         let label = tl!(c.label).to_string();
         let on = crate::widgets::enabled(app, id);
         let sc = crate::widgets::shortcut_text(app, id);
-        if ui.add_enabled(on, egui::Button::new(label).shortcut_text(sc)).clicked() {
+        // An empty shortcut would leave a trailing space in the item's accessible name.
+        let button = if sc.is_empty() { egui::Button::new(label) } else { egui::Button::new(label).shortcut_text(sc) };
+        if ui.add_enabled(on, button).clicked() {
             let _ = app.run(id, json!({}));
             ui.close();
         }
@@ -249,7 +257,8 @@ fn tools(app: &mut WordApp, ui: &mut Ui) {
         };
     }
     let size = st.get("size").and_then(Value::as_f64).map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { format!("{s}") }).unwrap_or_default();
-    let sizes: Vec<String> = wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
+    let sizes: Vec<String> =
+        wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
     if let Some(v) = combo(ui, "nexus_size", 48.0, &size, &sizes, None)
         && let Ok(x) = v.trim().parse::<f64>()
         && x.is_finite()
@@ -336,12 +345,56 @@ mod tests {
         assert_eq!(ms.iter().map(|m| m.tab.as_str()).collect::<Vec<_>>(), ["Home", "Insert", "Review"], "File and empty tabs have no menu");
         for m in &ms {
             let listed: usize = m.groups.iter().map(|(_, ids)| ids.len()).sum();
-            let expected =
-                s.registry.all().iter().filter(|c| c.location == m.tab || c.location.starts_with(&format!("{} › ", m.tab))).count();
+            let expected = s.registry.all().iter().filter(|c| c.location == m.tab || c.location.starts_with(&format!("{} › ", m.tab))).count();
             assert_eq!(listed, expected, "{}", m.tab);
         }
         let home = &ms[0];
         assert!(home.groups.iter().any(|(g, ids)| g == "Font" && ids.contains(&"format.bold")), "{home:?}");
+    }
+
+    /// The menu bar opens a tab's menu with its groups, a group lists its commands, and a click
+    /// runs the command; the tool row's Bold runs `format.bold`. The host's menus come after the
+    /// app's own.
+    #[test]
+    fn menus_and_tools_work_in_the_window() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = WordApp::new(wordcraft_engine::Session::new(wordcraft_engine::sample::sample_document()), crate::Services::default());
+        a.toolbar = true;
+        let hits = std::rc::Rc::new(std::cell::Cell::new(0));
+        let h2 = hits.clone();
+        a.host_menus.push((
+            "Nexus AI".to_string(),
+            Box::new(move |ui: &mut Ui| {
+                if ui.button("Viết tiếp (Pro)").clicked() {
+                    h2.set(h2.get() + 1);
+                }
+            }),
+        ));
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut WordApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            a,
+        );
+        h.run_steps(6);
+        h.get_by_label("Insert").click();
+        h.run_steps(6);
+        // Each ribbon group is a submenu.
+        h.get_by_label("Tables ⏵").hover();
+        h.run_steps(6);
+        h.get_by_label("Convert Text to Table");
+        h.get_by_label("Nexus AI").click();
+        h.run_steps(6);
+        h.get_by_label("Viết tiếp (Pro)").click();
+        h.run_steps(6);
+        assert_eq!(hits.get(), 1, "the host menu's item ran");
+        let before = h.state_mut().session.run("format.state", &json!({})).unwrap_or_default()["bold"].clone();
+        h.get_by_label("Bold").click();
+        h.run_steps(6);
+        let after = h.state_mut().session.run("format.state", &json!({})).unwrap_or_default()["bold"].clone();
+        assert_ne!(before, after, "Bold toggled");
     }
 
     /// The menus are built from any registry slice, so an empty one gives no menu (no panic).

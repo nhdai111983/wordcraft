@@ -351,6 +351,7 @@ impl Default for UiState {
             recent_symbols: Vec::new(),
             recent_colors: Vec::new(),
             theme: theme::Appearance::default(),
+            accent: None,
             interface_size: theme::InterfaceSize::default(),
             legacy_interface_size: None,
             animations: theme::Animations::default(),
@@ -2046,13 +2047,21 @@ impl WordApp {
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
             chrome::title_bar(self, ui);
-            if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
+            if self.toolbar {
+                nexus_toolbar::show(self, ui)
+            } else {
+                ribbon::show(self, ui)
+            }
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
             chrome::title_bar(self, ui);
             if !self.session.view.focus_mode {
-                if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
+                if self.toolbar {
+                    nexus_toolbar::show(self, ui)
+                } else {
+                    ribbon::show(self, ui)
+                }
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
             }
