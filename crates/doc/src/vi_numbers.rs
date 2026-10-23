@@ -1,9 +1,9 @@
 //! Vietnamese number words for the CardText and OrdText field formats (`\* CardText`), as
 //! documents write amounts ("một triệu hai trăm năm mươi nghìn đồng").
 //!
-//! Written from standard Vietnamese orthography, not observed from Word (WordCraft hasn't
-//! observed what Word writes for a `vi-VN` run yet). Where usage varies, the common written
-//! form is chosen:
+//! A WordCraft extension: Word (Microsoft 365 for Windows, English interface, observed
+//! 2026-10-23) keeps English words for `vi-VN` text. Written from standard Vietnamese
+//! orthography; where usage varies, the common written form is chosen:
 //! - 1 after "mươi" is "mốt" (21 = hai mươi mốt), but "một" after "mười" and "linh" (11, 101);
 //! - 5 after "mười"/"mươi" is "lăm" (15 = mười lăm, 25 = hai mươi lăm), "năm" elsewhere;
 //! - 4 after "mươi" is "tư" (24 = hai mươi tư), "bốn" elsewhere (14 = mười bốn, 104 = một trăm

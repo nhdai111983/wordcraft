@@ -1224,11 +1224,15 @@ mod tests {
         assert_eq!(free_formula(vi, "= 5 / 2"), "2,50");
         assert_eq!(free_formula(None, "= 2 * 3 + 1"), "7");
         assert_eq!(free_formula(None, r##"= 1234.5 \# "#,##0.00""##), "1,234.50");
-        assert_eq!(free_formula(Some("en-US"), r"= 21 \* CardText"), "Twenty-One");
-        // English has words up to 999,999; past that the digits, not words for another number.
-        assert_eq!(free_formula(Some("en-US"), r"= 999999 \* CardText"), "Nine Hundred Ninety-Nine Thousand Nine Hundred Ninety-Nine");
-        assert_eq!(free_formula(Some("en-US"), r"= 1250000 \* CardText"), "1250000");
-        assert_eq!(free_formula(Some("en-US"), r"= 1250000 \* OrdText"), "1250000");
+        // English in lower case, as Word writes it (observed 2026-10-23).
+        assert_eq!(free_formula(Some("en-US"), r"= 21 \* CardText"), "twenty-one");
+        assert_eq!(free_formula(Some("en-US"), r"= 105 \* CardText"), "one hundred five");
+        assert_eq!(free_formula(Some("en-US"), r"= 4 \* OrdText"), "fourth");
+        assert_eq!(free_formula(Some("en-US"), r"= 21 \* CardText \* Caps"), "Twenty-one", "words are split at spaces");
+        // English has words up to 999,999; past that an error result, as in Word.
+        assert_eq!(free_formula(Some("en-US"), r"= 999999 \* CardText"), "nine hundred ninety-nine thousand nine hundred ninety-nine");
+        assert_eq!(free_formula(Some("en-US"), r"= 1250000 \* CardText"), "!number too large for words");
+        assert_eq!(free_formula(Some("en-US"), r"= 1250000 \* OrdText"), "!number too large for words");
         assert_eq!(free_formula(Some("vi-VN"), r"= 12.5 \* CardText"), "mười ba", "rounded first (a choice; Word not observed)");
         assert_eq!(free_formula(None, r"= 21 \* CardText \* Upper"), "TWENTY-ONE");
     }

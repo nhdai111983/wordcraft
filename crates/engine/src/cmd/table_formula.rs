@@ -152,7 +152,7 @@ pub fn evaluate_field_in(
             })
         })
         .or_else(|| default_lang.map(str::to_string));
-    Ok(format_value(value, switch, out_lang.as_deref()))
+    format_value(value, switch, out_lang.as_deref())
 }
 
 /// The text a formula field outside a table shows (`{ = 1250000 \* CardText }`): its formula
@@ -168,7 +168,7 @@ pub fn evaluate_free_field(
     let (formula, switch) = split_switch(instr);
     let none = Table::default();
     let value = evaluate_in(&none, false, doc, lang, 0, 0, formula, marks)?;
-    Ok(format_value(value, switch, lang))
+    format_value(value, switch, lang)
 }
 
 /// The text of a field's numeric result `value` under its switches (`switches` from the first
@@ -176,25 +176,29 @@ pub fn evaluate_free_field(
 /// - a `\*` number format writes it that way: CardText and OrdText in words of that language
 ///   (Vietnamese or English, see [`wordcraft_doc::section::cardinal_text_in`]), Ordinal, roman,
 ///   alphabetic, Arabic. The value is rounded to a whole number first; a negative value or one
-///   too large for the format keeps the plain number, as there are no words for it;
+///   too large for the format keeps the plain number. English has no words past 999,999: that
+///   is an error ([`TOO_LARGE_FOR_WORDS`]), as in Word (observed 2026-10-23);
 /// - otherwise a `\#` numeric picture ([`format_picture`]);
 /// - otherwise the plain number as the language writes it;
 /// - then `\* Upper`/`Lower`/`Caps`/`FirstCap` set the case.
-pub fn format_value(value: f64, switches: Option<&str>, lang: Option<&str>) -> String {
+pub fn format_value(value: f64, switches: Option<&str>, lang: Option<&str>) -> Result<String, CmdError> {
     let switches = switches.unwrap_or("");
-    let text = number_switch_text(value, switches, lang).unwrap_or_else(|| wordcraft_doc::locale_number::format_number(value, lang));
-    apply_case_switch(text, switches)
+    let text = number_switch_text(value, switches, lang)?.unwrap_or_else(|| wordcraft_doc::locale_number::format_number(value, lang));
+    Ok(apply_case_switch(text, switches))
 }
+
+/// The error of CardText or OrdText on a number English has no words for (past 999,999).
+pub const TOO_LARGE_FOR_WORDS: &str = "number too large for words";
 
 /// `value` under the `\*` number format or else the `\#` picture among `switches` (see
 /// [`format_value`]); `None` when neither applies.
-pub fn number_switch_text(value: f64, switches: &str, lang: Option<&str>) -> Option<String> {
+pub fn number_switch_text(value: f64, switches: &str, lang: Option<&str>) -> Result<Option<String>, CmdError> {
     if let Some(fmt) = wordcraft_layout::fields::format_switch(switches)
-        && let Some(text) = number_in_format(value, fmt, lang)
+        && let Some(text) = number_in_format(value, fmt, lang)?
     {
-        return Some(text);
+        return Ok(Some(text));
     }
-    picture_of(switches).map(|picture| format_picture(value, &picture))
+    Ok(picture_of(switches).map(|picture| format_picture(value, &picture)))
 }
 
 /// `text` in the case a `\*` switch among `switches` asks for (unchanged without one).
@@ -206,23 +210,28 @@ pub fn apply_case_switch(text: String, switches: &str) -> String {
 }
 
 /// `value` in a `\*` number format, or `None` when the format has no form for it (negative,
-/// not finite, past `u64`, or past `u32` for the formats other than words and Arabic).
-fn number_in_format(value: f64, fmt: wordcraft_doc::section::NumFormat, lang: Option<&str>) -> Option<String> {
-    use wordcraft_doc::section::{NumFormat, cardinal_text_in, ordinal_text_in};
+/// not finite, past `u64`, or past `u32` for the formats other than words and Arabic). Words for
+/// a number the language has none for (English past 999,999) are an error.
+fn number_in_format(value: f64, fmt: wordcraft_doc::section::NumFormat, lang: Option<&str>) -> Result<Option<String>, CmdError> {
+    use wordcraft_doc::section::{NumFormat, cardinal_text_in, has_number_words, ordinal_text_in};
     /// 2^64: the first whole number a `u64` can't hold (exactly representable as an `f64`).
     const PAST_U64: f64 = 18_446_744_073_709_551_616.0;
     let n = value.round();
     if !(0.0..PAST_U64).contains(&n) {
-        return None;
+        return Ok(None);
     }
     // In range and whole, so the conversion is exact (it saturates in any case).
     let n = n as u64;
-    match fmt {
+    let words = matches!(fmt, NumFormat::CardinalText | NumFormat::OrdinalText);
+    if words && !has_number_words(n, lang) {
+        return Err(CmdError::Failed(TOO_LARGE_FOR_WORDS.into()));
+    }
+    Ok(match fmt {
         NumFormat::CardinalText => Some(cardinal_text_in(n, lang)),
         NumFormat::OrdinalText => Some(ordinal_text_in(n, lang)),
         NumFormat::Decimal => Some(n.to_string()),
         _ => u32::try_from(n).ok().map(|n| fmt.format_in(n, lang)),
-    }
+    })
 }
 
 /// Splits a field's switches off its formula: `=SUM(ABOVE) \# "0.00"` gives the formula and the

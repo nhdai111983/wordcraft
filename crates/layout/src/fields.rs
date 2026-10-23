@@ -371,7 +371,12 @@ mod tests {
         assert_eq!(field_text(" PAGE \\* ROMAN ", "", &ctx).0, "IV");
         assert_eq!(field_text("PAGE \\*roman", "", &ctx).0, "iv");
         assert_eq!(field_text("PAGE \\*roman\\*MERGEFORMAT", "", &ctx).0, "iv");
-        assert_eq!(field_text("NUMPAGES \\* CardText", "", &ctx).0, "Twelve");
+        // Lower case, as Word writes CardText field results (observed 2026-10-23); a case
+        // switch capitalises.
+        assert_eq!(field_text("NUMPAGES \\* CardText", "", &ctx).0, "twelve");
+        assert_eq!(field_text("NUMPAGES \\* CardText \\* FirstCap", "", &ctx).0, "Twelve");
+        assert_eq!(field_text("NUMPAGES \\* CardText \\* Upper", "", &ctx).0, "TWELVE");
+        assert_eq!(field_text("PAGE \\* OrdText", "", &ctx).0, "fourth");
         assert_eq!(field_text("NUMPAGES \\* CHINESENUM1", "", &ctx).0, "十二");
         assert_eq!(field_text("PAGE \\* ChineseNum2", "", &ctx).0, "肆");
         assert_eq!(field_text("DATE \\@ \"M/d/yyyy\"", "1/2/2026", &ctx), ("1/2/2026".into(), false));
@@ -387,7 +392,10 @@ mod tests {
         assert_eq!(field_text_in("PAGE \\* CardText", "", &ctx, 4, Some("vi-VN")).0, "bốn");
         assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &ctx, 4, Some("vi-VN")).0, "hai mươi mốt");
         assert_eq!(field_text_in("PAGE \\* OrdText", "", &ctx, 4, Some("vi-VN")).0, "thứ tư");
-        assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &ctx, 4, Some("en-GB")).0, "Twenty-One");
+        assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &ctx, 4, Some("en-GB")).0, "twenty-one");
+        // A page number English has no words for keeps its digits (no error in a page number).
+        let big = FieldCtx { page: 1, pages: 1_000_000, ..Default::default() };
+        assert_eq!(field_text_in("NUMPAGES \\* CardText", "", &big, 1, None).0, "1000000");
         assert_eq!(field_text_in("PAGE", "", &ctx, 4, Some("vi-VN")).0, "4");
         assert_eq!(field_text_in("PAGE \\* CardText \\* FirstCap", "", &ctx, 4, Some("vi-VN")).0, "Bốn");
         assert_eq!(field_text_in("NUMPAGES \\*CardText\\*Upper", "", &ctx, 4, Some("vi-VN")).0, "HAI MƯƠI MỐT");

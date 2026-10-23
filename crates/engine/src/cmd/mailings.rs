@@ -774,7 +774,13 @@ fn merge_value_text(raw: String, instr: &str, lang: Option<&str>) -> String {
     if !switches.contains('\\') {
         return raw;
     }
-    let numbered = super::table_formula::parse_number(&raw, lang).and_then(|x| super::table_formula::number_switch_text(x, switches, lang));
+    let numbered = match super::table_formula::parse_number(&raw, lang).map(|x| super::table_formula::number_switch_text(x, switches, lang)) {
+        Some(Ok(text)) => text,
+        // A number the format has no words for (English past 999,999): an error result, as `=`
+        // fields show one.
+        Some(Err(e)) => return format!("!{e}"),
+        None => None,
+    };
     super::table_formula::apply_case_switch(numbered.unwrap_or(raw), switches)
 }
 
@@ -1606,7 +1612,10 @@ mod tests {
         assert_eq!(merged_with(None, r##"MERGEFIELD "Số tiền" \# "#,##0""##, rows.clone()), "1,250,000\n21,000,000\n105\nabc\n-7");
         assert_eq!(merged_with(None, r#"MERGEFIELD "Số tiền""#, rows.clone()), "1250000\n21000000\n105\nabc\n-7");
         let rows = json!([{"N": "21", "Name": "ada"}, {"N": "3", "Name": "bo lin"}]);
-        assert_eq!(merged_with(None, r"MERGEFIELD N \* CardText", rows.clone()), "Twenty-One\nThree");
+        assert_eq!(merged_with(None, r"MERGEFIELD N \* CardText", rows.clone()), "twenty-one\nthree");
+        assert_eq!(merged_with(None, r"MERGEFIELD N \* CardText \* FirstCap", rows.clone()), "Twenty-one\nThree");
+        // English has no words past 999,999: an error result, as `=` fields show.
+        assert_eq!(merged_with(Some("en-US"), r"MERGEFIELD N \* CardText", json!([{"N": "1250000"}])), "!number too large for words");
         assert_eq!(merged_with(None, r"MERGEFIELD N \* Ordinal", rows.clone()), "21st\n3rd");
         assert_eq!(merged_with(None, r"MERGEFIELD Name \* Upper", rows.clone()), "ADA\nBO LIN");
         assert_eq!(merged_with(None, r"MERGEFIELD Name \* Caps", rows), "Ada\nBo Lin");

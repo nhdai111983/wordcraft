@@ -270,8 +270,10 @@ impl NumFormat {
             NumFormat::RussianUpper => russian_letters(n).to_uppercase(),
             NumFormat::RussianLower => russian_letters(n),
             NumFormat::Ordinal => format!("{n}{}", ordinal_suffix(n)),
-            NumFormat::CardinalText => cardinal_text_in(u64::from(n), None),
-            NumFormat::OrdinalText => ordinal_text_in(u64::from(n), None),
+            // List numbers: capitalised words ("One, Two, Three"), the digits past 999,999.
+            NumFormat::CardinalText if u64::from(n) <= MAX_ENGLISH_WORDS => cardinal_text(n),
+            NumFormat::OrdinalText if u64::from(n) <= MAX_ENGLISH_WORDS => ordinal_text(n),
+            NumFormat::CardinalText | NumFormat::OrdinalText => n.to_string(),
             NumFormat::Bullet | NumFormat::None => String::new(),
             NumFormat::Chicago => chicago(n),
             NumFormat::NumberInDash => format!("- {n} -"),
@@ -325,10 +327,11 @@ impl NumFormat {
 }
 
 impl NumFormat {
-    /// [`NumFormat::format`] in the language `lang` (a `w:lang` tag such as `vi-VN`) of the
-    /// text the number is written in: the word formats (CardText, OrdText) use that language's
-    /// words where WordCraft has them (Vietnamese), English otherwise. Every other format is
-    /// the same in every language.
+    /// A number as a field's `\*` switch writes it, in the language `lang` (a `w:lang` tag such
+    /// as `vi-VN`) of the field's text: the word formats (CardText, OrdText) give that language's
+    /// words where WordCraft has them (Vietnamese, a WordCraft extension) and English in lower
+    /// case otherwise ("twenty-one", as Word was observed to write field results, 2026-10-23),
+    /// see [`cardinal_text_in`]. Every other format is [`NumFormat::format`].
     pub fn format_in(self, n: u32, lang: Option<&str>) -> String {
         match self {
             NumFormat::CardinalText => cardinal_text_in(u64::from(n), lang),
@@ -346,28 +349,34 @@ pub fn is_vietnamese(lang: Option<&str>) -> bool {
 /// The largest number English words are written for (Word's CardText and OrdText stop there too).
 pub const MAX_ENGLISH_WORDS: u64 = 999_999;
 
-/// Cardinal words for `n` in `lang`: Vietnamese ([`crate::vi_numbers::cardinal`], any `u64`), else
-/// English ([`cardinal_text`]) up to [`MAX_ENGLISH_WORDS`]; a larger number keeps its digits
-/// rather than words for another number.
+/// Whether CardText and OrdText have words for `n` in `lang`: always in Vietnamese, up to
+/// [`MAX_ENGLISH_WORDS`] in English.
+pub fn has_number_words(n: u64, lang: Option<&str>) -> bool {
+    is_vietnamese(lang) || n <= MAX_ENGLISH_WORDS
+}
+
+/// A field's cardinal words for `n` in `lang`: Vietnamese ([`crate::vi_numbers::cardinal`], any
+/// `u64`), else English in lower case ("twenty-one") up to [`MAX_ENGLISH_WORDS`]. Past that
+/// English has no words ([`has_number_words`]) and this gives the digits (what a page number
+/// shows; a formula or merge field shows an error instead).
 pub fn cardinal_text_in(n: u64, lang: Option<&str>) -> String {
     if is_vietnamese(lang) {
         crate::vi_numbers::cardinal(n)
     } else {
         match u32::try_from(n) {
-            Ok(m) if n <= MAX_ENGLISH_WORDS => cardinal_text(m),
+            Ok(m) if n <= MAX_ENGLISH_WORDS => english_cardinal(m),
             _ => n.to_string(),
         }
     }
 }
 
-/// Ordinal words for `n` in `lang` (see [`cardinal_text_in`]; past [`MAX_ENGLISH_WORDS`] English
-/// keeps the digits).
+/// A field's ordinal words for `n` in `lang` ("fourth", "thứ tư"; see [`cardinal_text_in`]).
 pub fn ordinal_text_in(n: u64, lang: Option<&str>) -> String {
     if is_vietnamese(lang) {
         crate::vi_numbers::ordinal(n)
     } else {
         match u32::try_from(n) {
-            Ok(m) if n <= MAX_ENGLISH_WORDS => ordinal_text(m),
+            Ok(m) if n <= MAX_ENGLISH_WORDS => english_ordinal(m),
             _ => n.to_string(),
         }
     }
@@ -473,8 +482,14 @@ const ONES: [&str; 20] = [
 ];
 const TENS: [&str; 10] = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 
-/// English cardinal words, capitalised first letter (`Twenty-One`).
+/// English cardinal words with each word capitalised (`Twenty-One`), as list numbers show them;
+/// values past 999,999 are clamped (fields use [`cardinal_text_in`]).
 pub fn cardinal_text(n: u32) -> String {
+    capitalize(&english_cardinal(n))
+}
+
+/// English cardinal words in lower case (`twenty-one`), values past 999,999 clamped.
+fn english_cardinal(n: u32) -> String {
     fn words(n: u32) -> String {
         match n {
             0..=19 => ONES.get(n as usize).copied().unwrap_or("").to_string(),
@@ -492,12 +507,17 @@ pub fn cardinal_text(n: u32) -> String {
             }
         }
     }
-    capitalize(&words(n.min(999_999)))
+    words(n.min(999_999))
 }
 
-/// English ordinal words (`Twenty-First`).
+/// English ordinal words with each word capitalised (`Twenty-First`), as list numbers show them.
 pub fn ordinal_text(n: u32) -> String {
-    let c = cardinal_text(n).to_lowercase();
+    capitalize(&english_ordinal(n))
+}
+
+/// English ordinal words in lower case (`twenty-first`).
+fn english_ordinal(n: u32) -> String {
+    let c = english_cardinal(n);
     let (head, last) = match c.rfind(['-', ' ']) {
         Some(i) => (c.get(..=i).unwrap_or(""), c.get(i + 1..).unwrap_or("")),
         None => ("", c.as_str()),
@@ -513,7 +533,7 @@ pub fn ordinal_text(n: u32) -> String {
         l if l.ends_with('y') => format!("{}ieth", l.trim_end_matches('y')),
         l => format!("{l}th"),
     };
-    capitalize(&format!("{head}{last}"))
+    format!("{head}{last}")
 }
 
 fn capitalize(s: &str) -> String {
@@ -931,8 +951,9 @@ impl SectionProps {
 mod tests {
     use super::*;
 
-    /// CardText and OrdText follow the language of the text they are written in: Vietnamese in a
-    /// `vi` run, English (unchanged) everywhere else.
+    /// CardText and OrdText in fields follow the language of the text they are written in:
+    /// Vietnamese in a `vi` run, English in lower case everywhere else (as Word writes field
+    /// results, observed 2026-10-23); list numbers keep capitalised words.
     #[test]
     fn word_formats_follow_the_language() {
         assert_eq!(NumFormat::CardinalText.format_in(21, Some("vi-VN")), "hai mươi mốt");
@@ -940,13 +961,19 @@ mod tests {
         assert_eq!(NumFormat::OrdinalText.format_in(4, Some("VI_vn")), "thứ tư");
         assert_eq!(cardinal_text_in(1_250_000, Some("vi-VN")), "một triệu hai trăm năm mươi nghìn");
         assert_eq!(ordinal_text_in(1, Some("vi-VN")), "thứ nhất");
-        // English keeps its output, other languages and no language too.
+        // English in lower case, for other languages and no language too.
         for lang in [None, Some("en-US"), Some("fr-FR"), Some("vie"), Some("")] {
-            assert_eq!(NumFormat::CardinalText.format_in(21, lang), "Twenty-One", "{lang:?}");
-            assert_eq!(NumFormat::OrdinalText.format_in(112, lang), "One Hundred Twelfth", "{lang:?}");
+            assert_eq!(NumFormat::CardinalText.format_in(21, lang), "twenty-one", "{lang:?}");
+            assert_eq!(NumFormat::CardinalText.format_in(105, lang), "one hundred five", "{lang:?}");
+            assert_eq!(NumFormat::OrdinalText.format_in(4, lang), "fourth", "{lang:?}");
+            assert_eq!(NumFormat::OrdinalText.format_in(112, lang), "one hundred twelfth", "{lang:?}");
         }
-        // Past 999,999 English has no words here: the digits, not words for 999,999.
-        assert_eq!(cardinal_text_in(999_999, None), "Nine Hundred Ninety-Nine Thousand Nine Hundred Ninety-Nine");
+        // List numbers keep capitalised words.
+        assert_eq!(NumFormat::CardinalText.format(21), "Twenty-One");
+        assert_eq!(NumFormat::OrdinalText.format(112), "One Hundred Twelfth");
+        // Past 999,999 English has no words: the digits, not words for 999,999.
+        assert!(has_number_words(999_999, None) && !has_number_words(1_000_000, Some("en-US")) && has_number_words(u64::MAX, Some("vi")));
+        assert_eq!(cardinal_text_in(999_999, None), "nine hundred ninety-nine thousand nine hundred ninety-nine");
         assert_eq!(cardinal_text_in(1_000_000, None), "1000000");
         assert_eq!(ordinal_text_in(1_250_000, Some("en-US")), "1250000");
         assert_eq!(cardinal_text_in(u64::MAX, None), "18446744073709551615");

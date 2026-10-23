@@ -136,7 +136,7 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
 
 ## Progress log
 
-- 2026-10-23: Vietnamese numbers in words: `\* CardText` and `\* OrdText` follow the field's language, so `{ = 1250000 \* CardText }` in a `vi-VN` run shows "một triệu hai trăm năm mươi nghìn" (amounts up to `u64`; "mốt", "lăm", "tư", "linh", "không trăm" by standard orthography, not yet observed from Word); English is unchanged. `=` formula fields now evaluate outside tables (they showed nothing), MERGEFIELD results honour `\*` (CardText, OrdText, Ordinal, Upper, Lower, Caps, FirstCap) and `\#` pictures, and Insert › Page Number "x of y" writes "Trang X / Y" in a Vietnamese document. Formulas read bookmarks as numbers (`= Total * 2`) and keep Word's saved result when they can't be worked out; English CardText past 999,999 keeps the digits.
+- 2026-10-23: Vietnamese numbers in words: `\* CardText` and `\* OrdText` follow the field's language, so `{ = 1250000 \* CardText }` in a `vi-VN` run shows "một triệu hai trăm năm mươi nghìn" (amounts up to `u64`; "mốt", "lăm", "tư", "linh", "không trăm" by standard orthography). Word (Microsoft 365 for Windows, English interface, observed 2026-10-23) keeps English words for Vietnamese text, so this is a WordCraft extension; English field words are now lower case as Word writes them ("twenty-one"), with an error result past 999,999 in `=` and MERGEFIELD. `=` formula fields now evaluate outside tables (they showed nothing), MERGEFIELD results honour `\*` (CardText, OrdText, Ordinal, Upper, Lower, Caps, FirstCap) and `\#` pictures, and Insert › Page Number "x of y" writes "Trang X / Y" in a Vietnamese document. Formulas read bookmarks as numbers (`= Total * 2`) and keep Word's saved result when they can't be worked out.
 - 2026-10-22: Headers and footers: while editing the header, a single click in the footer edits the footer with the caret where clicked (and the reverse, and another page's own header or footer). The click went to the header being edited and the view scrolled back up to it, so a double-click on the footer rarely landed unless both were on screen.
 - 2026-10-21: Bullets and Numbering toggle off style-inherited lists at their effective level, including basedOn chains and numbered ListParagraph styles; other paragraphs and list definitions stay unchanged (related to #3459).
 
@@ -573,6 +573,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | trivial | Progress log: English field number words in lower case as Word (observed 2026-10-23); Vietnamese words a WordCraft extension |
 | 2026-10-23 | trivial | Progress log: formulas read bookmarks and keep saved results; English CardText past 999,999 keeps digits |
 | 2026-10-23 | trivial | Progress log: Vietnamese CardText/OrdText fields, `=` fields outside tables, MERGEFIELD switches, "Trang X / Y" |
 | 2026-10-22 | trivial | Progress log: a click in the footer while editing the header moves there |

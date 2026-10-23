@@ -170,20 +170,30 @@ and the document defaults; Update Field also falls back to the editing language 
 the document names one, which layout can't, so a document with no `w:lang` anywhere can show
 English words on the page for PAGE while a stored result is in the editing language — new
 documents always name a language). `\* CardText` and `\* OrdText` write Vietnamese words in a
-`vi` run (any region) and English everywhere else (`crates/doc/src/vi_numbers.rs`,
-`NumFormat::format_in`): on `PAGE`, `NUMPAGES`, `SECTIONPAGES`, `SECTION`, `PAGEREF` and `SEQ`, on
+`vi` run (any region) and English everywhere else, in lower case ("twenty-one", "one hundred
+five", "fourth"; `crates/doc/src/vi_numbers.rs`, `NumFormat::format_in`): on `PAGE`, `NUMPAGES`, `SECTIONPAGES`, `SECTION`, `PAGEREF` and `SEQ`, on
 `=` formula fields (in a table or, since C-14b, anywhere in the text:
 `{ = 1250000 \* CardText }` → "một triệu hai trăm năm mươi nghìn") and on `MERGEFIELD` results in
-Finish & Merge and Preview Results. Vietnamese covers every `u64`. English has words up to
-999,999 (unchanged there); a larger number keeps its digits (`1250000`) instead of the words for
-999,999 it showed before — Word shows an error there, which WordCraft doesn't copy. A fractional
+Finish & Merge and Preview Results. List numbers in the CardText/OrdText formats keep
+capitalised words ("One, Two, Three"). Vietnamese covers every `u64`. English has words up to
+999,999; past that a `=` or `MERGEFIELD` result is an error in WordCraft's own words
+(`!number too large for words`, like the other `!` results) and a page number keeps its digits.
+
+**Observed in Word** (Microsoft 365 for Windows, English interface, 2026-10-23, synthetic blank
+document, fields updated with F9): `{ = 21 \* CardText }` → "twenty-one", `{ = 105 \* CardText }`
+→ "one hundred five", `{ PAGE \* CardText }` → "one", `{ = 4 \* OrdText }` → "fourth", all lower
+case (capitals only with `\* Caps`/`\* FirstCap`); `{ = 1250000 \* CardText }` in en-US is an
+error result. With all the text marked Vietnamese (no Vietnamese proofing tools installed) the
+same fields still show the English words. So Word keeps English number words for `vi-VN` text in
+that setup: **Vietnamese CardText/OrdText is a WordCraft extension**, and the lower-case English
+matches Word. A fractional
 value is rounded to the nearest whole number before it is written in words or another `\*`
 number format (`= 2.5 \* Arabic` → 3, a merged `12.5` with CardText → "mười ba"): a choice, Word
 not observed. A negative value keeps its digits. List and page numbers in the `vietnameseCounting`
 format are Vietnamese words too ("một", "hai", …).
 
-The Vietnamese words are **chosen from standard orthography, not observed from Word** (Word's
-output for a `vi-VN` run has not been observed yet): lower case; "mốt" for 1 after "mươi"; "lăm"
+The Vietnamese words are **chosen from standard orthography** (Word writes English words there,
+see above): lower case; "mốt" for 1 after "mươi"; "lăm"
 for 5 after "mười"/"mươi"; "tư" for 4 after "mươi" ("mười bốn", "linh bốn"); "linh" for a zero
 tens digit (105 = "một trăm linh năm"); "không trăm" inside larger numbers (1 005 = "một nghìn
 không trăm linh năm"); "nghìn", "triệu", "tỷ", and "tỷ" repeating past it (10^12 = "một nghìn
@@ -254,6 +264,7 @@ WordCraft keeps 2,54 cm).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | trivial | English CardText/OrdText field results in lower case and an error past 999,999 in `=`/MERGEFIELD, as Word observed 2026-10-23 (M365 Windows, English UI); Word keeps English words for vi-VN text, so Vietnamese words are a WordCraft extension |
 | 2026-10-23 | trivial | "Trang X / Y" region fallback: decided when the page number is inserted, unchanged by Save As; formulas reading many bookmarks find them once per Update Fields |
 | 2026-10-23 | trivial | Review fixes: bookmarks in formulas and saved results kept; English words stop at 999,999 (digits past it); "Trang X / Y" region fallback only for new documents; case switches on page numbers and SEQ, chained switches; fractions rounded (documented); `vietnameseCounting` in Vietnamese words |
 | 2026-10-23 | minor | Vietnamese CardText/OrdText in the field's language (orthography-based, not observed from Word); `=` formula fields evaluate outside tables; MERGEFIELD honours `\*` and `\#`; "Page X of Y" is "Trang X / Y" in Vietnamese (NexusOffices C-14b) |
