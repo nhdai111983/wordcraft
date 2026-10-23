@@ -1,4 +1,4 @@
-# NexusOffices release (template: templates/workflows/nexus-release.yml in nhdai111983/NexusOffices).
+# NexusOffice release (template: templates/workflows/nexus-release.yml in nhdai111983/NexusOffices).
 # Copy verbatim to .github/workflows/nexus-release.yml in each fork (wordcraft, gridcraft, deckcraft,
 # pdfcraft). Checklist for Henry: docs/agent-rules/nexus-release.md in NexusOffices.
 #
@@ -23,7 +23,7 @@
 #   Nexus<App>-<ver>-macos-universal.dmg
 #   Nexus<App>-<ver>-linux-x86_64.AppImage (+ .zsync)   Nexus<App>-<ver>-linux-x86_64.deb
 #   Nexus<App>-<ver>-web.zip   SHA256SUMS.txt
-# <App> is Docs, Sheets, Slides or PDF. The packaging scripts of the fork do the building; this
+# <App> is Docs, Sheet, Slide or PDF. The packaging scripts of the fork do the building; this
 # workflow only installs tools, sets the version, renames the outputs, checks and uploads them.
 #
 # No code signing (0.x ships unsigned): Windows shows SmartScreen; macOS 15+ needs System Settings >
@@ -107,13 +107,15 @@ jobs:
           set -euo pipefail
           case "$REPO_NAME" in
             wordcraft) app=NexusDocs;   title="Nexus Docs";   bin=nexus-docs;   upgrade=B8F9CA5A-7CB4-4C4D-A260-DFC010020560 ;;
-            gridcraft) app=NexusSheets; title="Nexus Sheets"; bin=nexus-sheets; upgrade=AD43085E-E0C6-4FBD-A8FF-DA99DAC6F718 ;;
-            deckcraft) app=NexusSlides; title="Nexus Slides"; bin=nexus-slides; upgrade=96D068F9-30CC-4E22-808D-242613C1E158 ;;
+            gridcraft) app=NexusSheet; title="Nexus Sheet"; bin=nexus-sheet; upgrade=AD43085E-E0C6-4FBD-A8FF-DA99DAC6F718 ;;
+            deckcraft) app=NexusSlide; title="Nexus Slide"; bin=nexus-slide; upgrade=96D068F9-30CC-4E22-808D-242613C1E158 ;;
             pdfcraft)  app=NexusPDF;    title="Nexus PDF";    bin=nexus-pdf;    upgrade=CA922A7F-167E-414E-86E2-875DF949BBFC ;;
             *) echo "::error title=nexus-release::Unknown repository '$REPO_NAME' (expected wordcraft, gridcraft, deckcraft or pdfcraft)"; exit 1 ;;
           esac
           ver_var="$(printf '%s' "$REPO_NAME" | tr '[:lower:]' '[:upper:]')_VERSION"
           bundle_id="vn.sonnytech.${bin//-/.}"
+          # The reverse-DNS ids are machine identifiers and keep the plural (vn.sonnytech.nexus.sheets, .slides).
+          case "$REPO_NAME" in gridcraft | deckcraft) bundle_id="${bundle_id}s" ;; esac
 
           base=$(awk '
             /^\[/ { in_pkg = ($0 == "[workspace.package]"); next }
@@ -728,7 +730,7 @@ jobs:
           cli="scan/deb/usr/bin/$BIN-cli"
           if [ -x "$cli" ]; then
             ver=$("$cli" --version 2>&1 | head -n1)
-            # The branded CLI names itself by its command (nexus-sheets-cli 0.7.0-nexus.1).
+            # The branded CLI names itself by its command (nexus-sheet-cli 0.7.0-nexus.1).
             lower=$(printf '%s' "$ver" | tr '[:upper:]' '[:lower:]')
             case "$lower" in
               *wordcraft* | *gridcraft* | *deckcraft* | *pdfcraft* | *artcraft*) bad "'$BIN-cli --version' prints '$ver', an upstream name" ;;
@@ -800,7 +802,7 @@ jobs:
 
           [[allow]]
           path = "**/README.md"
-          pattern = '^Nexus (?:Docs|Sheets|Slides|PDF) (?:được phát triển dựa trên|is developed from) \w+ (?:của|by) Art[C]raft \(MIT/Apache-2\.0\)\.$'
+          pattern = '^Nexus (?:Docs|Sheets?|Slides?|PDF) (?:được phát triển dựa trên|is developed from) \w+ (?:của|by) Art[C]raft \(MIT/Apache-2\.0\)\.$'
           reason = "Upstream attribution sentence in the shipped README (text only, required by the licences)"
 
           [[allow]]
