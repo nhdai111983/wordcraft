@@ -2673,3 +2673,12 @@ template	Letter	Thư
 # Reading Mode column widths (#1040)
 	Narrow	Hẹp
 	Medium	Trung bình
+	Recover documents	Khôi phục tài liệu
+	Restore opens an unsaved copy. Your original file stays unchanged.	Khôi phục sẽ mở một bản sao chưa lưu. Tệp gốc của bạn giữ nguyên.
+	Recovery is disabled while this document has a password.	Tính năng khôi phục tắt khi tài liệu này có mật khẩu.
+	Local recovery is unavailable or still loading.	Bản khôi phục trên máy chưa dùng được hoặc đang tải.
+	No recovery copies.	Không có bản khôi phục nào.
+	Recovery copy	Bản khôi phục
+	Restore	Khôi phục
+	Discard…	Bỏ…
+	Continue without restoring	Tiếp tục, không khôi phục

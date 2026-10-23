@@ -2633,3 +2633,12 @@ preview	Title	Naslov
 	Bottom Right Cell	Donja desna ćelija
 	Inside Horizontal Border	Unutarnji vodoravni obrub
 	Inside Vertical Border	Unutarnji okomiti obrub
+	Recover documents	Oporavak dokumenata
+	Restore opens an unsaved copy. Your original file stays unchanged.	Vraćanje otvara nespremljenu kopiju. Vaša izvorna datoteka ostaje nepromijenjena.
+	Recovery is disabled while this document has a password.	Oporavak je isključen dok ovaj dokument ima lozinku.
+	Local recovery is unavailable or still loading.	Lokalni oporavak nije dostupan ili se još učitava.
+	No recovery copies.	Nema kopija za oporavak.
+	Recovery copy	Kopija za oporavak
+	Restore	Vrati
+	Discard…	Odbaci…
+	Continue without restoring	Nastavi bez vraćanja

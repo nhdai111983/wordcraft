@@ -162,6 +162,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
 
 /// Recovery is a separate copy. Leaving this page never discards it.
 fn recovery_page(app: &mut WordApp, ui: &mut Ui) {
+    // NexusOffice: the page is drawn on black, so its buttons use the dark look too; white text
+    // alone left them white on white in the light theme.
+    *ui.visuals_mut() = egui::Visuals::dark();
     ui.visuals_mut().override_text_color = Some(egui::Color32::WHITE);
     heading(ui, "Recover documents");
     ui.label(tl!("Restore opens an unsaved copy. Your original file stays unchanged."));
@@ -567,6 +570,25 @@ mod tests {
         settle_recovery(&mut h);
         assert!(h.state().session.recovery_documents().is_empty());
         assert!(h.query_by_label("No recovery copies.").is_some());
+        drop(h);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// NexusOffice: the Recover page is drawn on black, so its buttons are dark too and their
+    /// white labels read (in the light theme they were white on white).
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn recovery_page_buttons_are_readable() {
+        let (app, root) = recovery_app();
+        let mut h = recovery_harness(app);
+        settle_recovery(&mut h);
+        let r = h.get_by_label("Continue without restoring").rect();
+        let img = h.render().unwrap();
+        let ppp = h.ctx.pixels_per_point();
+        // Just inside the button's corner: its background, not its label.
+        let px = img.get_pixel(((r.min.x + 4.0) * ppp) as u32, ((r.center().y) * ppp) as u32).0;
+        let lum = (u32::from(px[0]) * 3 + u32::from(px[1]) * 6 + u32::from(px[2])) / 10;
+        assert!(lum < 110, "button background {px:?} is too light for white text");
         drop(h);
         let _ = std::fs::remove_dir_all(root);
     }
