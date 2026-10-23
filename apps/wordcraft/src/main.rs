@@ -264,7 +264,7 @@ fn app_icon() -> Option<egui::IconData> {
 }
 
 const USAGE: &str = "\
-nexus-docs — the Nexus Docs desktop app (NexusOffices)
+nexus-docs — the Nexus Docs desktop app (NexusOffice)
 
 USAGE:
   nexus-docs [--sample] [--control PORT] [FILE…]

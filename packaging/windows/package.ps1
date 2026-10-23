@@ -90,12 +90,12 @@ $Stage = Join-Path $TargetDir "windows-package\$Arch"
 Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 Copy-Item (Join-Path $Bin 'wordcraft.exe'), (Join-Path $Bin 'wordcraft-cli.exe') $Stage
-# NexusOffices: the licences, NOTICE (Apache-2.0 §4(d)) and ATTRIBUTION.md travel beside the
+# NexusOffice: the licences, NOTICE (Apache-2.0 §4(d)) and ATTRIBUTION.md travel beside the
 # binaries: the MSI installs them from here and the portable zip copies them below.
 foreach ($f in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'ATTRIBUTION.md') {
   Copy-Item (Join-Path $Root $f) $Stage
 }
-# NexusOffices: the OFL texts of every font the binaries embed go in licenses\ (the MSI installs it
+# NexusOffice: the OFL texts of every font the binaries embed go in licenses\ (the MSI installs it
 # as licenses\, the portable zip puts its files beside the exes): craft-fonts' fonts\<family>\OFL.txt
 # as OFL-<family>.txt, the name the Linux and macOS packages use, and the repo's own
 # assets\fonts\OFL-*.txt under their own names. Names must be unique ignoring case (Windows).
@@ -144,7 +144,7 @@ function ConvertTo-RtfText([string] $Text) {
 }
 $paragraphs = [System.Collections.Generic.List[string]]::new()
 $paragraphs.Add('\b Nexus Docs\b0')
-$paragraphs.Add((ConvertTo-RtfText 'Nexus Docs (NexusOffices, by Sonnytech) is based on the open-source WordCraft by the ArtCraft team. It is dual-licensed under the MIT License or the Apache License, Version 2.0, at your option. Both license texts follow. Bundled fonts and other third-party material keep their own open licenses, listed in NOTICE and ATTRIBUTION.md, which are installed with Nexus Docs.'))
+$paragraphs.Add((ConvertTo-RtfText 'Nexus Docs (NexusOffice, by SonnyTech) is based on the open-source WordCraft by the ArtCraft team. It is dual-licensed under the MIT License or the Apache License, Version 2.0, at your option. Both license texts follow. Bundled fonts and other third-party material keep their own open licenses, listed in NOTICE and ATTRIBUTION.md, which are installed with Nexus Docs.'))
 foreach ($file in 'LICENSE-MIT', 'LICENSE-APACHE') {
   $title = $true  # each file opens with its license's name: show it bold
   foreach ($para in ((Get-Content -Raw (Join-Path $Root $file)) -split '\r?\n\s*\r?\n')) {
@@ -176,14 +176,14 @@ Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Ms
 $Portable = Join-Path $TargetDir "windows-package\NexusDocs-$Version-windows-$Arch-portable"
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
-# NexusOffices: the same binary names the MSI installs.
+# NexusOffice: the same binary names the MSI installs.
 Copy-Item (Join-Path $Stage 'wordcraft.exe') (Join-Path $Portable 'nexus-docs.exe')
 Copy-Item (Join-Path $Stage 'wordcraft-cli.exe') (Join-Path $Portable 'nexus-docs-cli.exe')
 foreach ($f in 'README.md', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'ATTRIBUTION.md') {
   $p = Join-Path $Root $f
   if (Test-Path $p) { Copy-Item $p $Portable }
 }
-# NexusOffices: the font licences staged in licenses\ (craft-fonts and the repo's own), as in the MSI.
+# NexusOffice: the font licences staged in licenses\ (craft-fonts and the repo's own), as in the MSI.
 Copy-Item (Join-Path $Licenses '*') $Portable
 $Zip = Join-Path $Dist "NexusDocs-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue

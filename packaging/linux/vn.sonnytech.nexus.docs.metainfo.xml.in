@@ -8,18 +8,18 @@
   <name>Nexus Docs</name>
   <summary>Write and design documents; open and save Word files</summary>
   <developer id="vn.sonnytech">
-    <name>Sonnytech</name>
+    <name>SonnyTech</name>
   </developer>
   <description>
     <p>
-      Nexus Docs, part of the NexusOffices suite by Sonnytech, is a fast, open-source word processor with a familiar ribbon: styles, tables, track changes, references, mail merge, and .docx, PDF, ODT, RTF, HTML and Markdown files. It can be driven by AI agents over MCP. It is based on the open-source WordCraft by the ArtCraft team (MIT OR Apache-2.0).
+      Nexus Docs, part of the NexusOffice suite by SonnyTech, is a fast, open-source word processor with a familiar ribbon: styles, tables, track changes, references, mail merge, and .docx, PDF, ODT, RTF, HTML and Markdown files. It can be driven by AI agents over MCP. It is based on the open-source WordCraft by the ArtCraft team (MIT OR Apache-2.0).
     </p>
   </description>
   <launchable type="desktop-id">vn.sonnytech.nexus.docs.desktop</launchable>
   <icon type="stock">vn.sonnytech.nexus.docs</icon>
-  <url type="homepage">https://github.com/nhdai111983/wordcraft</url>
-  <url type="bugtracker">https://github.com/nhdai111983/wordcraft/issues</url>
-  <url type="help">https://github.com/nhdai111983/wordcraft</url>
+  <url type="homepage">https://github.com/sonnytech-vn/wordcraft</url>
+  <url type="bugtracker">https://github.com/sonnytech-vn/wordcraft/issues</url>
+  <url type="help">https://github.com/sonnytech-vn/wordcraft</url>
   <categories>
     <category>Office</category>
     <category>WordProcessor</category>
