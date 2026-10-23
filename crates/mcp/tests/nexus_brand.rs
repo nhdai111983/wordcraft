@@ -1,4 +1,4 @@
-//! NexusOffices: what the MCP server tells an agent names the product Nexus Docs and the installed
+//! NexusOffice: what the MCP server tells an agent names the product Nexus Docs and the installed
 //! binaries `nexus-docs` / `nexus-docs-cli` (the Cargo binaries are still `wordcraft` /
 //! `wordcraft-cli`; packaging renames them). Machine identifiers (`serverInfo.name`,
 //! `wordcraft://` resource URIs) keep upstream's spelling.

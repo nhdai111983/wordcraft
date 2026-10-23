@@ -3,7 +3,7 @@
 Danh sách file mà nhánh `nexus` sửa so với upstream vì lý do thương hiệu.
 Mỗi mục là đường dẫn file chính xác trong dấu backtick (không dùng glob/thư mục).
 
-Giá trị: sản phẩm **Nexus Docs**, bộ **NexusOffices**, nhà phát hành **Sonnytech**, app id
+Giá trị: sản phẩm **Nexus Docs**, bộ **NexusOffice**, nhà phát hành **SonnyTech** (viết hoa S và T), app id
 `vn.sonnytech.nexus.docs`, tài sản phát hành `NexusDocs-*`, binary cài đặt `nexus-docs`/`nexus-docs-cli`
 (Windows MSI, Linux; tên build Cargo vẫn là `wordcraft`/`wordcraft-cli`).
 
@@ -11,7 +11,7 @@ Không sửa catalog `.tsv` nào: chữ mới của About (en/vi) nằm trong `n
 (không phải key catalog, nên không bắt 7 catalog "đầy đủ" của upstream phải dịch thêm).
 
 Cơ chế chính: `crates/ui-egui/src/i18n/brand.rs` (file mới) — `pub fn brand(s) -> Cow<str>` thay
-`WordCraft → Nexus Docs`, `ArtCraft → NexusOffices` và tên lệnh CLI khi được trích dạng mã
+`WordCraft → Nexus Docs`, `ArtCraft → NexusOffice` và tên lệnh CLI khi được trích dạng mã
 (`` `wordcraft-cli `` → `` `nexus-docs-cli ``, vd. Options › Agent control, đủ 23 catalog), được gọi **một lần** trong `i18n::t`/`i18n::tc`
 (đường `tl!`), nên mọi ngôn ngữ (cả `en`) hiện tên Nexus mà không sửa key/catalog. `i18n::tr` giữ
 nguyên (test catalog upstream dựa vào nó; About dùng nó cho câu ghi công). Hằng và trang About ở
@@ -21,6 +21,14 @@ Văn bản người dùng không bao giờ qua `brand()`: trạng thái engine c
 khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú thích của tài liệu dùng
 `i18n::tr` (không đổi tên). Thông báo engine/Zotero mà CLI/MCP cũng thấy được đổi tên **tại nguồn**
 ("Nexus Docs can open"…), nên CLI, MCP và giao diện hiện cùng một chữ.
+
+Giữ nguyên định danh máy (không hiện cho người dùng; đổi tên hiển thị SonnyTech/NexusOffice ngày 2026-10-23 không đụng tới): app id
+`vn.sonnytech.nexus.docs` (chữ thường; desktop id, metainfo, bundle id, StartupWMClass), WiX `UpgradeCode`/GUID component,
+ProgId `Sonnytech.NexusDocs.*` và khoá registry `Software\Sonnytech\Nexus Docs\Capabilities`, `RegisteredApplications\NexusDocs`,
+tên crate (`wordcraft*`), `serverInfo.name = "wordcraft"`, tên biến môi trường (`WORDCRAFT_*`), tên repo `nhdai111983/NexusOffices`
+trong workflow CI/release (repo công cụ), `GITHUB_REPOSITORY` mặc định `nhdai111983/wordcraft` của zsync AppImage (kênh cập nhật,
+đã có chuyển hướng khi repo sang `sonnytech-vn`), email maintainer `nhdai111983@users.noreply.github.com`.
+Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.toml`, MCP `websiteUrl`) trỏ `https://github.com/sonnytech-vn/wordcraft`.
 
 ## File thương hiệu
 
@@ -59,16 +67,16 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | `crates/ui-egui/src/dialogs_review.rs` | Restrict Editing: tên kiểu của tài liệu hiện qua `i18n::tr` (dịch, không đổi tên) thay vì `tl!` | Có — nếu upstream tách tra catalog khỏi văn bản người dùng |
 | `crates/ui-egui/src/dialogs_refs.rs` | Insert Caption: nhãn chú thích (có thể do người dùng đặt) qua `i18n::tr` thay vì `tl!` | Có — như trên |
 | `crates/mcp/src/backend.rs` | Thông báo của backend nối app: "Nexus Docs app at … is not reachable", "unauthorized: the Nexus Docs app …", `describe()` (biến `WORDCRAFT_CONTROL_KEY` giữ nguyên); test `errors_name_nexus_docs` | Có — tên app qua biến build |
-| `apps/wordcraft/build.rs` | Resource Windows: ProductName, CompanyName Sonnytech, icon, LegalCopyright (ghi công), OriginalFilename `nexus-docs.exe` | Có |
+| `apps/wordcraft/build.rs` | Resource Windows: ProductName, CompanyName SonnyTech, icon, LegalCopyright (ghi công), OriginalFilename `nexus-docs.exe` | Có |
 | `apps/wordcraft/src/default_apps.rs` | Desktop id `vn.sonnytech.nexus.docs.desktop`, `registeredAppMachine=NexusDocs`, thông báo Flatpak (+ test) | Có |
 | `apps/wordcraft-web/index.html` | `<title>Nexus Docs</title>`, favicon, chữ "Loading" | Có |
 | `apps/wordcraft-web/src/web.rs` | Thông báo lỗi khởi động bản web | Có |
-| `packaging/windows/wordcraft.wxs` | MSI: Name/Manufacturer, **UpgradeCode + GUID component mới**, cài `nexus-docs.exe`/`nexus-docs-cli.exe` vào `Program Files\Nexus Docs`, ProgId `Sonnytech.NexusDocs.*`, khoá `Software\Sonnytech\Nexus Docs`, `RegisteredApplications\NexusDocs`, bỏ URL ARP của ArtCraft; cài `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` cạnh exe (4 component mới, GUID tự sinh); vòng sửa 1: thư mục `licenses\` + ComponentGroup `WordcraftFontLicences` (`<Files Include="$(var.BinDir)\licenses\*">`) trong feature Main, có điều kiện `FontLicences` (mặc định `no`) | Một phần (biến WiX) |
+| `packaging/windows/wordcraft.wxs` | MSI: Name/Manufacturer, **UpgradeCode + GUID component mới**, cài `nexus-docs.exe`/`nexus-docs-cli.exe` vào `Program Files\Nexus Docs`, ProgId `Sonnytech.NexusDocs.*`, khoá `Software\Sonnytech\Nexus Docs` (giữ nguyên, định danh máy), `RegisteredApplications\NexusDocs`, bỏ URL ARP của ArtCraft; cài `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` cạnh exe (4 component mới, GUID tự sinh); vòng sửa 1: thư mục `licenses\` + ComponentGroup `WordcraftFontLicences` (`<Files Include="$(var.BinDir)\licenses\*">`) trong feature Main, có điều kiện `FontLicences` (mặc định `no`) | Một phần (biến WiX) |
 | `packaging/windows/package.ps1` | Tài sản `NexusDocs-*.msi/.zip`, icon Nexus, trang giấy phép có ghi công; zip portable chứa `nexus-docs.exe`/`nexus-docs-cli.exe` như MSI; chép `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` vào thư mục stage (MSI cài từ đó) và zip portable (Apache-2.0 §4(d)); vòng sửa 1: dựng `licenses\` = OFL craft-fonts (`OFL-<family>.txt`) + `assets\fonts\OFL-*.txt` (tên duy nhất không phân biệt hoa thường; ném lỗi khi `CRAFT_FONTS_REQUIRED=1` mà không có OFL), truyền `-d FontLicences=yes|no` cho WiX, zip portable lấy OFL từ `licenses\` | Một phần |
 | `packaging/windows/sign.ps1` | Mô tả chữ ký `/d Nexus Docs`, `/du` repo fork (như 3 fork kia); bỏ mục allowlist cả file | Một phần |
 | `packaging/macos/Info.plist.in` | Tên bundle, executable `NexusDocs`, id `vn.sonnytech.nexus.docs`, icon, copyright (ghi công) | Một phần |
 | `packaging/macos/package.sh` | `Nexus Docs.app`, `NexusDocs-*.dmg/zip`, icns Nexus, tên volume; zip CLI chứa `nexus-docs-cli`; `copy_notices` chép `LICENSE-MIT`/`LICENSE-APACHE`/`NOTICE`/`ATTRIBUTION.md` vào `Contents/Resources` của app (trước khi ký) | Một phần |
-| `packaging/linux/package.sh` | `APP_ID=vn.sonnytech.nexus.docs`, binary `/usr/bin/nexus-docs(-cli)`, `NexusDocs-*`, icon `nexus/assets/hicolor`, maintainer Sonnytech, zsync trỏ fork; AppImage giữ `usr/share/doc/nexus-docs` (giấy phép, `NOTICE`, `ATTRIBUTION.md`) thay vì bỏ ra ngoài | Một phần |
+| `packaging/linux/package.sh` | `APP_ID=vn.sonnytech.nexus.docs`, binary `/usr/bin/nexus-docs(-cli)`, `NexusDocs-*`, icon `nexus/assets/hicolor`, maintainer SonnyTech, zsync trỏ fork; AppImage giữ `usr/share/doc/nexus-docs` (giấy phép, `NOTICE`, `ATTRIBUTION.md`) thay vì bỏ ra ngoài | Một phần |
 | `packaging/linux/nfpm.yaml` | Gói `nexus-docs`, vendor/homepage, binary, ghi công | Một phần |
 | `packaging/env.sh` | `copy_docs` chép thêm `NOTICE` (Apache-2.0 §4(d)) và `ATTRIBUTION.md` (README Nexus trỏ tới cả hai) qua hàm mới `copy_notices` — bắt buộc, thiếu file thì lỗi; dùng cho deb/AppImage/tar, zip CLI macOS, zip web; vòng sửa 1: chép thêm `assets/fonts/OFL-*.txt` (font của repo nhúng trong binary, nếu có) sau OFL craft-fonts và báo lỗi khi trùng tên; mọi `cp` có `|| return 1` (gọi qua `||` thì errexit tắt); `copy_font_licences` báo lỗi khi `CRAFT_FONTS_REQUIRED=1` mà không có OFL | Nên PR upstream (gói upstream cũng thiếu NOTICE) |
 | `crates/engine/src/session.rs` | Tác giả mặc định `"Nexus Docs User"` (ghi vào nhận xét/theo dõi thay đổi; avatar "ND") | Có — tên app qua biến build |
@@ -79,9 +87,9 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | `crates/formats/src/html.rs` | `<meta name="generator" content="Nexus Docs">` | Có — tên app qua biến build |
 | `crates/formats/src/odt.rs` | `<meta:generator>Nexus Docs</meta:generator>` | Có — tên app qua biến build |
 | `crates/formats/src/rtf.rs` | `{\*\generator Nexus Docs;}` | Có — tên app qua biến build |
-| `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffices/Sonnytech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE/NOTICE/ATTRIBUTION.md, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
-| `Cargo.toml` | `[workspace.package] repository` → `https://github.com/nhdai111983/wordcraft` (brand-check `brand-url`; metadata, không code nào đọc `CARGO_PKG_REPOSITORY`) | Có — metadata của fork |
-| `ATTRIBUTION.md` | 14 dòng cho icon Nexus (`nexus/assets/**`, Sonnytech, CC0-1.0) | Không (bắt buộc theo luật asset) |
+| `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffice/SonnyTech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE/NOTICE/ATTRIBUTION.md, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
+| `Cargo.toml` | `[workspace.package] repository` → `https://github.com/sonnytech-vn/wordcraft` (brand-check `brand-url`; metadata, không code nào đọc `CARGO_PKG_REPOSITORY`) | Có — metadata của fork |
+| `ATTRIBUTION.md` | 14 dòng cho icon Nexus (`nexus/assets/**`, SonnyTech, CC0-1.0) | Không (bắt buộc theo luật asset) |
 
 ### GUID WiX mới (Nexus Docs riêng, không dùng chung với WordCraft hay app Nexus khác)
 
@@ -114,7 +122,7 @@ Sinh bằng `python3 -c "import uuid; print(uuid.uuid4())"` ngày 2026-10-16.
 `rg -n -i "artcraft|storytold|storyteller|discord|telemetry|update|crash|sentry|posthog|https?://" --type rust`:
 không có telemetry/crash report/cập nhật tự động trong app. Link ArtCraft duy nhất app tự mở là
 `ui.discord` (đã chặn: `nexus::COMMUNITY_URL = None`) và link About (đã bỏ). AppImage zsync trỏ
-GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft`).
+GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft` — kênh cập nhật, GitHub chuyển hướng sau khi chuyển repo sang `sonnytech-vn`).
 
 ## Việc còn nợ (đã allowlist có lý do, cần PR white-label lên upstream — UPSTREAM_PRS.md)
 - `crates/engine/src/cmd/citations.rs`: trạng thái "Researcher needs an online service; WordCraft keeps…" là key catalog nên giữ nguyên; giao diện đổi tên qua `tl!`, nhưng CLI/MCP vẫn thấy "WordCraft".

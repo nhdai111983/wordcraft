@@ -105,7 +105,7 @@ cp "$WORK/bin/wordcraft" "$APP/Contents/MacOS/NexusDocs"
 cp "$ROOT/nexus/assets/nexus-docs.icns" "$APP/Contents/Resources/NexusDocs.icns"
 # Licences of the embedded craft-fonts fonts (only when built with CRAFT_FONTS_DIR).
 copy_font_licences "$APP/Contents/Resources"
-# NexusOffices: licences, NOTICE, ATTRIBUTION.md and the repo fonts' OFL texts (after the craft-fonts ones).
+# NexusOffice: licences, NOTICE, ATTRIBUTION.md and the repo fonts' OFL texts (after the craft-fonts ones).
 copy_notices "$APP/Contents/Resources"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHORT_VERSION@/$SHORT_VERSION/g" \
   -e "s/@BUILD_SHA@/${WORDCRAFT_BUILD_SHA:-unknown}/g" \

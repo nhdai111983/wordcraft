@@ -18,7 +18,7 @@ const INVALID_PARAMS: i64 = -32602;
 const INTERNAL_ERROR: i64 = -32603;
 const RESOURCE_NOT_FOUND: i64 = -32002;
 
-const INSTRUCTIONS: &str = "Nexus Docs (NexusOffices, by Sonnytech) is a word processor (a Microsoft Word clone). Every action is a command: find ids and \
+const INSTRUCTIONS: &str = "Nexus Docs (NexusOffice, by SonnyTech) is a word processor (a Microsoft Word clone). Every action is a command: find ids and \
 parameters with list_commands and run them with execute (or several with batch). Positions are \
 {story:\"body\", path:[block,(row,cell,block)...], off:byteOffset}. Typical flow: new_document → type_text \
 \"Hello\" → execute text.newParagraph → execute para.style {style:\"Heading 1\"} → select_text {text:\"Hello\"} → \
@@ -133,9 +133,9 @@ impl Server {
                 Ok(json!({
                     "protocolVersion": version,
                     "capabilities": {"tools": {}, "resources": {}},
-                    "serverInfo": {"name": "wordcraft", "title": "Nexus Docs", "version": env!("CARGO_PKG_VERSION"), "websiteUrl": "https://github.com/nhdai111983/wordcraft"},
+                    "serverInfo": {"name": "wordcraft", "title": "Nexus Docs", "version": env!("CARGO_PKG_VERSION"), "websiteUrl": "https://github.com/sonnytech-vn/wordcraft"},
                     "instructions": format!(
-                        "{INSTRUCTIONS} Backend: {}. Source: https://github.com/nhdai111983/wordcraft",
+                        "{INSTRUCTIONS} Backend: {}. Source: https://github.com/sonnytech-vn/wordcraft",
                         self.backend.describe()
                     ),
                 }))

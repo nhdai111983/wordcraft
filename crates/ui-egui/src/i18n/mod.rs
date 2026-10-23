@@ -357,17 +357,17 @@ pub fn has(lang: Lang, s: &str) -> bool {
     lang.catalog().plain(s).is_some()
 }
 
-/// NexusOffices: is `s` an interface string (a catalog key)? Checked in the current language and
+/// NexusOffice: is `s` an interface string (a catalog key)? Checked in the current language and
 /// in Vietnamese, the fork's fullest catalog (English has no entries: it is the source). Text
 /// that isn't, such as an engine status quoting a file name, is shown without [`t`]'s branding.
 pub fn is_catalog_key(s: &str) -> bool {
     has(current(), s) || Lang::from_code("vi").is_some_and(|vi| has(vi, s))
 }
 
-/// `s` in the current language ([`tr`] with [`current`]), with NexusOffices' product names
+/// `s` in the current language ([`tr`] with [`current`]), with NexusOffice' product names
 /// ([`brand`]).
 ///
-/// Invariant (NexusOffices): never pass document or other user text (file names, document text,
+/// Invariant (NexusOffice): never pass document or other user text (file names, document text,
 /// custom style or caption names, comment authors) to `t`, [`tc`] or `tl!`: what they return goes
 /// through [`brand`], which renames the product in interface strings only. Show user text as it
 /// is, or look it up with [`tr`], which is not branded.
@@ -410,7 +410,7 @@ pub fn lowercase(s: &str) -> String {
     out
 }
 
-/// `s` in `lang`; strings without a translation come back unchanged. Not branded (NexusOffices):
+/// `s` in `lang`; strings without a translation come back unchanged. Not branded (NexusOffice):
 /// upstream's catalog tests compare its result with the catalogs, and About's attribution keeps
 /// the upstream names; interface strings are shown through [`t`] / `tl!`.
 pub fn tr(lang: Lang, s: &str) -> &str {

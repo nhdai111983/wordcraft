@@ -34,7 +34,7 @@ fn help_and_h_print_the_options_and_exit() {
         let (stdout, stderr) = (String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
         assert!(out.status.success(), "{flag}: status {:?}, stderr: {stderr}", out.status);
         assert!(stdout.starts_with("nexus-docs — "), "{flag}: stdout: {stdout}");
-        // NexusOffices: no upstream name anywhere (`WORDCRAFT_CONTROL_PORT` is a variable, kept).
+        // NexusOffice: no upstream name anywhere (`WORDCRAFT_CONTROL_PORT` is a variable, kept).
         assert!(!stdout.contains("wordcraft") && !stdout.contains("WordCraft"), "{flag}: stdout: {stdout}");
         for option in ["--sample", "--control PORT", "--version", "-h, --help"] {
             assert!(stdout.contains(option), "{flag}: {option} missing from: {stdout}");

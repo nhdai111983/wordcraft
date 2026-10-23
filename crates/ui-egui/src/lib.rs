@@ -1203,7 +1203,7 @@ impl WordApp {
         if !self.session.status.is_empty() {
             // Engine messages are English; the catalog translates the ones it knows.
             let s = std::mem::take(&mut self.session.status);
-            // NexusOffices: only a catalog string is looked up (and so branded, `i18n::t`); a
+            // NexusOffice: only a catalog string is looked up (and so branded, `i18n::t`); a
             // status quoting the user's file or font name is shown as it is.
             let s = if i18n::is_catalog_key(&s) { tl!(&s).to_string() } else { s };
             self.status(s);
@@ -1496,7 +1496,7 @@ impl WordApp {
                 ));
             }
             "ui.discord" => {
-                // NexusOffices: upstream's community (ArtCraft's Discord) is never opened.
+                // NexusOffice: upstream's community (ArtCraft's Discord) is never opened.
                 let Some(url) = nexus::COMMUNITY_URL else { return Some(Err("no community link in this build".into())) };
                 self.canvas.open_url = Some(url.into());
                 json!({})
@@ -3948,7 +3948,7 @@ mod tests {
         assert!(via_key.iter().any(|t| t.contains("My unsaved novel")), "key event Cut: {via_key:?} body={:?}", body_text(h.state()));
     }
 
-    /// NexusOffices: the status bar shows a file name or other user text as it is. Only catalog
+    /// NexusOffice: the status bar shows a file name or other user text as it is. Only catalog
     /// strings are looked up (and so branded), never an engine status quoting the user's file.
     #[test]
     fn status_keeps_the_users_file_name() {
