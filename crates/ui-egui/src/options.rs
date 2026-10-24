@@ -180,6 +180,7 @@ fn flag(app: &mut WordApp, ui: &mut Ui, label: &str, key: &str, value: bool) {
 fn general(app: &mut WordApp, ui: &mut Ui) {
     section(ui, "Interface");
     theme_picker(app, ui);
+    accent_picker(app, ui);
     interface_size_picker(app, ui);
     ui.checkbox(&mut app.ui.mini_toolbar, tl!("Show the mini toolbar when text is selected"));
     let mut dark_page = app.session.view.dark_mode;
@@ -557,6 +558,33 @@ fn theme_picker(app: &mut WordApp, ui: &mut Ui) {
                 }
             }
         });
+    });
+}
+
+/// NexusOffice: the accent colour (buttons, selected tabs, selection), one of the palette's or any
+/// colour; "App colour" goes back to Nexus Docs' own. Saved with the preferences.
+fn accent_picker(app: &mut WordApp, ui: &mut Ui) {
+    let current = crate::theme::accent();
+    ui.horizontal(|ui| {
+        ui.label(crate::i18n::nexus_text("Accent colour:", "Màu chủ đạo:"));
+        if ui.selectable_label(current.is_none(), crate::i18n::nexus_text("App colour", "Màu ứng dụng")).clicked() {
+            let _ = app.run("ui.accent", json!({"value": null}));
+        }
+        for (name, c) in crate::theme::ACCENT_PRESETS {
+            let (r, resp) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::click());
+            ui.painter().circle_filled(r.center(), 8.0, c);
+            if current == Some(c) {
+                ui.painter().circle_stroke(r.center(), 10.0, egui::Stroke::new(2.0, crate::theme::Tokens::get(ui.ctx()).text));
+            }
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, current == Some(c), name));
+            if resp.on_hover_text(name).clicked() {
+                let _ = app.run("ui.accent", json!({"value": format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b())}));
+            }
+        }
+        let mut pick = current.unwrap_or(crate::theme::APP_COLOR);
+        if ui.color_edit_button_srgba(&mut pick).changed() {
+            let _ = app.run("ui.accent", json!({"value": format!("#{:02X}{:02X}{:02X}", pick.r(), pick.g(), pick.b())}));
+        }
     });
 }
 

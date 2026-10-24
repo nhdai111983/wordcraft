@@ -1716,6 +1716,7 @@
 	Italian	Tiếng Ý
 	Japanese	Tiếng Nhật
 	Korean	Tiếng Hàn
+	Vietnamese	Tiếng Việt
 	Limit consecutive hyphens to:	Giới hạn gạch nối liên tiếp:
 	Line Numbering Options…	Tùy chọn đánh số dòng…
 	Manual Hyphenation	Ngắt từ thủ công
@@ -2672,3 +2673,27 @@ template	Letter	Thư
 # Reading Mode column widths (#1040)
 	Narrow	Hẹp
 	Medium	Trung bình
+	Recover documents	Khôi phục tài liệu
+	Restore opens an unsaved copy. Your original file stays unchanged.	Khôi phục sẽ mở một bản sao chưa lưu. Tệp gốc của bạn giữ nguyên.
+	Recovery is disabled while this document has a password.	Tính năng khôi phục tắt khi tài liệu này có mật khẩu.
+	Local recovery is unavailable or still loading.	Bản khôi phục trên máy chưa dùng được hoặc đang tải.
+	No recovery copies.	Không có bản khôi phục nào.
+	Recovery copy	Bản khôi phục
+	Restore	Khôi phục
+	Discard…	Loại bỏ…
+	Continue without restoring	Tiếp tục, không khôi phục
+# NexusOffice: the Recover page and the WPS layout's Backstage (NX-UI.11)
+	Untitled draft	Bản nháp chưa đặt tên
+	Back	Quay lại
+	Discard	Loại bỏ
+	Discard recovery copy	Loại bỏ bản khôi phục
+	Discard the recovery copy of {name}?	Loại bỏ bản khôi phục của {name}?
+	This cannot be undone. Your original file stays unchanged.	Không thể hoàn tác thao tác này. Tệp gốc của bạn giữ nguyên.
+	Saving…	Đang lưu…
+	More options	Tùy chọn khác
+	More commands	Thêm lệnh
+	More tabs	Thêm thẻ
+	Indent Left	Thụt lề trái
+	Indent Right	Thụt lề phải
+	Spacing Before	Khoảng cách trước
+	Spacing After	Khoảng cách sau

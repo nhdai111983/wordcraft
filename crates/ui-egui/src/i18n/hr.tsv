@@ -1160,6 +1160,7 @@
 	Keys for this command:	Tipke za ovu naredbu:
 	Keywords	Ključne riječi
 	Korean	Korejski
+	Vietnamese	Vijetnamski
 	Label changes with:	Oznaka se mijenja s:
 	Label:	Oznaka:
 	Labels	Naljepnice
@@ -2632,3 +2633,27 @@ preview	Title	Naslov
 	Bottom Right Cell	Donja desna ćelija
 	Inside Horizontal Border	Unutarnji vodoravni obrub
 	Inside Vertical Border	Unutarnji okomiti obrub
+	Recover documents	Oporavak dokumenata
+	Restore opens an unsaved copy. Your original file stays unchanged.	Vraćanje otvara nespremljenu kopiju. Vaša izvorna datoteka ostaje nepromijenjena.
+	Recovery is disabled while this document has a password.	Oporavak je isključen dok ovaj dokument ima lozinku.
+	Local recovery is unavailable or still loading.	Lokalni oporavak nije dostupan ili se još učitava.
+	No recovery copies.	Nema kopija za oporavak.
+	Recovery copy	Kopija za oporavak
+	Restore	Vrati
+	Discard…	Odbaci…
+	Continue without restoring	Nastavi bez vraćanja
+# NexusOffice: the Recover page and the WPS layout's Backstage (NX-UI.11)
+	Untitled draft	Neimenovani nacrt
+	Back	Natrag
+	Discard	Odbaci
+	Discard recovery copy	Odbaci kopiju za oporavak
+	Discard the recovery copy of {name}?	Odbaciti kopiju za oporavak dokumenta {name}?
+	This cannot be undone. Your original file stays unchanged.	Ovo se ne može poništiti. Vaša izvorna datoteka ostaje nepromijenjena.
+	Saving…	Spremanje…
+	More options	Više mogućnosti
+	More commands	Više naredbi
+	More tabs	Više kartica
+	Indent Left	Uvlaka lijevo
+	Indent Right	Uvlaka desno
+	Spacing Before	Razmak prije
+	Spacing After	Razmak poslije

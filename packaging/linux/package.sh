@@ -18,7 +18,7 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 HERE="$ROOT/packaging/linux"
 APP_ID=vn.sonnytech.nexus.docs
-# NexusOffices: the shared MIME definitions stay upstream's file (installed under APP_ID's name).
+# NexusOffice: the shared MIME definitions stay upstream's file (installed under APP_ID's name).
 MIME_XML=ai.storyteller.wordcraft.mime.xml
 
 SKIP_BUILD=0
@@ -39,7 +39,7 @@ case "$ARCH" in
   aarch64 | arm64) ARCH=aarch64; DEB_ARCH=arm64 ;;
   *) echo "unsupported architecture $ARCH" >&2; exit 2 ;;
 esac
-export WORDCRAFT_MAINTAINER="${WORDCRAFT_MAINTAINER:-Sonnytech <nhdai111983@users.noreply.github.com>}"
+export WORDCRAFT_MAINTAINER="${WORDCRAFT_MAINTAINER:-SonnyTech <nhdai111983@users.noreply.github.com>}"
 BASENAME="NexusDocs-$VERSION-linux-$ARCH"
 
 echo "==> Nexus Docs $VERSION for Linux $ARCH ($FORMATS)"
@@ -103,7 +103,7 @@ fi
 if has appimage; then
   APPDIR="$WORK/NexusDocs.AppDir"
   cp -R "$STAGE" "$APPDIR"
-  # NexusOffices: usr/share/doc (licences, NOTICE, ATTRIBUTION.md, OFL texts) stays inside the AppImage.
+  # NexusOffice: usr/share/doc (licences, NOTICE, ATTRIBUTION.md, OFL texts) stays inside the AppImage.
   ln -s usr/bin/nexus-docs "$APPDIR/AppRun"
   cp "$HERE/$APP_ID.desktop" "$APPDIR/$APP_ID.desktop"
   cp "$ROOT/nexus/assets/hicolor/256x256/apps/$APP_ID.png" "$APPDIR/$APP_ID.png"
