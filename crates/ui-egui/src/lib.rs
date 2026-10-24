@@ -1326,6 +1326,12 @@ impl WordApp {
                 let tab = s("tab").unwrap_or("Home").to_string();
                 if tab == "File" {
                     self.ui.backstage = true;
+                    // NexusOffice: the Recover page opens by itself once, at start-up, when copies
+                    // are left from an earlier session; File afterwards opens Info (Home without a
+                    // document) rather than that page again.
+                    if self.ui.backstage_page == "recover" {
+                        self.ui.backstage_page = if self.has_document() { "info" } else { "home" }.into();
+                    }
                 } else {
                     self.ui.tab = tab;
                     self.ui.backstage = false;
@@ -1888,7 +1894,7 @@ impl WordApp {
         }
         if !self.recovery_seen && self.session.recovery_ready() {
             self.recovery_seen = true;
-            if !self.session.recovery_documents().is_empty() && !self.session.dirty {
+            if !backstage::recovery_list(self).is_empty() && !self.session.dirty {
                 self.ui.backstage = true;
                 self.ui.backstage_page = "recover".into();
             }
@@ -2056,6 +2062,9 @@ impl WordApp {
             return;
         }
         let t = theme::Tokens::get(&ctx);
+        // NexusOffice: a click that closed the Backstage (its Back button) belongs to it, not to
+        // the chrome under it (see `refocus_after_chrome_click`).
+        let backstage_at_start = self.ui.backstage;
         self.escape_free = self.dialog.is_none() && !self.ui.backstage && self.ui.keytips == keytips::Phase::Off && !egui::Popup::is_any_open(&ctx);
         // Keytips are read before layout so the frame paints the new state; badges paint after
         // the ribbon so they sit on top of it.
@@ -2109,7 +2118,9 @@ impl WordApp {
         read_aloud::show(self, &ctx);
         crate::keytips::show(self, &ctx, ui);
         keys::global_shortcuts(self, &ctx);
-        self.refocus_after_chrome_click(&ctx);
+        if !backstage_at_start {
+            self.refocus_after_chrome_click(&ctx);
+        }
         if let Some(url) = self.canvas.open_url.take() {
             ctx.open_url(egui::OpenUrl::new_tab(url));
         }

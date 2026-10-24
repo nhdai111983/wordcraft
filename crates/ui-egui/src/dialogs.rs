@@ -2386,7 +2386,8 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             ok || cancel
         }
         Dialog::DiscardRecovery { name, .. } => {
-            ui.label(crate::i18n::fmt(tl!("Discard the recovery copy of {name}?"), &[("name", name)]));
+            let name = crate::backstage::recovery_name(name);
+            ui.label(crate::i18n::fmt(tl!("Discard the recovery copy of {name}?"), &[("name", name.as_str())]));
             ui.label(tl!("This cannot be undone. Your original file stays unchanged."));
             let answer = ui
                 .horizontal(|ui| {

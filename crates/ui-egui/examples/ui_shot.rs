@@ -10,6 +10,8 @@
 //! document unless the first line is `{"empty": true}`; `{"empty": true, "startScreen": true}`
 //! starts the way the desktop app does with nothing to open (File › Home, #766). `{"wps": true}`
 //! draws the NexusOffice WPS-style layout, `{"embedded": true}` as a tab of the NexusOffice window.
+//! `{"language": "vi"}` sets the interface language; `{"recovery": "/abs/profile"}` turns local
+//! recovery on for that folder (File › Recover lists the copies in it).
 
 use wordcraft_engine::Session;
 use wordcraft_ui_egui::{ControlRequest, Services, WordApp};
@@ -36,6 +38,15 @@ fn main() {
     app.toolbar = flag("toolbar");
     app.wps = flag("wps");
     app.embedded = flag("embedded");
+    // `{"language": "vi"}`: the interface language, without saving it as a setting.
+    if let Some(lang) = lines.iter().find_map(|l| l.get("language").and_then(|v| v.as_str())) {
+        app.ui.language = lang.to_string();
+    }
+    // `{"recovery": "/abs/profile"}`: local recovery on that folder, for File › Recover with
+    // synthetic copies in it (follow with `{"wait": 500}` while the folder is read).
+    if let Some(dir) = lines.iter().find_map(|l| l.get("recovery").and_then(|v| v.as_str())) {
+        app.session.enable_recovery(dir.into(), std::sync::Arc::new(|| {})).expect("recovery folder");
+    }
     if lines.first().is_some_and(|l| l.get("startScreen").is_some()) {
         app.start_screen();
     }

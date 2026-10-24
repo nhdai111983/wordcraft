@@ -2680,8 +2680,15 @@ template	Letter	Thư
 	No recovery copies.	Không có bản khôi phục nào.
 	Recovery copy	Bản khôi phục
 	Restore	Khôi phục
-	Discard…	Bỏ…
+	Discard…	Loại bỏ…
 	Continue without restoring	Tiếp tục, không khôi phục
+# NexusOffice: the Recover page and the WPS layout's Backstage (NX-UI.11)
+	Untitled draft	Bản nháp chưa đặt tên
+	Back	Quay lại
+	Discard	Loại bỏ
+	Discard recovery copy	Loại bỏ bản khôi phục
+	Discard the recovery copy of {name}?	Loại bỏ bản khôi phục của {name}?
+	This cannot be undone. Your original file stays unchanged.	Không thể hoàn tác thao tác này. Tệp gốc của bạn giữ nguyên.
 	Saving…	Đang lưu…
 	More options	Tùy chọn khác
 	More commands	Thêm lệnh

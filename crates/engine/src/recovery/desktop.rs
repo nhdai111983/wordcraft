@@ -504,6 +504,10 @@ impl Recovery {
     pub fn document_is(&self, document: u64) -> bool {
         self.document == Some(document)
     }
+    /// The copy this session writes for `document` (the open one), if any.
+    pub fn current(&self, document: u64) -> Option<&str> {
+        if self.document_is(document) { self.id.as_deref() } else { None }
+    }
     pub fn wait(&self, document: u64, revision: u64) -> Option<Duration> {
         if !self.alive || !self.ready || self.busy || (self.document == Some(document) && self.revision == Some(revision)) {
             return None;

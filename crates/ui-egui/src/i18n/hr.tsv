@@ -2642,6 +2642,13 @@ preview	Title	Naslov
 	Restore	Vrati
 	Discard…	Odbaci…
 	Continue without restoring	Nastavi bez vraćanja
+# NexusOffice: the Recover page and the WPS layout's Backstage (NX-UI.11)
+	Untitled draft	Neimenovani nacrt
+	Back	Natrag
+	Discard	Odbaci
+	Discard recovery copy	Odbaci kopiju za oporavak
+	Discard the recovery copy of {name}?	Odbaciti kopiju za oporavak dokumenta {name}?
+	This cannot be undone. Your original file stays unchanged.	Ovo se ne može poništiti. Vaša izvorna datoteka ostaje nepromijenjena.
 	Saving…	Spremanje…
 	More options	Više mogućnosti
 	More commands	Više naredbi
