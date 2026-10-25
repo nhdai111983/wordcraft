@@ -1201,8 +1201,6 @@ impl WordApp {
         saved
     }
 
-    /// The window's close button (or the system) asked to quit. Returns true to let the window
-    /// close; with unsaved changes it asks first and returns false.
     /// NexusOffice: typing that isn't in the document yet (a comment being edited or replied to,
     /// held in egui's memory until its field loses focus), which moving the document to another
     /// window would leave behind.
@@ -1210,6 +1208,8 @@ impl WordApp {
         panes::has_comment_drafts(self, ctx)
     }
 
+    /// The window's close button (or the system) asked to quit. Returns true to let the window
+    /// close; with unsaved changes it asks first and returns false.
     pub fn close_requested(&mut self) -> bool {
         if self.printing.busy() {
             self.status(tl!("Wait for the print job to finish submitting before closing."));
