@@ -147,8 +147,9 @@ fn stand_alone_prompt_is_upstreams() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Tab and Shift+Tab go through the three buttons in the order they read (the dim and the card
-/// never take the focus): Lưu → Không lưu → Hủy → Không lưu.
+/// Tab and Shift+Tab go through the three buttons in the order they read and wrap around, the dim
+/// and the card never taking the focus: Lưu → Không lưu → Hủy, back to Không lưu and Lưu, then
+/// Shift+Tab wraps to Hủy and Tab to Lưu.
 #[test]
 fn tab_cycles_the_buttons_in_reading_order() {
     let dir = scratch("tab");
@@ -156,7 +157,14 @@ fn tab_cycles_the_buttons_in_reading_order() {
     let mut h = harness(a);
     let focused = |h: &egui_kittest::Harness<'static, WordApp>, l: &str| h.get_by_role_and_label(Role::Button, l).is_focused();
     assert!(focused(&h, "Lưu"));
-    for (key, shift, want) in [(egui::Key::Tab, false, "Không lưu"), (egui::Key::Tab, false, "Hủy"), (egui::Key::Tab, true, "Không lưu")] {
+    for (key, shift, want) in [
+        (egui::Key::Tab, false, "Không lưu"),
+        (egui::Key::Tab, false, "Hủy"),
+        (egui::Key::Tab, true, "Không lưu"),
+        (egui::Key::Tab, true, "Lưu"),
+        (egui::Key::Tab, true, "Hủy"),
+        (egui::Key::Tab, false, "Lưu"),
+    ] {
         let m = if shift { egui::Modifiers::SHIFT } else { egui::Modifiers::NONE };
         h.key_press_modifiers(m, key);
         h.step();
