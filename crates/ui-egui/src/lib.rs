@@ -63,6 +63,7 @@ pub mod keys;
 pub mod keytips;
 pub mod mini_toolbar;
 pub mod nexus;
+pub mod nexus_save_prompt;
 pub mod nexus_toolbar;
 pub mod nexus_wps;
 pub mod objects;
@@ -471,6 +472,9 @@ pub struct WordApp {
     /// the window alone (no title, no dragging or maximizing it from the title bar); the host
     /// names its tabs. Off in the stand-alone app.
     pub embedded: bool,
+    /// NexusOffice: the rectangle the app was last drawn in (its tab, when [`embedded`](Self::embedded)),
+    /// which "Lưu thay đổi?" dims and centres on.
+    pub(crate) drawn_in: egui::Rect,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
@@ -613,6 +617,7 @@ impl WordApp {
             wps: false,
             host_menus: Vec::new(),
             embedded: false,
+            drawn_in: egui::Rect::NOTHING,
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
             shot_token: 0,
@@ -2049,6 +2054,7 @@ impl WordApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let t0 = now_ms();
         let ctx = ui.ctx().clone();
+        self.drawn_in = ui.max_rect();
         i18n::set_current(i18n::Lang::from_pref(&self.ui.language));
         // Animation effects off: egui's scroll areas get a wheel notch whole, not eased in.
         if !self.animations_on() {
@@ -2537,6 +2543,8 @@ fn control_click_as_secondary(events: &mut [egui::Event], held: &mut bool) {
     }
 }
 
+#[cfg(test)]
+mod nexus_save_prompt_tests;
 #[cfg(test)]
 mod tests_perf;
 
