@@ -14,6 +14,8 @@ const MAX_BYTES: u64 = 256 << 20;
 const MAX_RECORDS: usize = 128;
 const MAX_FILES: usize = 16;
 const DISK_BUDGET: u64 = 2 << 30;
+/// How long [`Recovery::discard_current`] waits for the worker (NexusOffice: on the UI thread).
+const DISCARD_WAIT: Duration = Duration::from_secs(2);
 /// Times a record lock held for a moment (by a process being started) is tried again.
 const LOCK_RETRIES: u32 = 10;
 
@@ -527,7 +529,8 @@ impl Recovery {
     /// for `revision` again: the document went to another window, which keeps a copy of its own.
     pub fn discard_current(&mut self, document: u64, revision: u64) -> Result<(), String> {
         if self.document_is(document) {
-            self.purge()?;
+            // Bounded: the window's frame waits for one write at most, never for a stuck disk.
+            self.purge_within(Some(DISCARD_WAIT))?;
         }
         self.document = Some(document);
         self.revision = Some(revision);
@@ -559,9 +562,25 @@ impl Recovery {
         self.queue(Job::Scan)
     }
     pub fn purge(&mut self) -> Result<(), String> {
+        self.purge_within(None)
+    }
+    /// [`Self::purge`], waiting for the worker at most `limit` each time (`None`: as long as it
+    /// takes). Out of time before the removal is queued: an error, the copy stays. Out of time
+    /// after: the worker removes it on its own (its answer is read by the next poll).
+    fn purge_within(&mut self, limit: Option<Duration>) -> Result<(), String> {
+        let wait = |rx: &mpsc::Receiver<Event>| -> Result<Option<Event>, String> {
+            match limit {
+                None => rx.recv().map(Some).map_err(|e| e.to_string()),
+                Some(t) => match rx.recv_timeout(t) {
+                    Ok(e) => Ok(Some(e)),
+                    Err(mpsc::RecvTimeoutError::Timeout) => Ok(None),
+                    Err(e) => Err(e.to_string()),
+                },
+            }
+        };
         let Some(id) = self.id.clone() else { return Ok(()) };
         if self.busy {
-            let e = self.rx.recv().map_err(|e| e.to_string())?;
+            let e = wait(&self.rx)?.ok_or("recovery is busy; the copy stays")?;
             self.documents = e.documents;
             self.busy = false;
             self.ready = true;
@@ -570,7 +589,10 @@ impl Recovery {
             }
         }
         self.queue(Job::Discard(id))?;
-        let e = self.rx.recv().map_err(|e| e.to_string())?;
+        let Some(e) = wait(&self.rx)? else {
+            // Queued: the worker removes it; `poll` reads the answer.
+            return Ok(());
+        };
         self.busy = false;
         self.documents = e.documents;
         e.outcome?;
