@@ -513,8 +513,13 @@ pub fn style_gallery(app: &mut WordApp, ui: &mut Ui, state: &Value) {
     let skey = app.previews.styles_key(&app.session.doc, rev);
     let ppp = ui.ctx().pixels_per_point();
     let start = ui.data(|d| d.get_temp::<usize>(egui::Id::new("gallery_start"))).unwrap_or(0).min(styles.len().saturating_sub(1));
-    let visible = 6usize;
-    let (area, _) = ui.allocate_exact_size(vec2(visible as f32 * 76.0 + 18.0, crate::widgets::CONTENT_H), Sense::hover());
+    // NexusOffices look: as many tiles (1 to 6) as leave room for the Editing group after the
+    // gallery, so a narrow window shows whole tiles and Find/Replace instead of a cut-off tile.
+    let room = ui.available_width() - 18.0 - 190.0;
+    let visible = if room.is_finite() { (room / 76.0).floor().clamp(1.0, 6.0) as usize } else { 6 };
+    let (area, _) = ui.allocate_exact_size(vec2(visible as f32 * 76.0 + 18.0, crate::widgets::content_h(ui)), Sense::hover());
+    // The WPS strip is shorter: a smaller sample over the name.
+    let sample_h = if crate::nexus_wps::compact(ui) { 22.0 } else { 32.0 };
     ui.painter().rect(area.shrink(1.0), 4.0, t.input, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     for (k, (id, name)) in styles.iter().skip(start).take(visible).enumerate() {
         let r = Rect::from_min_size(pos2(area.min.x + 3.0 + k as f32 * 76.0, area.min.y + 3.0), vec2(74.0, area.height() - 6.0));
@@ -532,7 +537,12 @@ pub fn style_gallery(app: &mut WordApp, ui: &mut Ui, state: &Value) {
         let doc = &app.session.doc;
         let tex = app.previews.get_or(ui.ctx(), &key, || {
             // Sample letters in the interface's script (`АаБбВвГг` in Russian).
-            let mut p = Paragraph::with_text(tl!("AaBbCcDd"), CharProps::default()).styled(id);
+            // NexusOffices look: a large style (Title, Heading 1) is drawn at a size that fits
+            // the tile rather than cut off; its font, weight and colour stay its own.
+            let size = doc.styles.resolve_char(Some(id), &CharProps::default()).size;
+            let cap = crate::nexus::look::STYLE_SAMPLE_MAX_PT;
+            let run = CharProps { size: (size.is_finite() && size > cap).then_some(cap), ..CharProps::default() };
+            let mut p = Paragraph::with_text(tl!("AaBbCcDd"), run).styled(id);
             p.props.space_before = Some(0.0);
             p.props.align = Some(wordcraft_doc::Align::Left);
             // Keep hanging indents (bullets) but start the first line at the tile's left edge.
@@ -544,7 +554,7 @@ pub fn style_gallery(app: &mut WordApp, ui: &mut Ui, state: &Value) {
         });
         if let Some(h) = tex {
             let sz = h.size_vec2() / ppp;
-            let ir = Rect::from_min_size(pos2(r.min.x + 3.0, r.min.y + 4.0), sz.min(vec2(68.0, 32.0)));
+            let ir = Rect::from_min_size(pos2(r.min.x + 3.0, r.min.y + 4.0), sz.min(vec2(68.0, sample_h)));
             let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2((ir.width() / sz.x).min(1.0), (ir.height() / sz.y).min(1.0)));
             ui.painter().with_clip_rect(r).image(h.id(), ir, uv, preview_tint(&t, dark_page));
         }
@@ -601,7 +611,7 @@ pub fn style_set_gallery(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let ppp = ui.ctx().pixels_per_point();
     for name in STYLE_SETS {
-        let (r, resp) = ui.allocate_exact_size(vec2(STYLE_SET_W, crate::widgets::CONTENT_H), Sense::click());
+        let (r, resp) = ui.allocate_exact_size(vec2(STYLE_SET_W, crate::widgets::content_h(ui)), Sense::click());
         if resp.hovered() {
             ui.painter().rect_filled(r, 3.0, t.hover);
         }
@@ -618,7 +628,7 @@ pub fn style_set_gallery(app: &mut WordApp, ui: &mut Ui) {
         });
         if let Some(h) = tex {
             let sz = h.size_vec2() / ppp;
-            let ir = Rect::from_min_size(pos2(r.min.x + 3.0, r.min.y + 3.0), sz.min(vec2(50.0, 60.0)));
+            let ir = Rect::from_min_size(pos2(r.min.x + 3.0, r.min.y + 3.0), sz.min(vec2(50.0, r.height() - 6.0)));
             ui.painter().rect_stroke(ir, 0.0, Stroke::new(1.0, t.border), egui::StrokeKind::Outside);
             let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2((ir.width() / sz.x).min(1.0), (ir.height() / sz.y).min(1.0)));
             ui.painter().image(h.id(), ir, uv, preview_tint(&t, false));

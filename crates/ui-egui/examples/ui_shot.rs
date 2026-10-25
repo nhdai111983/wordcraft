@@ -8,7 +8,10 @@
 //! `{"steps": n}` to run extra frames, or `{"wait": ms}` to keep running frames for a while (for
 //! background work such as a Zotero session). The window is 1440×900 pt at 2× and opens the sample
 //! document unless the first line is `{"empty": true}`; `{"empty": true, "startScreen": true}`
-//! starts the way the desktop app does with nothing to open (File › Home, #766).
+//! starts the way the desktop app does with nothing to open (File › Home, #766). `{"wps": true}`
+//! draws the NexusOffice WPS-style layout, `{"embedded": true}` as a tab of the NexusOffice window.
+//! `{"language": "vi"}` sets the interface language; `{"recovery": "/abs/profile"}` turns local
+//! recovery on for that folder (File › Recover lists the copies in it).
 
 use wordcraft_engine::Session;
 use wordcraft_ui_egui::{ControlRequest, Services, WordApp};
@@ -28,6 +31,22 @@ fn main() {
     };
     let mut app = WordApp::new(Session::new(doc), Services::default()).with_control(rx);
     app.integrated_titlebar = true;
+    // `{"toolbar": true}` on any line: the NexusOffice menu bar and tool row; `{"wps": true}`: the
+    // NexusOffice WPS-style layout; `{"embedded": true}`: drawn as a tab of the NexusOffice window
+    // (no window title, no title bar room for the traffic lights).
+    let flag = |name: &str| lines.iter().any(|l| l.get(name).and_then(|v| v.as_bool()) == Some(true));
+    app.toolbar = flag("toolbar");
+    app.wps = flag("wps");
+    app.embedded = flag("embedded");
+    // `{"language": "vi"}`: the interface language, without saving it as a setting.
+    if let Some(lang) = lines.iter().find_map(|l| l.get("language").and_then(|v| v.as_str())) {
+        app.ui.language = lang.to_string();
+    }
+    // `{"recovery": "/abs/profile"}`: local recovery on that folder, for File › Recover with
+    // synthetic copies in it (follow with `{"wait": 500}` while the folder is read).
+    if let Some(dir) = lines.iter().find_map(|l| l.get("recovery").and_then(|v| v.as_str())) {
+        app.session.enable_recovery(dir.into(), std::sync::Arc::new(|| {})).expect("recovery folder");
+    }
     if lines.first().is_some_and(|l| l.get("startScreen").is_some()) {
         app.start_screen();
     }

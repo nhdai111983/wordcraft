@@ -1236,6 +1236,11 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         ctx.data_mut(|d| d.remove::<(egui::Id, u8)>(dialog_top_key()));
         return;
     };
+    // NexusOffice: as a tab of the NexusOffice window, the prompt every Nexus app shows.
+    if app.embedded && matches!(d, Dialog::SaveChanges { .. }) {
+        embedded_save_prompt(app, ctx, d);
+        return;
+    }
     let mut open = true;
     let mut close = false;
     let title = match &d {
@@ -1302,6 +1307,41 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
     if open && !close {
         app.dialog = Some(d);
     } else {
+        app.canvas.want_focus = true;
+    }
+}
+
+/// NexusOffice: "Lưu thay đổi?" over the tab (`nexus_save_prompt`), answered through
+/// `ui.saveChanges` like the stand-alone prompt.
+fn embedded_save_prompt(app: &mut WordApp, ctx: &egui::Context, d: Dialog) {
+    let Dialog::SaveChanges { name, message, .. } = &d else {
+        app.dialog = Some(d);
+        return;
+    };
+    use crate::nexus_save_prompt as sp;
+    let t = Tokens::get(ctx);
+    let vi = crate::i18n::current().code() == "vi";
+    let question = sp::question(vi, name);
+    let prompt = sp::Prompt { words: sp::words(vi), question: &question, note: None, error: Some(message.as_str()) };
+    let look = sp::Look {
+        dark: t.dark,
+        accent: t.accent,
+        on_accent: t.on_accent,
+        error: ctx.global_style().visuals.error_fg_color,
+        title_font: semibold(sp::TITLE_SIZE),
+        title_fake_bold: false,
+    };
+    let answer = sp::show(ctx, egui::Id::new("nexus_save_prompt"), app.drawn_in, &prompt, &look);
+    // `ui.saveChanges` reads the prompt from `app.dialog`.
+    app.dialog = Some(d);
+    let Some(answer) = answer else { return };
+    let answer = match answer {
+        sp::Answer::Save => "save",
+        sp::Answer::DontSave => "dontSave",
+        sp::Answer::Cancel => "cancel",
+    };
+    let _ = app.run("ui.saveChanges", json!({"answer": answer}));
+    if app.dialog.is_none() {
         app.canvas.want_focus = true;
     }
 }
@@ -2379,14 +2419,15 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             match *tab {
                 1 => crate::credits::contributors_ui(ui),
                 2 => crate::credits::models_ui(ui),
-                // NexusOffices: name, links and attribution (`nexus.rs`).
+                // NexusOffice: name, links and attribution (`nexus.rs`).
                 _ => crate::nexus::about_ui(ui),
             }
             let (ok, cancel) = buttons(ui, tl!("Close"));
             ok || cancel
         }
         Dialog::DiscardRecovery { name, .. } => {
-            ui.label(crate::i18n::fmt(tl!("Discard the recovery copy of {name}?"), &[("name", name)]));
+            let name = crate::backstage::recovery_name(name);
+            ui.label(crate::i18n::fmt(tl!("Discard the recovery copy of {name}?"), &[("name", name.as_str())]));
             ui.label(tl!("This cannot be undone. Your original file stays unchanged."));
             let answer = ui
                 .horizontal(|ui| {

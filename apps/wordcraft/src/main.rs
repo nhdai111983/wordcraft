@@ -264,7 +264,7 @@ fn app_icon() -> Option<egui::IconData> {
 }
 
 const USAGE: &str = "\
-nexus-docs — the Nexus Docs desktop app (NexusOffices)
+nexus-docs — the Nexus Docs desktop app (NexusOffice)
 
 USAGE:
   nexus-docs [--sample] [--control PORT] [FILE…]
@@ -441,6 +441,8 @@ fn main() -> eframe::Result {
             }
             app.ui.window = restored;
             app.integrated_titlebar = cfg!(target_os = "macos");
+            // NexusOffice layout in the style of WPS Office (no title bar; tabs and a flat command strip).
+            app.wps = true;
             #[cfg(target_os = "macos")]
             if let Some(bar) = traffic_lights::title_bar() {
                 log::info!("title bar: {bar:?}");
