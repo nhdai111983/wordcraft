@@ -1324,15 +1324,12 @@ fn embedded_save_prompt(app: &mut WordApp, ctx: &egui::Context, d: Dialog) {
     let question = sp::question(vi, name);
     let prompt = sp::Prompt { words: sp::words(vi), question: &question, note: None, error: Some(message.as_str()) };
     let look = sp::Look {
-        surface: t.menu,
-        border: t.border,
-        text: t.text,
-        text_dim: t.text_dim,
-        error: ctx.global_style().visuals.error_fg_color,
+        dark: t.dark,
         accent: t.accent,
         on_accent: t.on_accent,
-        backdrop: egui::Color32::from_black_alpha(if t.dark { 110 } else { 56 }),
+        error: ctx.global_style().visuals.error_fg_color,
         title_font: semibold(sp::TITLE_SIZE),
+        title_fake_bold: false,
     };
     let answer = sp::show(ctx, egui::Id::new("nexus_save_prompt"), app.drawn_in, &prompt, &look);
     // `ui.saveChanges` reads the prompt from `app.dialog`.

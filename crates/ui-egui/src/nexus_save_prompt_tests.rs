@@ -77,10 +77,10 @@ fn embedded_prompt_reads_like_every_nexus_app() {
     for b in [save, dont, cancel] {
         assert!(b.width() >= crate::nexus_save_prompt::BUTTON_SIZE.x - 0.5 && b.height() >= crate::nexus_save_prompt::BUTTON_SIZE.y - 0.5);
     }
-    // Right-aligned: the buttons end at the card's right padding, the title starts at its left.
-    let title = h.get_by_label("Lưu thay đổi?").rect();
-    let inner = crate::nexus_save_prompt::WIDTH - 2.0 * f32::from(crate::nexus_save_prompt::PADDING);
-    assert!((cancel.max.x - (title.min.x + inner)).abs() < 1.5, "right-aligned: {cancel:?} {title:?}");
+    // A dialog named by its title; the buttons end at its right padding.
+    let card = h.get_by_role_and_label(Role::Dialog, "Lưu thay đổi?").rect();
+    let pad = f32::from(crate::nexus_save_prompt::PADDING);
+    assert!((cancel.max.x - (card.max.x - pad)).abs() < 1.5, "right-aligned: {cancel:?} {card:?}");
     assert!(h.get_by_role_and_label(Role::Button, "Lưu").is_focused(), "the keyboard starts on Lưu");
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -144,5 +144,25 @@ fn stand_alone_prompt_is_upstreams() {
     let h = harness(a);
     assert!(h.query_by_label("Lưu thay đổi?").is_none());
     h.get_by_role_and_label(Role::Button, "Không lưu");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Tab and Shift+Tab go through the three buttons in the order they read (the dim and the card
+/// never take the focus): Lưu → Không lưu → Hủy → Không lưu.
+#[test]
+fn tab_cycles_the_buttons_in_reading_order() {
+    let dir = scratch("tab");
+    let (a, _) = asking(&dir);
+    let mut h = harness(a);
+    let focused = |h: &egui_kittest::Harness<'static, WordApp>, l: &str| h.get_by_role_and_label(Role::Button, l).is_focused();
+    assert!(focused(&h, "Lưu"));
+    for (key, shift, want) in [(egui::Key::Tab, false, "Không lưu"), (egui::Key::Tab, false, "Hủy"), (egui::Key::Tab, true, "Không lưu")] {
+        let m = if shift { egui::Modifiers::SHIFT } else { egui::Modifiers::NONE };
+        h.key_press_modifiers(m, key);
+        h.step();
+        h.step();
+        assert!(focused(&h, want), "{key:?} shift={shift}: {want} has the focus");
+    }
+    assert!(h.state().dialog.is_some(), "still asking");
     let _ = std::fs::remove_dir_all(&dir);
 }
