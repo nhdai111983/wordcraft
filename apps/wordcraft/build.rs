@@ -16,8 +16,8 @@ fn main() {
     res.set_icon("../../nexus/assets/nexus-docs.ico")
         .set("ProductName", "Nexus Docs")
         .set("FileDescription", "Nexus Docs word processor")
-        .set("CompanyName", "Sonnytech")
-        .set("LegalCopyright", "Nexus Docs (c) 2026 Sonnytech; based on WordCraft by the ArtCraft team. MIT OR Apache-2.0.")
+        .set("CompanyName", "SonnyTech")
+        .set("LegalCopyright", "Nexus Docs (c) 2026 SonnyTech; based on WordCraft by the ArtCraft team. MIT OR Apache-2.0.")
         .set("OriginalFilename", "nexus-docs.exe")
         .set("InternalName", "wordcraft");
     if let Err(e) = res.compile() {

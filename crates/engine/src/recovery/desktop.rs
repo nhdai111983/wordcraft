@@ -14,6 +14,8 @@ const MAX_BYTES: u64 = 256 << 20;
 const MAX_RECORDS: usize = 128;
 const MAX_FILES: usize = 16;
 const DISK_BUDGET: u64 = 2 << 30;
+/// How long [`Recovery::discard_current`] waits for the worker (NexusOffice: on the UI thread).
+const DISCARD_WAIT: Duration = Duration::from_secs(2);
 /// Times a record lock held for a moment (by a process being started) is tried again.
 const LOCK_RETRIES: u32 = 10;
 
@@ -504,6 +506,36 @@ impl Recovery {
     pub fn document_is(&self, document: u64) -> bool {
         self.document == Some(document)
     }
+    /// The copy this session writes for `document` (the open one), if any.
+    pub fn current(&self, document: u64) -> Option<&str> {
+        if self.document_is(document) { self.id.as_deref() } else { None }
+    }
+    /// NexusOffice: the next tick writes the copy instead of waiting out the interval.
+    pub fn save_soon(&mut self) {
+        self.due = Instant::now();
+    }
+    /// NexusOffice: whether `revision` of `document` is in its copy on disk: written (not
+    /// queued), and the last write didn't fail.
+    pub fn written(&self, document: u64, revision: u64) -> bool {
+        self.alive
+            && self.ready
+            && !self.busy
+            && self.error.is_none()
+            && self.id.is_some()
+            && self.document == Some(document)
+            && self.revision == Some(revision)
+    }
+    /// NexusOffice: removes the copy of `document` now (waiting for the worker), and writes none
+    /// for `revision` again: the document went to another window, which keeps a copy of its own.
+    pub fn discard_current(&mut self, document: u64, revision: u64) -> Result<(), String> {
+        if self.document_is(document) {
+            // Bounded: the window's frame waits for one write at most, never for a stuck disk.
+            self.purge_within(Some(DISCARD_WAIT))?;
+        }
+        self.document = Some(document);
+        self.revision = Some(revision);
+        Ok(())
+    }
     pub fn wait(&self, document: u64, revision: u64) -> Option<Duration> {
         if !self.alive || !self.ready || self.busy || (self.document == Some(document) && self.revision == Some(revision)) {
             return None;
@@ -530,9 +562,25 @@ impl Recovery {
         self.queue(Job::Scan)
     }
     pub fn purge(&mut self) -> Result<(), String> {
+        self.purge_within(None)
+    }
+    /// [`Self::purge`], waiting for the worker at most `limit` each time (`None`: as long as it
+    /// takes). Out of time before the removal is queued: an error, the copy stays. Out of time
+    /// after: the worker removes it on its own (its answer is read by the next poll).
+    fn purge_within(&mut self, limit: Option<Duration>) -> Result<(), String> {
+        let wait = |rx: &mpsc::Receiver<Event>| -> Result<Option<Event>, String> {
+            match limit {
+                None => rx.recv().map(Some).map_err(|e| e.to_string()),
+                Some(t) => match rx.recv_timeout(t) {
+                    Ok(e) => Ok(Some(e)),
+                    Err(mpsc::RecvTimeoutError::Timeout) => Ok(None),
+                    Err(e) => Err(e.to_string()),
+                },
+            }
+        };
         let Some(id) = self.id.clone() else { return Ok(()) };
         if self.busy {
-            let e = self.rx.recv().map_err(|e| e.to_string())?;
+            let e = wait(&self.rx)?.ok_or("recovery is busy; the copy stays")?;
             self.documents = e.documents;
             self.busy = false;
             self.ready = true;
@@ -541,7 +589,10 @@ impl Recovery {
             }
         }
         self.queue(Job::Discard(id))?;
-        let e = self.rx.recv().map_err(|e| e.to_string())?;
+        let Some(e) = wait(&self.rx)? else {
+            // Queued: the worker removes it; `poll` reads the answer.
+            return Ok(());
+        };
         self.busy = false;
         self.documents = e.documents;
         e.outcome?;
@@ -626,6 +677,34 @@ mod tests {
         s.recovery.as_mut().unwrap().due = Instant::now();
         s.recovery_tick();
         settle(s);
+    }
+
+    /// NexusOffice: a document handed to another window gets its copy at the next tick, says when
+    /// that copy holds its latest change, and its copy goes at once (none written again for it).
+    #[test]
+    fn a_handed_over_document_is_written_soon_and_discarded_now() {
+        let profile = Temp::new();
+        let mut s = session(&profile.0);
+        assert!(!s.recovery_written(), "nothing changed: no copy");
+        s.run("document.setText", &json!({"text": "Bản nháp chuyển cửa sổ"})).unwrap();
+        s.recovery_save_soon();
+        s.recovery_tick();
+        assert!(!s.recovery_written(), "queued is not written");
+        settle(&mut s);
+        assert!(s.recovery_written(), "written at the next tick, not after the interval");
+        assert_eq!(s.recovery_documents().len(), 1);
+        s.run("document.setText", &json!({"text": "Đổi nữa"})).unwrap();
+        assert!(!s.recovery_written(), "a newer change isn't in the copy");
+        s.recovery_discard_current().unwrap();
+        assert!(s.recovery_documents().is_empty(), "removed before it returns");
+        assert_eq!(fs::read_dir(&profile.0).unwrap().filter_map(Result::ok).filter(|e| e.path().is_dir()).count(), 0);
+        save_now(&mut s);
+        assert!(s.recovery_documents().is_empty(), "not written again for the same revision");
+        // Without recovery there is nothing to write or remove.
+        let mut off = Session::new(Document::new());
+        off.recovery_save_soon();
+        assert!(!off.recovery_written());
+        assert!(off.recovery_discard_current().is_ok());
     }
 
     #[test]

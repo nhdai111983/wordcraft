@@ -16,20 +16,20 @@
   already installed") or silently uninstall the other. packaging-lint.yml checks this.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <!-- NexusOffices: package.ps1 passes FontLicences=yes when it staged licenses\ (the OFL texts of
+  <!-- NexusOffice: package.ps1 passes FontLicences=yes when it staged licenses\ (the OFL texts of
        the embedded fonts); a build without that folder (a smoke test) leaves the group out. -->
   <?ifndef FontLicences ?>
   <?define FontLicences = "no" ?>
   <?endif ?>
   <Package
       Name="Nexus Docs"
-      Manufacturer="Sonnytech"
+      Manufacturer="SonnyTech"
       Version="$(var.Version)"
       UpgradeCode="B8F9CA5A-7CB4-4C4D-A260-DFC010020560"
       Scope="perMachine"
       Compressed="yes"
       Language="1033">
-    <SummaryInformation Description="Nexus Docs word processor" Manufacturer="Sonnytech" />
+    <SummaryInformation Description="Nexus Docs word processor" Manufacturer="SonnyTech" />
     <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
          (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
     <MajorUpgrade AllowSameVersionUpgrades="yes"
@@ -162,7 +162,7 @@
       <Component Id="WordcraftCli">
         <File Id="WordcraftCliExe" Source="$(var.BinDir)\wordcraft-cli.exe" Name="nexus-docs-cli.exe" KeyPath="yes" />
       </Component>
-      <!-- NexusOffices: the licences, NOTICE (Apache-2.0 4(d)) and ATTRIBUTION.md, staged by
+      <!-- NexusOffice: the licences, NOTICE (Apache-2.0 4(d)) and ATTRIBUTION.md, staged by
            package.ps1, are installed beside the binaries. Auto GUIDs, like the CLI component. -->
       <Component Id="WordcraftMitLicense">
         <File Id="WordcraftMitLicenseFile" Source="$(var.BinDir)\LICENSE-MIT" KeyPath="yes" />
@@ -178,7 +178,7 @@
       </Component>
     </ComponentGroup>
     <?if $(var.FontLicences) = "yes" ?>
-    <!-- NexusOffices: OFL texts of the embedded fonts, staged by package.ps1 in licenses\, one
+    <!-- NexusOffice: OFL texts of the embedded fonts, staged by package.ps1 in licenses\, one
          auto-GUID component each. -->
     <ComponentGroup Id="WordcraftFontLicences" Directory="LicensesFolder">
       <Files Include="$(var.BinDir)\licenses\*" />

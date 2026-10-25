@@ -63,6 +63,9 @@ pub mod keys;
 pub mod keytips;
 pub mod mini_toolbar;
 pub mod nexus;
+pub mod nexus_save_prompt;
+pub mod nexus_toolbar;
+pub mod nexus_wps;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -155,6 +158,9 @@ pub struct Services {
     /// names), where the platform lists them, so a paste that finds nothing it can use says what
     /// is there instead of "empty" (#833).
     pub clipboard_formats: Option<Box<dyn Fn() -> Vec<String>>>,
+    /// NexusOffice: a host showing documents in tabs makes a new document (File › New, Ctrl+N,
+    /// a template; the `file.new` params) in a tab of its own instead of in place of this one.
+    pub new_document: Option<Box<dyn Fn(Value)>>,
     /// Web: keep a font the user added (stored file name, original bytes) for the next visit
     /// (#582). Desktop fonts are stored by the font database itself, in the app's font folder.
     pub store_font: Option<Box<dyn Fn(&str, &[u8])>>,
@@ -242,6 +248,9 @@ pub struct UiState {
     pub recent_colors: Vec<String>,
     /// Interface theme: light, dark, or follow the OS appearance (#115).
     pub theme: theme::Appearance,
+    /// NexusOffice: the accent colour the user picked (`#RRGGBB`); `None` = the app's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
     /// Interface size (#475, #822): Auto (the display scale the system reports) or an absolute
     /// size in percent. Junk saved values read as Auto; out-of-range ones are clamped to 50–300 %.
     #[serde(rename = "uiScale")]
@@ -347,6 +356,7 @@ impl Default for UiState {
             recent_symbols: Vec::new(),
             recent_colors: Vec::new(),
             theme: theme::Appearance::default(),
+            accent: None,
             interface_size: theme::InterfaceSize::default(),
             legacy_interface_size: None,
             animations: theme::Animations::default(),
@@ -447,6 +457,24 @@ pub struct WordApp {
     pub(crate) dialog_pick: Option<String>,
     /// macOS: the window has no title bar; leave room for the traffic lights.
     pub integrated_titlebar: bool,
+    /// NexusOffice layout: a menu bar and one tool row instead of the ribbon
+    /// ([`nexus_toolbar`]). The Nexus apps turn it on; off keeps upstream's ribbon.
+    pub toolbar: bool,
+    /// NexusOffice layout in the style of WPS Office ([`nexus_wps`]): no title bar; one row with
+    /// File, the Quick Access Toolbar, the ribbon tabs, the save state, Search, Comments and Share;
+    /// under it the current tab's groups as one flat strip whose trailing groups fold into a "…"
+    /// menu. Wins over [`toolbar`](Self::toolbar). Off keeps upstream's title bar and ribbon.
+    pub wps: bool,
+    /// Menus a host program adds to the menu bar after the app's own (the NexusOffice window adds
+    /// its "Nexus AI" menu this way): `(title, contents)`. Empty in the stand-alone app.
+    pub host_menus: Vec<(String, Box<dyn FnMut(&mut egui::Ui)>)>,
+    /// Drawn inside another program's window (a tab of the NexusOffice window): the app leaves
+    /// the window alone (no title, no dragging or maximizing it from the title bar); the host
+    /// names its tabs. Off in the stand-alone app.
+    pub embedded: bool,
+    /// NexusOffice: the rectangle the app was last drawn in (its tab, when [`embedded`](Self::embedded)),
+    /// which "Lưu thay đổi?" dims and centres on.
+    pub(crate) drawn_in: egui::Rect,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
@@ -585,6 +613,11 @@ impl WordApp {
             status_msg: None,
             previews: previews::Previews::default(),
             integrated_titlebar: false,
+            toolbar: false,
+            wps: false,
+            host_menus: Vec::new(),
+            embedded: false,
+            drawn_in: egui::Rect::NOTHING,
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
             shot_token: 0,
@@ -698,6 +731,9 @@ impl WordApp {
         if let Some(dark) = self.ui.legacy_dark.take() {
             self.ui.theme = if dark { theme::Appearance::Dark } else { theme::Appearance::Light };
         }
+        // NexusOffice: the user's accent colour (a junk value reads as the app's own colour).
+        theme::set_accent(self.ui.accent.as_deref().and_then(theme::parse_hex));
+        self.applied_theme = None;
         // A `ui.json` from before #822: its interface size was on top of the display scale, so it
         // becomes absolute on the first frame that knows that scale (`logic`). A chosen `uiScale`
         // (the current key) wins; "auto" can't be told from a missing key, so the old size does.
@@ -752,6 +788,14 @@ impl WordApp {
     /// Close, Envelopes, Labels and Finish & Merge on a document with unsaved changes first ask
     /// Save / Don't Save / Cancel, and the command runs once that is answered (`ui.saveChanges`).
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
+        // NexusOffice: the host's tabs take new documents; this one stays as it is.
+        if id == "file.new"
+            && let Some(new) = &self.services.new_document
+        {
+            new(params);
+            self.ui.backstage = false;
+            return Ok(json!({"host": "file.new"}));
+        }
         if id == "file.recover" && params.as_object().is_none_or(|p| p.is_empty()) {
             self.ui.backstage = true;
             self.ui.backstage_page = "recover".into();
@@ -1157,6 +1201,13 @@ impl WordApp {
         saved
     }
 
+    /// NexusOffice: typing that isn't in the document yet (a comment being edited or replied to,
+    /// held in egui's memory until its field loses focus), which moving the document to another
+    /// window would leave behind.
+    pub fn has_drafts(&self, ctx: &egui::Context) -> bool {
+        panes::has_comment_drafts(self, ctx)
+    }
+
     /// The window's close button (or the system) asked to quit. Returns true to let the window
     /// close; with unsaved changes it asks first and returns false.
     pub fn close_requested(&mut self) -> bool {
@@ -1203,7 +1254,7 @@ impl WordApp {
         if !self.session.status.is_empty() {
             // Engine messages are English; the catalog translates the ones it knows.
             let s = std::mem::take(&mut self.session.status);
-            // NexusOffices: only a catalog string is looked up (and so branded, `i18n::t`); a
+            // NexusOffice: only a catalog string is looked up (and so branded, `i18n::t`); a
             // status quoting the user's file or font name is shown as it is.
             let s = if i18n::is_catalog_key(&s) { tl!(&s).to_string() } else { s };
             self.status(s);
@@ -1287,6 +1338,12 @@ impl WordApp {
                 let tab = s("tab").unwrap_or("Home").to_string();
                 if tab == "File" {
                     self.ui.backstage = true;
+                    // NexusOffice: the Recover page opens by itself once, at start-up, when copies
+                    // are left from an earlier session; File afterwards opens Info (Home without a
+                    // document) rather than that page again.
+                    if self.ui.backstage_page == "recover" {
+                        self.ui.backstage_page = if self.has_document() { "info" } else { "home" }.into();
+                    }
                 } else {
                     self.ui.tab = tab;
                     self.ui.backstage = false;
@@ -1374,6 +1431,26 @@ impl WordApp {
                     }
                 }
                 json!({"theme": self.ui.theme.code(), "dark": self.ui_is_dark()})
+            }
+            "ui.accent" => {
+                // NexusOffice: `#RRGGBB` sets the accent colour, `null` or "" goes back to the
+                // app's own; no value reads it.
+                if let Some(v) = p.get("value") {
+                    let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
+                    match hex.map(theme::parse_hex) {
+                        Some(None) => return Some(Err(format!("unknown colour {v}; use #RRGGBB"))),
+                        Some(Some(c)) => {
+                            self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
+                            theme::set_accent(Some(c));
+                        }
+                        None => {
+                            self.ui.accent = None;
+                            theme::set_accent(None);
+                        }
+                    }
+                    self.applied_theme = None;
+                }
+                json!({"accent": self.ui.accent})
             }
             "ui.interfaceSize" => {
                 // `auto` (the display scale the system reports) or an absolute size in percent,
@@ -1496,7 +1573,7 @@ impl WordApp {
                 ));
             }
             "ui.discord" => {
-                // NexusOffices: upstream's community (ArtCraft's Discord) is never opened.
+                // NexusOffice: upstream's community (ArtCraft's Discord) is never opened.
                 let Some(url) = nexus::COMMUNITY_URL else { return Some(Err("no community link in this build".into())) };
                 self.canvas.open_url = Some(url.into());
                 json!({})
@@ -1829,7 +1906,7 @@ impl WordApp {
         }
         if !self.recovery_seen && self.session.recovery_ready() {
             self.recovery_seen = true;
-            if !self.session.recovery_documents().is_empty() && !self.session.dirty {
+            if !backstage::recovery_list(self).is_empty() && !self.session.dirty {
                 self.ui.backstage = true;
                 self.ui.backstage_page = "recover".into();
             }
@@ -1984,6 +2061,7 @@ impl WordApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let t0 = now_ms();
         let ctx = ui.ctx().clone();
+        self.drawn_in = ui.max_rect();
         i18n::set_current(i18n::Lang::from_pref(&self.ui.language));
         // Animation effects off: egui's scroll areas get a wheel notch whole, not eased in.
         if !self.animations_on() {
@@ -1997,6 +2075,9 @@ impl WordApp {
             return;
         }
         let t = theme::Tokens::get(&ctx);
+        // NexusOffice: a click that closed the Backstage (its Back button) belongs to it, not to
+        // the chrome under it (see `refocus_after_chrome_click`).
+        let backstage_at_start = self.ui.backstage;
         self.escape_free = self.dialog.is_none() && !self.ui.backstage && self.ui.keytips == keytips::Phase::Off && !egui::Popup::is_any_open(&ctx);
         // Keytips are read before layout so the frame paints the new state; badges paint after
         // the ribbon so they sit on top of it.
@@ -2010,14 +2091,30 @@ impl WordApp {
             backstage::show(self, ui);
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
-            chrome::title_bar(self, ui);
-            ribbon::show(self, ui);
+            if self.wps {
+                nexus_wps::show(self, ui, true);
+            } else {
+                chrome::title_bar(self, ui);
+                if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
+            }
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
-            chrome::title_bar(self, ui);
-            if !self.session.view.focus_mode {
-                ribbon::show(self, ui);
+            let full = !self.session.view.focus_mode;
+            if self.wps {
+                // Focus keeps the WPS layout's top row, as it keeps the title bar.
+                nexus_wps::show(self, ui, full);
+            } else {
+                chrome::title_bar(self, ui);
+            }
+            if full {
+                if self.wps {
+                    // Drawn above with the top row.
+                } else if self.toolbar {
+                    nexus_toolbar::show(self, ui);
+                } else {
+                    ribbon::show(self, ui);
+                }
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
             }
@@ -2034,7 +2131,9 @@ impl WordApp {
         read_aloud::show(self, &ctx);
         crate::keytips::show(self, &ctx, ui);
         keys::global_shortcuts(self, &ctx);
-        self.refocus_after_chrome_click(&ctx);
+        if !backstage_at_start {
+            self.refocus_after_chrome_click(&ctx);
+        }
         if let Some(url) = self.canvas.open_url.take() {
             ctx.open_url(egui::OpenUrl::new_tab(url));
         }
@@ -2043,7 +2142,7 @@ impl WordApp {
         } else {
             nexus::APP_NAME.to_string()
         };
-        if title != self.sent_title {
+        if title != self.sent_title && !self.embedded {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.sent_title = title;
         }
@@ -2388,6 +2487,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.keytips"
             | "ui.dark"
             | "ui.theme"
+            | "ui.accent"
             | "ui.interfaceSize"
             | "ui.animations"
             | "ui.language"
@@ -2450,6 +2550,8 @@ fn control_click_as_secondary(events: &mut [egui::Event], held: &mut bool) {
     }
 }
 
+#[cfg(test)]
+mod nexus_save_prompt_tests;
 #[cfg(test)]
 mod tests_perf;
 
@@ -3948,7 +4050,7 @@ mod tests {
         assert!(via_key.iter().any(|t| t.contains("My unsaved novel")), "key event Cut: {via_key:?} body={:?}", body_text(h.state()));
     }
 
-    /// NexusOffices: the status bar shows a file name or other user text as it is. Only catalog
+    /// NexusOffice: the status bar shows a file name or other user text as it is. Only catalog
     /// strings are looked up (and so branded), never an engine status quoting the user's file.
     #[test]
     fn status_keeps_the_users_file_name() {
@@ -5887,6 +5989,10 @@ mod tests {
         }
         let mut a = app();
         assert!(a.run("ui.theme", json!({"value": "purple"})).is_err());
+        // NexusOffice accent: junk is refused and changes nothing; null keeps the app's colour.
+        assert!(a.run("ui.accent", json!({"value": "purple"})).is_err());
+        assert_eq!(a.run("ui.accent", json!({"value": null})).unwrap()["accent"], Value::Null);
+        assert_eq!(a.run("ui.accent", json!({})).unwrap()["accent"], Value::Null);
         assert_eq!(a.run("ui.theme", json!({"value": "dark"})).unwrap()["theme"], "dark");
         assert_eq!(a.run("ui.dark", json!({})).unwrap()["theme"], "light", "ui.dark toggles the manual choice");
         assert_eq!(a.run("ui.theme", json!({})).unwrap()["theme"], "light");

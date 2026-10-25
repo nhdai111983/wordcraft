@@ -31,6 +31,47 @@ impl Session {
         }
         Vec::new()
     }
+    /// NexusOffice: the id of the recovery copy that belongs to the open document (its own
+    /// autosave copy, written by this session), if there is one. A window lists the other copies
+    /// for restoring, never its own.
+    pub fn recovery_current(&self) -> Option<&str> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(r) = &self.recovery {
+            return r.current(self.document_id());
+        }
+        None
+    }
+    /// NexusOffice: writes the open document's recovery copy at the next tick instead of after
+    /// the interval (a document handed over from another window, whose copy there goes once this
+    /// one is on disk).
+    pub fn recovery_save_soon(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(r) = &mut self.recovery {
+            r.save_soon();
+        }
+    }
+    /// NexusOffice: whether the open document's latest change is in its recovery copy on disk
+    /// (`false` without recovery, while a write is under way, or after one failed).
+    pub fn recovery_written(&self) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(r) = &self.recovery {
+            return r.written(self.document_id(), self.rev());
+        }
+        false
+    }
+    /// NexusOffice: removes the open document's recovery copy now, waiting for the worker, and
+    /// writes none for this revision again: the document moved to another window, which keeps a
+    /// copy of its own. An error leaves the copy (offered after a crash rather than lost).
+    pub fn recovery_discard_current(&mut self) -> Result<(), String> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (document, revision) = (self.document_id(), self.rev());
+            if let Some(r) = &mut self.recovery {
+                r.discard_current(document, revision)?;
+            }
+        }
+        Ok(())
+    }
     pub fn recovery_ready(&self) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(r) = &self.recovery {

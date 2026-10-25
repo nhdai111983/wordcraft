@@ -8,14 +8,53 @@ use crate::{WordApp, icons};
 
 /// Height of the ribbon content area (without group labels).
 pub const CONTENT_H: f32 = 66.0;
-/// Height of the group title row under the content.
-pub const LABEL_H: f32 = 18.0;
+/// Height of the group title row under the content (none in the NexusOffices look, see
+/// [`crate::nexus::look::GROUP_TITLES`]).
+pub const LABEL_H: f32 = if crate::nexus::look::GROUP_TITLES { 18.0 } else { 0.0 };
 /// Large buttons: centre of the 32 px icon, top of the first label line, and the pitch and
 /// height of a label line (`regular(11.5)`; a test checks the font's real line height).
 pub const BIG_ICON_Y: f32 = 18.0;
 pub const BIG_LABEL_Y: f32 = 36.0;
 pub const LABEL_PITCH: f32 = 13.0;
 pub const LABEL_LINE_H: f32 = 14.0;
+/// Height of the content in the NexusOffice WPS strip ([`crate::nexus_wps`]): two rows of small
+/// buttons; a large button is a 20 px icon over one label line there.
+pub const COMPACT_H: f32 = 50.0;
+const COMPACT_ICON_Y: f32 = 15.0;
+const COMPACT_ICON: f32 = 20.0;
+const COMPACT_LABEL_Y: f32 = 30.0;
+const _: () = assert!(COMPACT_LABEL_Y + LABEL_LINE_H <= COMPACT_H);
+const _: () = assert!(COMPACT_ICON_Y + COMPACT_ICON / 2.0 <= COMPACT_LABEL_Y);
+
+/// Height of the ribbon content being drawn: [`COMPACT_H`] in the WPS strip, else [`CONTENT_H`].
+pub fn content_h(ui: &Ui) -> f32 {
+    if crate::nexus_wps::compact(ui) { COMPACT_H } else { CONTENT_H }
+}
+
+/// Where a large button draws: icon centre (from the top) and size, the first label line's top,
+/// and whether its label is kept to one line (the WPS strip).
+#[derive(Clone, Copy, Debug)]
+pub struct BigLayout {
+    pub icon_y: f32,
+    pub icon: f32,
+    pub label_y: f32,
+    pub one_line: bool,
+}
+
+/// The large-button geometry for the ribbon being drawn.
+pub fn big_layout(ui: &Ui) -> BigLayout {
+    if crate::nexus_wps::compact(ui) {
+        BigLayout { icon_y: COMPACT_ICON_Y, icon: COMPACT_ICON, label_y: COMPACT_LABEL_Y, one_line: true }
+    } else {
+        BigLayout { icon_y: BIG_ICON_Y, icon: 32.0, label_y: BIG_LABEL_Y, one_line: false }
+    }
+}
+
+/// A large button's label lines: as written, or on one line in the WPS strip.
+fn big_lines(label: &str, one_line: bool) -> Vec<String> {
+    if one_line { vec![label.split('\n').map(str::trim).collect::<Vec<_>>().join(" ")] } else { label.split('\n').map(str::to_string).collect() }
+}
+
 // #653: a two-line label ends inside the content, above the group title row.
 const _: () = assert!(BIG_LABEL_Y + LABEL_PITCH + LABEL_LINE_H <= CONTENT_H);
 const _: () = assert!(BIG_ICON_Y + 16.0 <= BIG_LABEL_Y);
@@ -162,18 +201,18 @@ pub fn label_line(ui: &Ui, cx: f32, y: f32, text: &str, font: egui::FontId, colo
 fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str, params: Value, menu: bool, checked: bool) -> Response {
     let label = tl!(label);
     let t = Tokens::get(ui.ctx());
-    let galley_w =
-        label.split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
+    let g = big_layout(ui);
+    let lines = big_lines(label, g.one_line);
+    let galley_w = lines.iter().map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
     let w = (galley_w + 12.0).max(44.0);
-    let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(w, content_h(ui)), Sense::click());
     keytip_badge(ui, r, id, &label.replace('\n', " "));
     let on = enabled(app, id);
     bg(ui, r, &resp, checked, &t);
-    let ic = Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0));
+    let ic = Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon, g.icon));
     let (c, a) = if on { (t.icon, t.accent) } else { (t.text_disabled, t.text_disabled) };
     icons::paint(ui.painter(), ic, icon, c, a);
-    let mut y = r.min.y + BIG_LABEL_Y;
-    let lines: Vec<&str> = label.split('\n').collect();
+    let mut y = r.min.y + g.label_y;
     for (i, l) in lines.iter().enumerate() {
         label_line(ui, r.center().x, y, l, regular(11.5), if on { t.text } else { t.text_disabled }, menu && i + 1 == lines.len());
         y += LABEL_PITCH;
@@ -269,18 +308,16 @@ pub fn menu_button(
     let on = menu_enabled(app, id);
     let (c, a, text) = if on { (t.icon, t.accent, t.text) } else { (t.text_disabled, t.text_disabled, t.text_disabled) };
     let resp = if big_btn {
-        let galley_w = label
-            .unwrap_or("")
-            .split('\n')
-            .map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x))
-            .fold(0.0, f32::max);
+        let g = big_layout(ui);
+        let lines = big_lines(label.unwrap_or(""), g.one_line);
+        let galley_w =
+            lines.iter().map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
         let w = (galley_w + 22.0).max(44.0);
-        let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
+        let (r, resp) = ui.allocate_exact_size(vec2(w, content_h(ui)), Sense::click());
         keytip_badge(ui, r, "menu", tip);
         bg(ui, r, &resp, false, &t);
-        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0)), icon, c, a);
-        let lines: Vec<&str> = label.unwrap_or("").split('\n').collect();
-        let mut y = r.min.y + BIG_LABEL_Y;
+        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon, g.icon)), icon, c, a);
+        let mut y = r.min.y + g.label_y;
         for (i, l) in lines.iter().enumerate() {
             label_line(ui, r.center().x, y, l, regular(11.5), text, i + 1 == lines.len());
             y += LABEL_PITCH;
@@ -324,28 +361,46 @@ pub fn group(ui: &mut Ui, title: &str, launcher: Option<&str>, app: &mut WordApp
 
 /// A ribbon group whose title is shown as is (a custom group's name, Customize Ribbon).
 pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&str>, app: &mut WordApp, add: impl FnOnce(&mut Ui, &mut WordApp)) {
+    // NexusOffice WPS layout: a group may be left for the "…" menu (or be drawn only there), and
+    // its dialog launcher moves to the group's right-click menu.
+    let Some(slot) = crate::nexus_wps::group_begin(ui) else { return };
+    let (launcher, launcher_menu) = if slot.is_wps() { (None, launcher) } else { (launcher, None) };
+    let group_menu = launcher_menu.map(|cmd| (crate::nexus_wps::group_menu_area(ui, id_title), cmd));
     let t = Tokens::get(ui.ctx());
+    let h = content_h(ui);
     let label_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(title.to_string(), regular(11.0), t.group_label).size().x);
     let start = ui.cursor().min;
+    let titles = crate::nexus::look::GROUP_TITLES;
     let inner = ui.vertical(|ui| {
-        ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
-        let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), CONTENT_H), egui::Layout::left_to_right(egui::Align::Min), |ui| {
+        if titles {
+            ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
+        }
+        let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), h), egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = vec2(1.0, 1.0);
             add(ui, app);
         });
         #[cfg(test)]
-        if content.response.rect.height() > CONTENT_H + 0.5 {
+        if content.response.rect.height() > h + 0.5 {
             TALL_GROUPS.with(|g| g.borrow_mut().push(format!("{id_title}: {:.1}", content.response.rect.height())));
         }
         #[cfg(not(test))]
         let _ = content;
     });
     let r = inner.response.rect;
-    let r = Rect::from_min_max(start, pos2(r.max.x, start.y + CONTENT_H + LABEL_H));
+    let r = Rect::from_min_max(start, pos2(r.max.x, start.y + h + LABEL_H));
     let title_y = r.max.y - LABEL_H / 2.0;
-    ui.painter().text(pos2(r.center().x, title_y), Align2::CENTER_CENTER, title, regular(11.0), t.group_label);
+    if titles {
+        ui.painter().text(pos2(r.center().x, title_y), Align2::CENTER_CENTER, title, regular(11.0), t.group_label);
+    }
     if let Some(cmd) = launcher {
-        let lr = Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0));
+        // Without titles the launcher gets its own narrow column right of the controls, level
+        // with their bottom row.
+        let lr = if titles {
+            Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0))
+        } else {
+            let (col, _) = ui.allocate_exact_size(vec2(13.0, h), Sense::hover());
+            Rect::from_center_size(pos2(col.center().x, col.max.y - 7.0), vec2(11.0, 11.0))
+        };
         let resp = ui.interact(lr, ui.id().with(("launch", id_title)), Sense::click());
         if resp.hovered() {
             ui.painter().rect_filled(lr.expand(2.0), 2.0, t.hover);
@@ -357,8 +412,12 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
     }
     ui.add_space(5.0);
     let x = ui.cursor().min.x;
-    ui.painter().line_segment([pos2(x, start.y + 4.0), pos2(x, start.y + CONTENT_H + LABEL_H - 4.0)], Stroke::new(1.0, t.border));
+    ui.painter().line_segment([pos2(x, start.y + 4.0), pos2(x, start.y + h + LABEL_H - 4.0)], Stroke::new(1.0, t.border));
     ui.add_space(6.0);
+    if let Some((area, cmd)) = group_menu {
+        crate::nexus_wps::group_menu(ui, area, r, title, cmd, app);
+    }
+    crate::nexus_wps::group_end(ui, slot, ui.cursor().min.x - start.x);
 }
 
 /// The icon a command's button shows outside its own ribbon group (custom groups, the Quick

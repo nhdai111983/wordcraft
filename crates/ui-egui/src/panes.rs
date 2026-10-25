@@ -449,6 +449,17 @@ pub(crate) fn commit_comment(app: &mut WordApp, ctx: &egui::Context, id: u32) {
     }
 }
 
+/// NexusOffice: whether a comment is being edited or replied to with text not in the document
+/// yet (drafts live in egui's memory until the field loses focus): moving the document to another
+/// window would leave them behind.
+pub(crate) fn has_comment_drafts(app: &WordApp, ctx: &egui::Context) -> bool {
+    app.session.doc.comments.iter().any(|(id, c)| {
+        let edited = ctx.data(|d| d.get_temp::<String>(edit_key(*id))).is_some_and(|t| t != app.session.doc.plain_text(StoryRef::Part(c.part)));
+        let replied = ctx.data(|d| d.get_temp::<String>(reply_key(*id))).is_some_and(|t| !t.trim().is_empty());
+        edited || replied
+    })
+}
+
 /// The comment a reply to `id` answers: replies to a reply join its thread.
 fn thread_root(app: &WordApp, id: u32) -> u32 {
     match app.session.doc.comments.get(&id).and_then(|c| c.parent) {
@@ -731,6 +742,28 @@ fn camel_words(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::comment_stamp;
+    use crate::{Services, WordApp};
+    use serde_json::json;
+
+    /// NexusOffice: a comment edit or reply being typed (in egui's memory until the field loses
+    /// focus) is a draft; an edit back to the comment's own text or a blank reply isn't.
+    #[test]
+    fn comment_typing_not_in_the_document_is_a_draft() {
+        let mut app = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Services::default());
+        let ctx = egui::Context::default();
+        assert!(!app.has_drafts(&ctx));
+        let id = app.run("review.newComment", json!({"text": "Ghi chú"})).unwrap()["id"].as_u64().unwrap() as u32;
+        assert!(!app.has_drafts(&ctx), "a posted comment is in the document");
+        ctx.data_mut(|d| d.insert_temp(super::reply_key(id), "  ".to_string()));
+        assert!(!app.has_drafts(&ctx), "a blank reply posts nothing");
+        ctx.data_mut(|d| d.insert_temp(super::reply_key(id), "Đồng ý".to_string()));
+        assert!(app.has_drafts(&ctx), "a reply being written");
+        ctx.data_mut(|d| d.remove_temp::<String>(super::reply_key(id)));
+        ctx.data_mut(|d| d.insert_temp(super::edit_key(id), "Ghi chú".to_string()));
+        assert!(!app.has_drafts(&ctx), "the comment's own text");
+        ctx.data_mut(|d| d.insert_temp(super::edit_key(id), "Ghi chú mới".to_string()));
+        assert!(app.has_drafts(&ctx), "an edit being typed");
+    }
 
     #[test]
     fn comment_stamp_keeps_date_and_time() {
