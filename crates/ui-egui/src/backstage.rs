@@ -549,7 +549,7 @@ mod tests {
     use egui_kittest::kittest::Queryable;
     use serde_json::json;
 
-    use super::matching_templates;
+    use super::{elide_middle, matching_templates};
     use crate::{Services, WordApp};
 
     #[cfg(not(target_arch = "wasm32"))]
