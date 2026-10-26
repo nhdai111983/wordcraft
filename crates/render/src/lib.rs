@@ -493,6 +493,16 @@ pub fn render_page(doc: &Document, page: &Page, scale: f32, opts: &RenderOptions
     render_region(doc, page, w, h, Affine::scale(scale as f64), opts)
 }
 
+/// NexusOffice: rows `y0_px..y0_px + h_px` of [`render_page`]'s raster at `scale`, alone and
+/// pixel for pixel the same as in the whole page (the band is moved by whole pixels). An edit
+/// redraws only the band of a page it changed.
+pub fn render_band(doc: &Document, page: &Page, scale: f32, y0_px: u32, h_px: u32, opts: &RenderOptions) -> Rendered {
+    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+    let w = ((page.w * scale).ceil() as u32).clamp(1, MAX_SIDE);
+    let view = Affine::translate((0.0, -(y0_px as f64))) * Affine::scale(scale as f64);
+    render_region(doc, page, w, h_px.clamp(1, MAX_SIDE), view, opts)
+}
+
 /// Render a page into a `w`×`h` raster with `view` (page points → pixels).
 pub fn render_region(doc: &Document, page: &Page, w: u32, h: u32, view: Affine, opts: &RenderOptions) -> Rendered {
     let (w16, h16) = (w.clamp(1, MAX_SIDE) as u16, h.clamp(1, MAX_SIDE) as u16);
