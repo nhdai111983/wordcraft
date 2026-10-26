@@ -6,18 +6,20 @@ use serde_json::json;
 use crate::theme::{APP_COLOR, Tokens, medium, regular, semibold};
 use crate::{WordApp, icons};
 
-const PAGES: [(&str, &str); 11] = [
-    ("home", "Home"),
-    ("new", "New"),
-    ("open", "Open"),
-    ("info", "Info"),
-    ("recover", "Recover"),
-    ("save", "Save"),
-    ("saveAs", "Save As"),
-    ("print", "Print"),
-    ("export", "Export"),
-    ("close", "Close"),
-    ("options", "Options"),
+/// `(page id, label, icon)`. Every entry carries an icon of its own: a column of bare words all
+/// the same length is read, not scanned.
+const PAGES: [(&str, &str, &str); 11] = [
+    ("home", "Home", "homeFolder"),
+    ("new", "New", "blankPage"),
+    ("open", "Open", "open"),
+    ("info", "Info", "docPrefs"),
+    ("recover", "Recover", "undo"),
+    ("save", "Save", "save"),
+    ("saveAs", "Save As", "file"),
+    ("print", "Print", "print"),
+    ("export", "Export", "share"),
+    ("close", "Close", "close"),
+    ("options", "Options", "setDefault"),
 ];
 
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
@@ -70,7 +72,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 app.canvas.want_focus = true;
             }
             ui.add_space(if mac { 12.0 } else { 6.0 });
-            for (id, label) in PAGES {
+            for (id, label, icon) in PAGES {
                 // No document open (#1129): Info, Save, Save As, Print and Export are greyed out.
                 let on = has_document || works_without_document(id);
                 let (r, resp) = ui.add_enabled_ui(on, |ui| ui.allocate_exact_size(vec2(200.0, 38.0), Sense::click())).inner;
@@ -81,12 +83,14 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 } else if on && resp.hovered() {
                     ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
                 }
+                let ink = if on { egui::Color32::WHITE } else { egui::Color32::from_white_alpha(110) };
+                icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 30.0, r.center().y), vec2(17.0, 17.0)), icon, ink, ink);
                 ui.painter().text(
-                    pos2(r.min.x + 22.0, r.center().y),
+                    pos2(r.min.x + 50.0, r.center().y),
                     Align2::LEFT_CENTER,
                     tl!(label),
                     if active { semibold(14.0) } else { medium(14.0) },
-                    if on { egui::Color32::WHITE } else { egui::Color32::from_white_alpha(110) },
+                    ink,
                 );
                 if resp.clicked() {
                     match id {
@@ -394,12 +398,50 @@ fn save_as_page(app: &mut WordApp, ui: &mut Ui) {
     }
 }
 
+/// A section heading inside a backstage page: icon, then the title.
+fn section(ui: &mut Ui, icon: &str, label: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.horizontal(|ui| {
+        let (r, _) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
+        icons::paint(ui.painter(), r, icon, t.icon, t.accent);
+        ui.add_space(6.0);
+        ui.label(egui::RichText::new(tl!(label)).font(semibold(15.0)));
+    });
+    ui.add_space(6.0);
+}
+
+/// One statistic as a big number over a small label, which reads far faster than a
+/// `Label: value` line when five of them sit together.
+fn stat(ui: &mut Ui, label: &str, value: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        ui.label(egui::RichText::new(value).font(semibold(22.0)).color(t.text));
+        ui.label(egui::RichText::new(tl!(label)).font(medium(11.5)).color(t.text_dim));
+    });
+}
+
+/// Shorten a long path in the middle, so the panel keeps its width. Counts characters, not
+/// bytes, so a Vietnamese path is not cut inside a letter. Every subtraction is saturating: a
+/// small `keep` must not panic (never-crash).
+fn elide_middle(s: &str, keep: usize) -> String {
+    let n = s.chars().count();
+    if n <= keep || keep < 4 {
+        return s.to_string();
+    }
+    let head_len = keep / 2;
+    let tail_len = (keep / 2).saturating_sub(2);
+    let head: String = s.chars().take(head_len).collect();
+    let tail: String = s.chars().skip(n.saturating_sub(tail_len)).collect();
+    format!("{head}…{tail}")
+}
+
 fn info_page(app: &mut WordApp, ui: &mut Ui) {
     heading(ui, "Info");
     let info = app.session.run("file.info", &json!({})).unwrap_or_default();
     ui.columns(2, |cols| {
         let ui = &mut cols[0];
-        ui.label(egui::RichText::new(tl!("Properties")).font(semibold(15.0)));
+        section(ui, "docPrefs", "Properties");
         // The fields edit a copy of the document's properties that is read afresh every frame,
         // so each change goes into the document as it is typed (#260): waiting for the field to
         // lose focus dropped the keystrokes, and leaving File with Escape never loses it at all.
@@ -431,8 +473,8 @@ fn info_page(app: &mut WordApp, ui: &mut Ui) {
             app.info_editing = None;
         }
         // Protect Document › Encrypt with Password (#55).
-        ui.add_space(18.0);
-        ui.label(egui::RichText::new(tl!("Protect Document")).font(semibold(15.0)));
+        ui.add_space(20.0);
+        section(ui, "signature", "Protect Document");
         let encrypted = info.get("encrypted").and_then(|v| v.as_bool()).unwrap_or(false);
         ui.label(if encrypted {
             tl!("A password is required to open this document.")
@@ -449,12 +491,32 @@ fn info_page(app: &mut WordApp, ui: &mut Ui) {
             }
         });
         let ui = &mut cols[1];
-        ui.label(egui::RichText::new(tl!("Statistics")).font(semibold(15.0)));
-        for (l, k) in [("Pages", "pages"), ("Words", "words"), ("Paragraphs", "paragraphs"), ("Sections", "sections"), ("Comments", "comments")] {
-            ui.label(format!("{}: {}", tl!(l), info.get(k).map(|v| v.to_string()).unwrap_or_default()));
+        section(ui, "wordCount", "Statistics");
+        // Two rows of big numbers: the counts are what the page is read for, so they carry the
+        // weight instead of hiding inside sentences.
+        let counts = [("Pages", "pages"), ("Words", "words"), ("Paragraphs", "paragraphs"), ("Sections", "sections"), ("Comments", "comments")];
+        for row in counts.chunks(3) {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 26.0;
+                for (l, k) in row {
+                    stat(ui, l, &info.get(*k).map(|v| v.to_string()).unwrap_or_else(|| "–".into()));
+                }
+            });
+            ui.add_space(10.0);
         }
-        let path = info.get("path").and_then(|v| v.as_str()).unwrap_or(tl!("Not saved yet"));
-        ui.label(crate::i18n::fmt(tl!("Location: {path}"), &[("path", path)]));
+        ui.add_space(8.0);
+        section(ui, "folder", "Location");
+        let t = Tokens::get(ui.ctx());
+        match info.get("path").and_then(|v| v.as_str()) {
+            // The full path is in the tooltip: the panel is narrow and a long path would
+            // otherwise stretch the column.
+            Some(path) => {
+                ui.label(egui::RichText::new(elide_middle(path, 46)).font(medium(12.5)).color(t.text_dim)).on_hover_text(path);
+            }
+            None => {
+                ui.label(egui::RichText::new(tl!("Not saved yet")).font(medium(12.5)).color(t.text_dim));
+            }
+        }
     });
 }
 
@@ -487,7 +549,7 @@ mod tests {
     use egui_kittest::kittest::Queryable;
     use serde_json::json;
 
-    use super::matching_templates;
+    use super::{elide_middle, matching_templates};
     use crate::{Services, WordApp};
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -640,6 +702,20 @@ mod tests {
     /// re-read each frame and only wrote it back when the field lost focus), so a save had no
     /// title or author. Typing now lands in the document as it happens, one undo step per field,
     /// and the browser's Save downloads it with the save stamps advanced (#262).
+    /// A path is cut by characters, never inside one, and a tiny budget does not panic.
+    #[test]
+    fn elide_middle_cuts_on_character_boundaries() {
+        assert_eq!(elide_middle("ngắn.docx", 46), "ngắn.docx");
+        let p = "D:\\ai\\OpenOffices\\_claude_review\\Công văn thử nghiệm dài.docx";
+        let e = elide_middle(p, 46);
+        assert!(e.chars().count() <= 46 && e.contains('…'), "{e}");
+        assert!(e.starts_with("D:"), "{e}");
+        assert!(e.ends_with(".docx"), "{e}");
+        for k in 0..6 {
+            let _ = elide_middle(p, k);
+        }
+    }
+
     #[test]
     fn info_fields_keep_typed_properties_through_a_web_save() {
         use egui::accesskit::Role;
