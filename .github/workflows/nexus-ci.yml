@@ -70,6 +70,19 @@ jobs:
           echo "CRAFT_FONTS_DIR=$GITHUB_WORKSPACE/craft-fonts" >> "$GITHUB_ENV"
           echo "craft-fonts at $ref"
 
+      # Interface translations (Vietnamese included) moved out of the repo upstream (2026-10-23):
+      # build input CRAFT_I18N_DIR, a storytold/craft-i18n checkout at the SHA in craft-i18n.rev.
+      # Without it the interface is English only and the vi catalog tests skip.
+      - name: Fetch craft-i18n (pinned in craft-i18n.rev)
+        run: |
+          [ -f craft-i18n.rev ] || { echo "no craft-i18n.rev; building without craft-i18n"; exit 0; }
+          ref=$(grep -oE '^[0-9a-f]{40}' craft-i18n.rev | head -n1)
+          git init -q craft-i18n
+          git -C craft-i18n fetch -q --depth 1 https://github.com/storytold/craft-i18n "$ref"
+          git -C craft-i18n checkout -q FETCH_HEAD
+          echo "CRAFT_I18N_DIR=$GITHUB_WORKSPACE/craft-i18n" >> "$GITHUB_ENV"
+          echo "craft-i18n at $ref"
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
