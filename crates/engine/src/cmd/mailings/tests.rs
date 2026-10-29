@@ -569,12 +569,12 @@ fn failed_edit_recipients_keeps_filter_and_sort() {
 #[test]
 fn mailings_sort_and_filter_vietnamese() {
     const V1_INPUT: &[&str] = &[
-        "Yến", "Ưng", "Uyên", "Út", "Phan", "Phạm", "Ơn", "Ông", "Oanh", "Nguyễn", "Ngô", "Huỳnh", "Hồ", "Hoàng", "Ê-đê", "Em", "Đỗ", "Đinh",
-        "Đặng", "Đào", "Dương", "Duy", "Dũng", "Bùi", "Bình", "Âu", "Ấn", "Ân", "Ăn", "Ắc", "Ánh", "Ảnh", "Anh", "An",
+        "Yến", "Ưng", "Uyên", "Út", "Phan", "Phạm", "Ơn", "Ông", "Oanh", "Nguyễn", "Ngô", "Huỳnh", "Hồ", "Hoàng", "Ê-đê", "Em", "Đỗ", "Đinh", "Đặng",
+        "Đào", "Dương", "Duy", "Dũng", "Bùi", "Bình", "Âu", "Ấn", "Ân", "Ăn", "Ắc", "Ánh", "Ảnh", "Anh", "An",
     ];
     const V1_EXPECTED: &[&str] = &[
-        "An", "Anh", "Ảnh", "Ánh", "Ắc", "Ăn", "Ân", "Ấn", "Âu", "Bình", "Bùi", "Dũng", "Duy", "Dương", "Đào", "Đặng", "Đinh", "Đỗ", "Em",
-        "Ê-đê", "Hoàng", "Hồ", "Huỳnh", "Ngô", "Nguyễn", "Oanh", "Ông", "Ơn", "Phạm", "Phan", "Út", "Uyên", "Ưng", "Yến",
+        "An", "Anh", "Ảnh", "Ánh", "Ắc", "Ăn", "Ân", "Ấn", "Âu", "Bình", "Bùi", "Dũng", "Duy", "Dương", "Đào", "Đặng", "Đinh", "Đỗ", "Em", "Ê-đê",
+        "Hoàng", "Hồ", "Huỳnh", "Ngô", "Nguyễn", "Oanh", "Ông", "Ơn", "Phạm", "Phan", "Út", "Uyên", "Ưng", "Yến",
     ];
     let mut s = Session::new(Document::new());
     s.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();

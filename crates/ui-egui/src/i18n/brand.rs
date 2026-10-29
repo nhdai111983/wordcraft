@@ -97,7 +97,9 @@ mod tests {
         use super::super::{Lang, current, set_current, t};
         const KEY: &str = "Every command is available to scripts and AI agents: run `wordcraft-cli mcp` for an MCP server, or start the app with `--control <port>` for the JSON control channel.";
         let before = current();
-        for code in ["en", "vi", "de", "ko", "ja"] {
+        // The translations come from craft-i18n (`CRAFT_I18N_DIR`); without it only English.
+        let codes: &[&str] = if super::super::catalogs_embedded() { &["en", "vi", "de", "ko", "ja"] } else { &["en"] };
+        for &code in codes {
             set_current(Lang::from_code(code).unwrap());
             let shown = t(KEY);
             assert!(shown.contains("`nexus-docs-cli mcp`") && !shown.contains("wordcraft"), "{code}: {shown}");
@@ -125,8 +127,11 @@ mod tests {
         assert_eq!(t("About WordCraft"), "About Nexus Docs");
         assert_eq!(crate::tl!("WordCraft"), "Nexus Docs");
         set_current(Lang::from_code("vi").unwrap());
-        assert_eq!(t("About WordCraft"), "Giới thiệu về Nexus Docs");
-        assert_eq!(tc("preview", "About WordCraft"), "Giới thiệu về Nexus Docs");
+        // The Vietnamese catalog comes from craft-i18n (`CRAFT_I18N_DIR`).
+        if super::super::catalogs_embedded() {
+            assert_eq!(t("About WordCraft"), "Giới thiệu về Nexus Docs");
+            assert_eq!(tc("preview", "About WordCraft"), "Giới thiệu về Nexus Docs");
+        }
         assert!(!t("Show the Start screen when WordCraft starts").contains("WordCraft"));
         assert_eq!(tr(Lang::from_code("vi").unwrap(), "WordCraft"), "WordCraft");
         assert_eq!(nexus_text("Source", "Mã nguồn"), "Mã nguồn");
