@@ -14,7 +14,8 @@
 //!    precomposed (`ậ`) and typed as base + marks (`a` U+0302 U+0323 or `a` U+0323 U+0302;
 //!    marks of different combining classes match in either order) get one key. This covers the
 //!    Latin letters U+00C0..=U+024F and U+1E00..=U+1EFF with marks U+0300..=U+036F; other
-//!    scripts (Cyrillic й, Greek ά) are not unified. (Lowercasing comes first so a character whose lowercase is a precomposed letter, such
+//!    scripts are not decomposed; a letter of `COMPOSE` the table keeps whole (Cyrillic `й`, `ё`) is
+//!    composed from its decomposed spelling instead, so both spellings meet; Greek `ά` is not unified. (Lowercasing comes first so a character whose lowercase is a precomposed letter, such
 //!    as the Angstrom sign, is decomposed too; the result is the same canonical lowercase text.)
 //! 2. Each cluster is a base character and the combining marks (U+0300..=U+036F) after it. The
 //!    base is composed with the cluster's **first** mark when `COMPOSE` has the pair **and**
@@ -411,7 +412,30 @@ fn lower_canonical(s: &str) -> String {
     if s.is_ascii() {
         return s.to_ascii_lowercase();
     }
-    collate_ucd::canonical(&s.to_lowercase())
+    compose_kept_whole(collate_ucd::canonical(&s.to_lowercase()))
+}
+
+/// `text` (canonical) with each base + first mark that `COMPOSE` lists composed when the canonical
+/// form keeps that letter whole (Cyrillic `й`, `ё`): rule 1 for the letters it does not decompose.
+fn compose_kept_whole(text: String) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut base = None;
+    for c in text.chars() {
+        if !is_mark(c) {
+            out.push(c);
+            base = Some(c);
+            continue;
+        }
+        let composed = base.take().and_then(|b| COMPOSE.iter().find(|(x, m, _)| *x == b && *m == c)).map(|(_, _, k)| *k);
+        match composed.filter(|k| !collate_ucd::decomposes(*k)) {
+            Some(k) => {
+                out.pop();
+                out.push(k);
+            }
+            None => out.push(c),
+        }
+    }
+    out
 }
 
 /// The letter `base` + `mark` compose to, when the key reads that letter as one (rule 2): it is
