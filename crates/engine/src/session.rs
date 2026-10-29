@@ -994,6 +994,53 @@ impl Session {
         blank_document(&self.region())
     }
 
+    /// NexusOffice (QC-DOC-02): change the region "Automatic" stands for (the host sets it from
+    /// the system; the window moves it to Vietnam when the interface is Vietnamese). A document
+    /// nobody has touched yet — untitled, unchanged, no undo steps, no text — is re-laid on the
+    /// new region's blank page: its paper, margins, body font and size, and language move from
+    /// the old region's defaults to the new one's (a value already changed is kept). Like
+    /// [`Session::set_editing_language`], the document stays the same document (same
+    /// `document_id`) and no undo step is added.
+    pub fn set_system_region(&mut self, region: wordcraft_geom::Region) {
+        if self.system_region == region {
+            return;
+        }
+        let before = self.region();
+        self.system_region = region;
+        let after = self.region();
+        let untouched = self.path.is_none() && !self.dirty && self.history.is_empty() && self.redo.is_empty();
+        if before == after || !untouched || !self.doc.plain_text(StoryRef::Body).trim().is_empty() || self.doc.paragraph_count() > 1 {
+            return;
+        }
+        let (old, new) = (blank_document(&before), blank_document(&after));
+        let (o, n, d) = (&old.last_section, &new.last_section, &mut self.doc.last_section);
+        for (field, was, now) in [
+            (&mut d.page_w, o.page_w, n.page_w),
+            (&mut d.page_h, o.page_h, n.page_h),
+            (&mut d.margin_top, o.margin_top, n.margin_top),
+            (&mut d.margin_bottom, o.margin_bottom, n.margin_bottom),
+            (&mut d.margin_left, o.margin_left, n.margin_left),
+            (&mut d.margin_right, o.margin_right, n.margin_right),
+        ] {
+            if *field == was {
+                *field = now;
+            }
+        }
+        let (o, n, c) = (&old.styles.default_chr, &new.styles.default_chr, &mut self.doc.styles.default_chr);
+        if c.font == o.font {
+            c.font = n.font.clone();
+        }
+        if c.size == o.size {
+            c.size = n.size;
+        }
+        // The old region's language, or US English the editing language falls back to.
+        if new.styles.default_chr.lang != old.styles.default_chr.lang && (c.lang == o.lang || c.lang.as_deref() == Some("en-US")) {
+            c.lang = n.lang.clone();
+        }
+        self.rev = self.rev.wrapping_add(1);
+        self.relayout();
+    }
+
     /// Replace the document (open/new).
     pub fn set_document(&mut self, doc: Document) {
         self.document_id = self.document_id.wrapping_add(1);

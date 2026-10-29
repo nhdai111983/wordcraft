@@ -86,8 +86,15 @@ fn reserved(name: &str) -> bool {
     TABS.iter().chain(CONTEXTUAL_TABS.iter()).any(|t| same(t, name))
 }
 
+/// NexusOffice (QC-DOC-16): tabs hidden until the user shows them (File › Options › Customize
+/// Ribbon). Zotero serves few of NexusOffice's users and only works with the Zotero app running.
+pub const HIDDEN_BY_DEFAULT: [&str; 1] = ["Zotero"];
+
 fn default_tabs() -> Vec<TabEntry> {
-    TABS.iter().skip(1).map(|t| TabEntry { name: (*t).to_string(), custom: false, hidden: false, groups: Vec::new() }).collect()
+    TABS.iter()
+        .skip(1)
+        .map(|t| TabEntry { name: (*t).to_string(), custom: false, hidden: HIDDEN_BY_DEFAULT.contains(t), groups: Vec::new() })
+        .collect()
 }
 
 /// `base`, or `base 2`, `base 3`… whichever `taken` doesn't have yet.
@@ -168,7 +175,7 @@ impl RibbonLayout {
                 continue;
             }
             let at = TABS.get(1..i).and_then(|before| before.iter().rev().find_map(|b| tabs.iter().position(|t| !t.custom && t.name == *b)));
-            let entry = TabEntry { name: (*name).to_string(), custom: false, hidden: false, groups: Vec::new() };
+            let entry = TabEntry { name: (*name).to_string(), custom: false, hidden: HIDDEN_BY_DEFAULT.contains(name), groups: Vec::new() };
             tabs.insert(at.map_or(0, |p| p + 1), entry);
         }
         self.tabs = if tabs == default_tabs() { Vec::new() } else { tabs };

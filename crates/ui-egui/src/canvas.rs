@@ -2845,6 +2845,12 @@ fn context_menu(app: &mut WordApp, ui: &mut Ui) {
     item(ui, app, "Cut", "edit.cut", json!({}));
     item(ui, app, "Copy", "edit.copy", json!({}));
     item(ui, app, "Paste", "edit.paste", json!({}));
+    // NexusOffice (QC-DOC-17): the paste options, as on the ribbon's Paste menu.
+    ui.menu_button(crate::i18n::nexus_text("Paste Options", "Tùy chọn dán"), |ui| {
+        item(ui, app, "Merge Formatting", "edit.pasteMerge", json!({}));
+        item(ui, app, "Keep Text Only", "edit.pasteText", json!({}));
+        item(ui, app, "Paste Special…", "edit.pasteSpecial", json!({}));
+    });
     ui.separator();
     if let Some(syn) = app.canvas.context_synonyms.clone().and_then(|v| v.as_array().cloned()).filter(|a| !a.is_empty()) {
         ui.menu_button(tl!("Synonyms"), |ui| {
@@ -2863,6 +2869,18 @@ fn context_menu(app: &mut WordApp, ui: &mut Ui) {
     }
     item(ui, app, "Font…", "ui.dialog", json!({"name": "font"}));
     item(ui, app, "Paragraph…", "ui.dialog", json!({"name": "paragraph"}));
+    // NexusOffice (QC-DOC-17): lists and the common styles without going to the ribbon.
+    if app.canvas.context_issue.is_none() && !crate::ribbon::has_picture_selected(&app.session) {
+        item(ui, app, "Bullets", "para.bullets", json!({}));
+        item(ui, app, "Numbering", "para.numbering", json!({}));
+        ui.menu_button(tl!("Styles"), |ui| {
+            for (label, id) in
+                [("Normal", "Normal"), ("Title", "Title"), ("Heading 1", "Heading1"), ("Heading 2", "Heading2"), ("Heading 3", "Heading3")]
+            {
+                item(ui, app, label, "para.style", json!({"style": id}));
+            }
+        });
+    }
     item(ui, app, "Link…", "ui.dialog", json!({"name": "link"}));
     item(ui, app, "New Comment", "review.newComment", json!({}));
     if !wordcraft_engine::cmd::fields::selected(&app.session).is_empty() {

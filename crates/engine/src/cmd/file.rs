@@ -178,12 +178,16 @@ fn privacy(s: &Session) -> Value {
 }
 
 fn new(s: &mut Session, v: &Value) -> CmdResult {
-    let doc = match p::str(v, "template").unwrap_or("blank") {
-        "sample" => crate::sample::sample_document(),
-        "letter" => crate::sample::letter(),
-        "resume" => crate::sample::resume(),
-        "report" => crate::sample::report(),
-        _ => normal_document(s),
+    let name = p::str(v, "template").unwrap_or("blank");
+    // NexusOffice (QC-DOC-07): Vietnamese templates on the region's page in Vietnam.
+    let vi = (s.region().language == "vi").then(|| crate::nexus_samples_vi::template(name, normal_document(s))).flatten();
+    let doc = match (vi, name) {
+        (Some(d), _) => d,
+        (None, "sample") => crate::sample::sample_document(),
+        (None, "letter") => crate::sample::letter(),
+        (None, "resume") => crate::sample::resume(),
+        (None, "report") => crate::sample::report(),
+        (None, _) => normal_document(s),
     };
     s.set_document(doc);
     s.path = None;

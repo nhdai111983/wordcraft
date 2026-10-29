@@ -453,6 +453,19 @@ fn plus_and_hyphen_line_becomes_a_table() {
     assert!(s.doc.body.iter().all(|b| b.as_para().is_some()));
 }
 
+/// NexusOffice QC-DOC-01: Insert › Table leaves the caret in the first cell; typed text goes
+/// there and Tab moves to the next cell, as in Word.
+#[test]
+fn typing_after_insert_table_fills_the_first_cells() {
+    let mut s = typed("Đề nghị\n");
+    run(&mut s, "insert.table", json!({"rows": 3, "cols": 3}));
+    typ(&mut s, "Số tiền\t1.250.000 ₫\tGhi chú");
+    let Some(wordcraft_doc::Block::Table(t)) = s.doc.body.get(1).map(|b| &**b) else { panic!("no table: {:?}", paras(&s)) };
+    let cell = |c: usize| t.rows[0].cells[c].blocks[0].as_para().map(|p| p.text.clone()).unwrap_or_default();
+    assert_eq!([cell(0), cell(1), cell(2)], ["Số tiền", "1.250.000 ₫", "Ghi chú"]);
+    assert_eq!(paras(&s).first().map(|p| p.0.as_str()), Some("Đề nghị"), "the paragraph before the table is untouched");
+}
+
 #[test]
 fn arrow_bullets() {
     for (keys, bullet) in [("> ", "\u{27A2}"), ("-> ", "\u{2794}"), ("=> ", "\u{21E8}")] {
