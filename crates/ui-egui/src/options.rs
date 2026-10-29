@@ -79,8 +79,11 @@ fn parse_length(text: &str, unit: Unit) -> Option<f64> {
 
 /// Regions offered in File › Options › Advanced › Region (any locale tag works through
 /// `file.options`): Letter and A4 countries, decimal point and decimal comma.
-const REGIONS: [&str; 16] =
-    ["en-US", "en-CA", "en-GB", "en-AU", "en-IN", "es-MX", "es-ES", "pt-BR", "fr-FR", "de-DE", "it-IT", "pl-PL", "ru-RU", "ja-JP", "zh-CN", "ko-KR"];
+/// NexusOffice: Vietnam too.
+const REGIONS: [&str; 17] = [
+    "en-US", "en-CA", "en-GB", "en-AU", "en-IN", "es-MX", "es-ES", "pt-BR", "fr-FR", "de-DE", "it-IT", "pl-PL", "ru-RU", "ja-JP", "zh-CN", "ko-KR",
+    "vi-VN",
+];
 
 /// The units offered, with their names.
 pub const UNITS: [(Unit, &str); 5] = [
@@ -571,6 +574,8 @@ fn accent_picker(app: &mut WordApp, ui: &mut Ui) {
             let _ = app.run("ui.accent", json!({"value": null}));
         }
         for (name, c) in crate::theme::ACCENT_PRESETS {
+            // NexusOffice (QC-CHUNG-05): the colour's name in the interface language.
+            let name = crate::nexus_vi::accent_name(name);
             let (r, resp) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::click());
             ui.painter().circle_filled(r.center(), 8.0, c);
             if current == Some(c) {

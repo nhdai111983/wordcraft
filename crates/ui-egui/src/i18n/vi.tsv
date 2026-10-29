@@ -550,7 +550,7 @@
 	OK	OK
 	Object	Đối tượng
 	Odd Page	Trang lẻ
-	Office 2003 Default	Mặc định Office 2003
+	Office 2003 Default	Cổ điển
 	One	Một
 	One Page	Một trang
 	Open	Mở
@@ -799,7 +799,7 @@
 	Statistics	Thống kê
 	Status Bar	Thanh trạng thái
 	Strikethrough	Gạch ngang chữ
-	Studio cover	Bìa Studio
+	Studio cover	Bìa đơn giản
 	Studio handbook (sample)	Sổ tay Studio (mẫu)
 	Style	Kiểu
 	Style Inspector	Trình kiểm tra kiểu
@@ -1312,12 +1312,12 @@
 	Version	Phiên bản
 	% of all commits	% tổng số commit
 	Lines +/−	Dòng +/−
-	Craft	Craft
-	Studio	Studio
-	Atelier	Atelier
-	Darkroom	Darkroom
-	Gallery	Gallery
-	Sketchbook	Sketchbook
+	Craft	Cơ bản
+	Studio	Xưởng vẽ
+	Atelier	Xưởng thủ công
+	Darkroom	Phòng tối
+	Gallery	Phòng tranh
+	Sketchbook	Sổ phác thảo
 	Change Picture…	Đổi ảnh…
 	Font…	Phông chữ…
 	Paragraph…	Đoạn…
@@ -2697,3 +2697,4 @@ template	Letter	Thư
 	Indent Right	Thụt lề phải
 	Spacing Before	Khoảng cách trước
 	Spacing After	Khoảng cách sau
+	Auto orientation	Hướng tự động

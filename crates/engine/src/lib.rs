@@ -13,6 +13,8 @@ pub mod io;
 mod io_ext;
 pub mod keymap;
 pub mod math_gallery;
+pub mod nexus_samples_vi;
+pub mod nexus_vi;
 pub mod print;
 pub mod recovery;
 pub mod ribbon;

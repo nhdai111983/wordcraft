@@ -217,7 +217,14 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
         label_line(ui, r.center().x, y, l, regular(11.5), if on { t.text } else { t.text_disabled }, menu && i + 1 == lines.len());
         y += LABEL_PITCH;
     }
-    let resp = tooltip(app, resp, &label.replace('\n', " "), id);
+    let name = label.replace('\n', " ");
+    let resp = tooltip(app, resp, &name, id);
+    // NexusOffice (QC-DOC-12): in the NexusOffice layout the big buttons (Pictures, Comment,
+    // Text Box…) have a name too. Upstream's ribbon leaves them unnamed (its tests find the status
+    // bar's View buttons by the same names).
+    if app.wps {
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, &name));
+    }
     command_menu(&resp, app, id);
     if resp.clicked() && on && !menu {
         run_from_ribbon(app, id, params);
@@ -275,6 +282,11 @@ pub fn split(
     }
     icons::paint(ui.painter(), Rect::from_center_size(ar.center(), vec2(DROPDOWN, DROPDOWN)), "dropdown", t.icon, t.accent);
     let resp = tooltip(app, resp, tip, id);
+    // NexusOffice (QC-DOC-12): the button and its arrow have names (Bullets, Bullets – More options).
+    let on = enabled(app, id);
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, tip));
+    let more = format!("{tip} – {}", crate::i18n::nexus_text("More options", "Tùy chọn khác"));
+    aresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &more));
     command_menu(&resp, app, id);
     if resp.clicked() {
         run_from_ribbon(app, id, params);
@@ -621,6 +633,18 @@ struct ComboSearch {
     view_h: f32,
 }
 
+/// The accessible name of the combo `id` (NexusOffice, QC-DOC-12), in English.
+fn combo_name(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "size" | "mini_size" | "nexus_size" => "Font Size",
+        "nexus_style" => "Styles",
+        "outlineLevel" => "Outline Level",
+        "outlineShowLevel" => "Show Level",
+        _ if id.ends_with("font") || id.ends_with("asian") => "Font",
+        _ => return None,
+    })
+}
+
 fn combo_impl(
     ui: &mut Ui,
     id: &str,
@@ -664,6 +688,15 @@ fn combo_impl(
         // The arrow's box is painted here, under the field, once its size is known.
         let arrow_bg = ui.painter().add(egui::Shape::Noop);
         let resp = ui.add(te);
+        // NexusOffice (QC-DOC-12): screen readers and scripts find the box by its name.
+        if let Some(name) = combo_name(id) {
+            let (name, value) = (tl!(name).to_string(), text.clone());
+            resp.widget_info(|| {
+                let mut info = egui::WidgetInfo::text_edit(true, value.clone(), value.clone(), "");
+                info.label = Some(name.clone());
+                info
+            });
+        }
         keytip_badge(ui, resp.rect, "combo", id);
         focused = resp.has_focus();
         let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));

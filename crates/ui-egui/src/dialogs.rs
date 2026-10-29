@@ -1182,6 +1182,14 @@ pub fn table_grid_picker(ui: &mut Ui, app: &mut WordApp) {
                     egui::Stroke::new(1.0, if on { t.accent } else { t.border_strong }),
                     egui::StrokeKind::Inside,
                 );
+                // Screen readers and scripts find each cell by the size it inserts.
+                resp.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::Button,
+                        true,
+                        crate::i18n::fmt(tl!("{cols}×{rows} Table"), &[("cols", &c.to_string()), ("rows", &r.to_string())]),
+                    )
+                });
                 if resp.hovered() {
                     new_hover = (r, c);
                 }
@@ -1194,7 +1202,9 @@ pub fn table_grid_picker(ui: &mut Ui, app: &mut WordApp) {
     });
     ui.data_mut(|d| d.insert_temp(id, new_hover));
     if let Some((r, c)) = clicked {
-        let _ = app.run("insert.table", json!({"rows": r, "cols": c}));
+        // NexusOffice QC-DOC-01: the caret is in the first cell and typing goes there, as after
+        // every other ribbon command (the click in the menu took the page's keyboard focus).
+        crate::widgets::run_from_ribbon(app, "insert.table", json!({"rows": r, "cols": c}));
         ui.close();
     }
 }
@@ -2230,10 +2240,10 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 });
                 ui.end_row();
                 ui.label(tl!("Offset (pt):"));
-                ui.add(egui::DragValue::new(offset).speed(0.5).range(-100.0..=100.0));
+                ui.add(crate::nexus_vi::regional(egui::DragValue::new(offset).speed(0.5).range(-100.0..=100.0)));
                 ui.end_row();
                 ui.label(tl!("Size (pt):"));
-                ui.add(egui::DragValue::new(size).speed(0.5).range(1.0..=200.0));
+                ui.add(crate::nexus_vi::regional(egui::DragValue::new(size).speed(0.5).range(1.0..=200.0)));
                 ui.end_row();
             });
             let mut remove = false;

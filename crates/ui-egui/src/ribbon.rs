@@ -784,7 +784,9 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
     let st = app.session.run("format.state", &json!({})).unwrap_or_default();
     let flag = |k: &str| st.get(k).and_then(Value::as_bool).unwrap_or(false);
     group(ui, "Clipboard", Some("edit.clipboardPane"), app, |ui, app| {
-        menu_button(ui, app, "paste", Some("Paste"), "Paste (⌘V)", true, "edit.paste", |ui, app| {
+        // NexusOffice (QC-DOC-13): no hard-coded Mac key ("Paste (⌘V)" on Windows); the menu's
+        // Paste item shows the platform's own key.
+        menu_button(ui, app, "paste", Some("Paste"), "Paste", true, "edit.paste", |ui, app| {
             mi(ui, app, "Paste", "edit.paste", json!({}));
             mi(ui, app, "Keep Text Only", "edit.pasteText", json!({}));
             mi(ui, app, "Merge Formatting", "edit.pasteMerge", json!({}));
@@ -983,7 +985,8 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
                 ui.add_space(4.0);
                 menu_button(ui, app, "lineSpacing", None, "Line and Paragraph Spacing", false, "para.lineSpacing", |ui, app| {
                     for v in [1.0, 1.15, 1.5, 2.0, 2.5, 3.0] {
-                        mi(ui, app, &format!("{v}"), "para.lineSpacing", json!({"value": v}));
+                        // NexusOffice (QC-DOC-10): 1,15 with a decimal comma.
+                        mi(ui, app, &crate::nexus_vi::num(v), "para.lineSpacing", json!({"value": v}));
                     }
                     ui.separator();
                     mi(ui, app, "Add Space Before Paragraph", "para.addSpaceBefore", json!({}));
@@ -1073,7 +1076,13 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
             ui.separator();
             mi(ui, app, "Insert Table…", "ui.dialog", json!({"name": "insertTable"}));
             let drawing = app.canvas.table_tool == Some(crate::table_pen::TableTool::Draw);
-            mi_check(ui, app, "Draw Table", drawing, "table.draw", json!({}));
+            // NexusOffice (QC-DOC-14): lined up with the items around it (no check-mark column in
+            // a menu where it is the only toggle); the pen being on shows as the selected state.
+            let enabled = crate::widgets::enabled(app, "table.draw");
+            if ui.add_enabled(enabled, egui::Button::new(tl!("Draw Table")).selected(drawing).min_size(vec2(200.0, 0.0))).clicked() {
+                crate::widgets::run_from_ribbon(app, "table.draw", json!({}));
+                ui.close();
+            }
             mi(ui, app, "Convert Text to Table…", "table.fromText", json!({}));
             ui.menu_button(tl!("Quick Tables"), |ui| {
                 mi(ui, app, "Tabular List", "table.quick", json!({"kind": "tabular"}));
@@ -1173,7 +1182,8 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
         });
         stack(ui, |ui| {
             small(ui, app, "signature", None, "Signature Line", "insert.signatureLine", json!({}), false);
-            small(ui, app, "dateTime", None, "Date & Time", "insert.dateTime", json!({}), false);
+            // NexusOffice (QC-DOC-03): today's date in the text's language, one format per item.
+            menu_button(ui, app, "dateTime", None, "Date & Time", false, "insert.dateTime", date_time_items);
             small(ui, app, "object", None, "Object", "insert.object", json!({}), false);
         });
     });
@@ -1257,7 +1267,7 @@ fn draw(app: &mut WordApp, ui: &mut Ui) {
             menu_button(ui, app, "thickness", None, "Thickness", false, "draw.pen", |ui, app| {
                 let widths: &[f32] = if tool == InkTool::Highlighter { &[4.0, 8.0, 12.0, 18.0, 24.0] } else { &[0.5, 1.0, 1.5, 2.5, 3.5, 5.0] };
                 for w in widths {
-                    let label = crate::i18n::fmt(tl!("{n} pt"), &[("n", &w.to_string())]);
+                    let label = crate::i18n::fmt(tl!("{n} pt"), &[("n", &crate::nexus_vi::num(*w))]);
                     mi_check(ui, app, &label, (set.width - w).abs() < 0.01, pen_command(tool), json!({"width": w}));
                 }
                 update_gallery_pen(app, custom, tool);
@@ -1322,7 +1332,7 @@ fn gallery_pen(ui: &mut Ui, app: &mut WordApp, i: usize, pen: wordcraft_engine::
         InkTool::Pencil => "Pencil",
         InkTool::Highlighter => "Highlighter",
     });
-    let size = crate::i18n::fmt(tl!("{n} pt"), &[("n", &pen.width.to_string())]);
+    let size = crate::i18n::fmt(tl!("{n} pt"), &[("n", &crate::nexus_vi::num(pen.width))]);
     let resp = resp.on_hover_text(format!("{kind}: {size}, #{}", pen.color.hex()));
     if resp.clicked() {
         let _ = app.run(pen_command(pen.kind), json!({"color": pen.color.hex(), "width": pen.width}));
@@ -1422,6 +1432,12 @@ fn margins_items(ui: &mut Ui, app: &mut WordApp) {
     ] {
         let label = match uniform {
             Some(pt) => crate::i18n::fmt(tl!(l), &[("size", &crate::options::length(pt))]),
+            // NexusOffice (QC-DOC-05): no Microsoft product name in the menu; the preset is named
+            // by what it is (1" top and bottom, 1.25" left and right).
+            None if k == "office2003" => crate::i18n::fmt(
+                crate::i18n::nexus_text("Classic  {size} left and right", "Cổ điển  trái, phải {size}"),
+                &[("size", &crate::options::length(90.0))],
+            ),
             None => l.to_string(),
         };
         // Mirrored margins come from the document as well as from the preset (#1181).
@@ -1429,6 +1445,20 @@ fn margins_items(ui: &mut Ui, app: &mut WordApp) {
         mi_check(ui, app, &label, on, "layout.margins", json!({"preset": k}));
     }
     mi(ui, app, "Custom Margins…", "ui.dialog", json!({"name": "pageSetup"}));
+}
+
+/// Insert › Date & Time: today's date in each format offered for the caret's language (26/10/2026,
+/// "Thứ Hai, 26 tháng 10 năm 2026"… in Vietnamese text); a click inserts that one.
+fn date_time_items(ui: &mut Ui, app: &mut WordApp) {
+    use wordcraft_engine::cmd::insert as ins;
+    let lang = ins::caret_lang(&app.session);
+    for pic in ins::date_formats(lang.as_deref()) {
+        let sample = ins::format_date_in(pic, lang.as_deref());
+        if ui.add(egui::Button::new(sample).min_size(vec2(200.0, 0.0))).clicked() {
+            crate::widgets::run_from_ribbon(app, "insert.dateTime", json!({"format": pic, "lang": lang}));
+            ui.close();
+        }
+    }
 }
 
 fn orientation_items(ui: &mut Ui, app: &mut WordApp) {

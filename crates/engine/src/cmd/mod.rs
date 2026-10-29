@@ -432,6 +432,28 @@ pub fn now_iso() -> String {
     iso_from_unix_secs(now_unix())
 }
 
+/// NexusOffice (QC-DOC-03, QC-DOC-11): seconds the local clock is ahead of UTC (25 200 in
+/// Vietnam), 0 when it can't be told. Clamped to a real time zone's ±18 h.
+pub fn local_offset_secs() -> i64 {
+    const MAX: i64 = 18 * 3600;
+    #[cfg(not(target_arch = "wasm32"))]
+    let secs = i64::from(chrono::Local::now().offset().local_minus_utc());
+    // The browser's offset is in minutes, UTC minus local.
+    #[cfg(target_arch = "wasm32")]
+    let secs = {
+        let m = js_sys::Date::new_0().get_timezone_offset();
+        if m.is_finite() { (-m * 60.0).clamp(-(MAX as f64), MAX as f64) as i64 } else { 0 }
+    };
+    secs.clamp(-MAX, MAX)
+}
+
+/// The local date and time now, in the [`now_iso`] layout (the `Z` stays: callers read the
+/// digits). What Insert › Date & Time and today's DATE fields show: the date on the user's clock,
+/// not in Greenwich (in Vietnam, before 7 a.m. UTC still read yesterday).
+pub fn now_local_iso() -> String {
+    iso_from_unix_secs(now_unix().saturating_add_signed(local_offset_secs()))
+}
+
 /// Days since 1970-01-01 → (year, month, day) (Howard Hinnant's algorithm).
 pub fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719_468;

@@ -432,7 +432,9 @@ fn insert_toc(s: &mut Session, v: &Value) -> CmdResult {
         }
         None => delete_selection(s)?,
     };
-    let title = p::str(v, "title").unwrap_or("Contents").to_string();
+    // NexusOffice (QC-DOC-04): the default heading in the text's language ("Mục lục").
+    let lang = super::insert::caret_lang(s);
+    let title = p::str(v, "title").unwrap_or(crate::nexus_vi::doc_text(lang.as_deref(), "Contents")).to_string();
     if at.story != StoryRef::Body || at.path.depth() > 0 {
         return Err(CmdError::Failed("a table of contents goes in the main text".into()));
     }
@@ -885,8 +887,13 @@ pub fn update_fields(s: &mut Session) -> Result<(), CmdError> {
             let name = wordcraft_layout::fields::field_name(instr);
             match name.as_str() {
                 "DATE" | "TIME" | "CREATEDATE" | "SAVEDATE" | "PRINTDATE" => {
-                    let pic = date_picture(instr).unwrap_or_else(|| if name == "TIME" { "h:mm am/pm".into() } else { "M/d/yyyy".into() });
-                    updates.push((k, super::insert::format_date(&pic)));
+                    // NexusOffice (QC-DOC-03): names, and the picture a field without one gets, in
+                    // the document's language.
+                    let lang = super::default_lang(s);
+                    let pic = date_picture(instr).unwrap_or_else(|| {
+                        if name == "TIME" { "h:mm am/pm".into() } else { super::insert::default_date_picture(lang.as_deref()).into() }
+                    });
+                    updates.push((k, super::insert::format_date_in(&pic, lang.as_deref())));
                 }
                 "REF" | "PAGEREF" => {
                     let target = instr.split_whitespace().nth(1).unwrap_or("");
@@ -927,6 +934,7 @@ pub fn update_fields(s: &mut Session) -> Result<(), CmdError> {
 /// (`fields.updateAll`) and not on open, again as Word does. A field carrying `w:fldLock` keeps
 /// its stored result, which is what the lock is for.
 pub fn refresh_date_fields(doc: &mut wordcraft_doc::Document) {
+    let lang = super::doc_lang(doc);
     let stories: Vec<StoryRef> = std::iter::once(StoryRef::Body).chain(doc.parts.keys().copied().map(StoryRef::Part)).collect();
     for story in stories {
         for path in doc.para_paths(story) {
@@ -939,8 +947,11 @@ pub fn refresh_date_fields(doc: &mut wordcraft_doc::Document) {
                     continue;
                 }
                 // Word's default picture when the code carries no `\@` switch.
-                let pic = date_picture(instr).unwrap_or_else(|| if name == "TIME" { "h:mm am/pm".into() } else { "M/d/yyyy".into() });
-                updates.push((k, super::insert::format_date(&pic)));
+                let pic = date_picture(instr).unwrap_or_else(|| {
+                    if name == "TIME" { "h:mm am/pm".into() } else { super::insert::default_date_picture(lang.as_deref()).into() }
+                });
+                // NexusOffice (QC-DOC-03): names in the document's language.
+                updates.push((k, super::insert::format_date_in(&pic, lang.as_deref())));
             }
             if updates.is_empty() {
                 continue;

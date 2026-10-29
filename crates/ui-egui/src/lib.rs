@@ -65,6 +65,7 @@ pub mod mini_toolbar;
 pub mod nexus;
 pub mod nexus_save_prompt;
 pub mod nexus_toolbar;
+pub mod nexus_vi;
 pub mod nexus_wps;
 pub mod objects;
 pub mod options;
@@ -517,6 +518,10 @@ pub struct WordApp {
     desktop_dark: Option<bool>,
     /// The interface language whose editing language the session last got ([`i18n::Lang::editing_lang`]).
     applied_editing: Option<i18n::Lang>,
+    /// NexusOffice (QC-DOC-02, [`nexus_vi::sync_region`]): the region the host gave the session,
+    /// and the one this window last set for the interface language.
+    nexus_host_region: Option<wordcraft_engine::Region>,
+    nexus_region_set: Option<wordcraft_engine::Region>,
     /// What the system last said about its animation effects ([`Services::animations_enabled`]).
     system_animations: Option<bool>,
     /// Whether egui's own animations were last switched on or off ([`theme::apply_animations`]).
@@ -594,7 +599,9 @@ impl SaveChoice {
 }
 
 impl WordApp {
-    pub fn new(session: Session, services: Services) -> Self {
+    pub fn new(mut session: Session, services: Services) -> Self {
+        // NexusOffice (QC-CHUNG-05): comments and tracked changes are by the computer's user.
+        nexus_vi::os_author(&mut session);
         // Numeral › System follows the system locale, found here rather than in layout.
         if let Some(tag) = sys_locale::get_locale() {
             wordcraft_engine::set_system_locale(&tag);
@@ -641,6 +648,8 @@ impl WordApp {
             desktop_theme: desktop_theme::DesktopTheme::default(),
             desktop_dark: None,
             applied_editing: None,
+            nexus_host_region: None,
+            nexus_region_set: None,
             system_animations: None,
             applied_animations: None,
             frame_ms: 0.0,
@@ -1832,6 +1841,7 @@ impl WordApp {
             self.session.set_editing_language(lang.editing_lang());
             self.applied_editing = Some(lang);
         }
+        nexus_vi::sync_region(self, lang.code());
         options::sync(self);
         self.settle_async_saves();
         // Chinese text wants the Chinese face before the Japanese one (one glyph style per line).
@@ -2078,6 +2088,8 @@ impl WordApp {
         // NexusOffice: a click that closed the Backstage (its Back button) belongs to it, not to
         // the chrome under it (see `refocus_after_chrome_click`).
         let backstage_at_start = self.ui.backstage;
+        // NexusOffice QC-DOC-01: a click on a menu item that closed its menu hands focus back too.
+        let popup_at_start = egui::Popup::is_any_open(&ctx);
         self.escape_free = self.dialog.is_none() && !self.ui.backstage && self.ui.keytips == keytips::Phase::Off && !egui::Popup::is_any_open(&ctx);
         // Keytips are read before layout so the frame paints the new state; badges paint after
         // the ribbon so they sit on top of it.
@@ -2132,7 +2144,7 @@ impl WordApp {
         crate::keytips::show(self, &ctx, ui);
         keys::global_shortcuts(self, &ctx);
         if !backstage_at_start {
-            self.refocus_after_chrome_click(&ctx);
+            self.refocus_after_chrome_click(&ctx, popup_at_start);
         }
         if let Some(url) = self.canvas.open_url.take() {
             ctx.open_url(egui::OpenUrl::new_tab(url));
@@ -2180,7 +2192,9 @@ impl WordApp {
     /// on any click elsewhere; only a click that left nothing focused counts, so a text field
     /// (font size, zoom, command search) keeps the focus it took, and clicks on a dialog, menu or
     /// popup, or while one is open, leave focus alone. Clicks on the page are the canvas's own.
-    fn refocus_after_chrome_click(&mut self, ctx: &egui::Context) {
+    /// NexusOffice (QC-DOC-01): a click on a menu or popup item (Insert › Table's grid, a symbol,
+    /// a bullet) that closed it counts as a click on the chrome, when it left nothing focused.
+    fn refocus_after_chrome_click(&mut self, ctx: &egui::Context, popup_at_start: bool) {
         if self.ui.backstage || self.dialog.is_some() || self.colors.is_some() {
             return;
         }
@@ -2193,7 +2207,9 @@ impl WordApp {
         if self.canvas.balloon.is_some() || self.canvas.viewport.is_some_and(|v| v.contains(pos)) {
             return;
         }
-        let on_chrome = ctx.layer_id_at(pos).is_none_or(|l| l.order == egui::Order::Background);
+        let layer = ctx.layer_id_at(pos);
+        let closed_a_menu = popup_at_start && layer.is_some_and(|l| l.order == egui::Order::Foreground);
+        let on_chrome = closed_a_menu || layer.is_none_or(|l| l.order == egui::Order::Background);
         if on_chrome && ctx.memory(|m| m.focused().is_none()) && !egui::Popup::is_any_open(ctx) {
             self.canvas.want_focus = true;
             // The page has already been drawn, so it only sees `want_focus` next frame, and its own
@@ -4886,6 +4902,60 @@ mod tests {
         h.step();
         assert!(!h.state().canvas.focused, "the font size box keeps focus while edited");
         assert_eq!(body_text(h.state()), before, "typing went into the font size box, not the page");
+    }
+
+    /// NexusOffice QC-DOC-01: Insert › Table, a click on the grid, then typing: the text goes into
+    /// the first cell and Tab moves to the next, in the ribbon and in the WPS layout. The click in
+    /// the menu took the page's keyboard focus, so the typing was silently lost.
+    #[test]
+    fn typing_after_inserting_a_table_from_the_grid_goes_into_its_cells() {
+        use egui::accesskit::Role;
+
+        for wps in [false, true] {
+            let mut a = app();
+            a.wps = wps;
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+                |ui, app: &mut WordApp| {
+                    let ctx = ui.ctx().clone();
+                    app.logic(&ctx);
+                    app.ui(ui);
+                },
+                a,
+            );
+            for _ in 0..12 {
+                h.step();
+            }
+            // Real pointer clicks, as a mouse makes them: move there, press, release.
+            let click = |h: &mut egui_kittest::Harness<'_, WordApp>, label: &str| {
+                let at = h.get_by_role_and_label(Role::Button, label).rect().center();
+                h.event(egui::Event::PointerMoved(at));
+                h.step();
+                for pressed in [true, false] {
+                    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() });
+                    h.step();
+                }
+                // The WPS strip settles its stacks and its "…" fold over a few frames.
+                for _ in 0..8 {
+                    h.step();
+                }
+            };
+            click(&mut h, "Insert");
+            click(&mut h, "Add a Table");
+            click(&mut h, "3×3 Table");
+            assert!(!egui::Popup::is_any_open(&h.ctx), "wps {wps}: the click closed the menu");
+            h.event(egui::Event::Text("Số tiền".into()));
+            h.step();
+            h.event(egui::Event::Key { key: egui::Key::Tab, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() });
+            h.step();
+            h.event(egui::Event::Text("1.250.000 ₫".into()));
+            h.step();
+            let doc = &h.state().session.doc;
+            let Some(wordcraft_doc::Block::Table(t)) = doc.body.first().map(|b| &**b) else { panic!("wps {wps}: no table") };
+            assert_eq!((t.rows.len(), t.grid.len()), (3, 3), "wps {wps}");
+            let cell = |c: usize| t.rows[0].cells[c].blocks[0].as_para().map(|p| p.text.clone()).unwrap_or_default();
+            assert_eq!(cell(0), "Số tiền", "wps {wps}: typing went into the first cell");
+            assert_eq!(cell(1), "1.250.000 ₫", "wps {wps}: Tab moved to the next cell");
+        }
     }
 
     /// #330: Word's shortcuts work from the keyboard — Ctrl+Alt+1 (⌘⌥1) applies Heading 1, and
