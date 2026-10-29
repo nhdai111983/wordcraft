@@ -715,6 +715,12 @@ fn decompose(c: char) -> Option<&'static str> {
     DECOMPOSITION.get(i).map(|&(_, d)| d)
 }
 
+/// Whether [`canonical`] decomposes `c`. A letter it keeps whole (Cyrillic `й`, `ё`) is only
+/// matched by its decomposed spelling when that spelling is composed back.
+pub(crate) fn decomposes(c: char) -> bool {
+    decompose(c).is_some()
+}
+
 /// `s` with every character in the table fully decomposed and each run of combining marks put in
 /// canonical order. Case is kept and characters outside the table are kept as they are. A run of
 /// more than 32 marks keeps its input order. ASCII text comes back unchanged.

@@ -31,16 +31,16 @@ fn version_usage_and_errors_name_nexus_docs_cli() {
     assert!(!err.contains("wordcraft") && !err.contains("WordCraft"), "{err}");
 }
 
-/// `mcp --connect` to a port nothing listens on names the app as installed.
+/// `mcp --connect` to a port nothing listens on names the app as installed. (Since upstream #4078
+/// the server starts anyway and connects on the first call; with no stdin it then ends.)
 #[test]
 fn unreachable_app_is_named_nexus_docs() {
     // A port that was free a moment ago: bind, read the port, close.
     let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let out = cli(&["mcp", "--connect", &format!("127.0.0.1:{port}")]);
-    assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.starts_with("nexus-docs-cli: "), "{err}");
-    assert!(err.contains(&format!("can't reach the Nexus Docs app at 127.0.0.1:{port}")), "{err}");
+    assert!(err.starts_with("nexus-docs-cli mcp: "), "{err}");
+    assert!(err.contains(&format!("Nexus Docs is not reachable at 127.0.0.1:{port} yet")), "{err}");
     assert!(!err.contains("WordCraft") && !err.contains("wordcraft-cli"), "{err}");
 }
 

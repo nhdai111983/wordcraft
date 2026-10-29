@@ -128,6 +128,10 @@ $FontLicences = if ($LicenceSources.Count) { 'yes' } else { 'no' }
 
 & (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'wordcraft.exe') (Join-Path $Stage 'wordcraft-cli.exe')
 
+# NexusOffices: the Nexus MSI (wordcraft.wxs, per machine, its own UpgradeCode) installs NOTICE,
+# ATTRIBUTION.md and the licences from $Stage and the font licences from licenses\ (above), so
+# upstream's app-notices\ and font-licences\ staging for its dual-scope MSI is not used here.
+
 # ---- MSI ---------------------------------------------------------------------------------------
 # The installer's welcome page shows the license: build its RTF from LICENSE-MIT and LICENSE-APACHE
 # so it never drifts from them. Hard-wrapped lines are rejoined into paragraphs so the text wraps
@@ -168,6 +172,8 @@ Invoke-Native 'wix build' {
     -d "FontLicences=$FontLicences" `
     -o $Msi
 }
+# NexusOffices: no check-install-policy.ps1 here: install-policy.json describes WordCraft's
+# dual-scope MSI (its UpgradeCode, ArtCraft folders and registry keys), not the Nexus one.
 # wix writes its debug symbols (.wixpdb) next to the MSI; keep them out of the release assets.
 Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Msi, '.wixpdb'))
 & (Join-Path $PSScriptRoot 'sign.ps1') $Msi
