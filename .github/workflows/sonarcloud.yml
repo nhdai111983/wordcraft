@@ -16,6 +16,9 @@ concurrency:
 
 jobs:
   sonarcloud:
+    # NexusOffices: upstream's SonarCloud project only; in a fork this would hand every secret to a
+    # workflow at storytold/craft-common-actions@main.
+    if: github.repository == 'storytold/wordcraft'
     # Tracked at @main so org-wide CI improvements propagate without PR churn.
     uses: storytold/craft-common-actions/.github/workflows/sonarcloud.yml@main
     secrets: inherit

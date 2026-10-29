@@ -26,6 +26,14 @@ pub const COMMUNITY_URL: Option<&str> = None;
 /// NexusOffices installer.
 pub const UPDATES: bool = false;
 
+/// What Help › Check for Updates says while [`UPDATES`] is off.
+pub fn updates_message() -> &'static str {
+    crate::i18n::nexus_text(
+        "New versions of Nexus Docs come with the NexusOffices installer.",
+        "Phiên bản mới của Nexus Docs được cập nhật qua bộ cài NexusOffices.",
+    )
+}
+
 /// The About page's attribution to upstream, which the MIT/Apache licences and ArtCraft's brand
 /// licence ask for (text only, no logo, no endorsement implied). Never branded.
 pub const ATTRIBUTION: (&str, &str) = (

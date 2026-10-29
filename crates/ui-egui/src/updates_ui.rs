@@ -77,8 +77,10 @@ pub(crate) fn tick(app: &mut WordApp, ctx: &egui::Context) {
 }
 
 pub(crate) fn show(app: &mut WordApp, ctx: &egui::Context) {
+    // NexusOffices: with upstream's updater off (`nexus::UPDATES`) the window only shows the
+    // message `ui.checkForUpdates` put there.
     #[cfg(not(target_arch = "wasm32"))]
-    {
+    if crate::nexus::UPDATES {
         // The restart helper is scheduled before the app closes, so no update starts over unsaved work.
         let clean = !(app.session.dirty || app.save_unconfirmed() || app.printing.busy() || crate::panes::has_comment_drafts(app));
         match app.updates_rt.updater.show_if(ctx, clean) {
@@ -127,7 +129,7 @@ pub(crate) fn show(app: &mut WordApp, ctx: &egui::Context) {
 
     // Closing the window dismisses the outcome it showed.
     #[cfg(not(target_arch = "wasm32"))]
-    if !app.updates_rt.manual_window_open {
+    if crate::nexus::UPDATES && !app.updates_rt.manual_window_open {
         app.updates_rt.updater.dismiss_status();
     }
 }

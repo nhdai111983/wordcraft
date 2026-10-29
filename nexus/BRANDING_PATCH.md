@@ -31,12 +31,14 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 |---|---|---|
 | `crates/ui-egui/src/i18n.rs` | `pub mod brand; pub use brand::{brand, nexus_text};` + gọi `brand::branded` trong `t()`/`tc()`; `is_catalog_key` (ngôn ngữ hiện tại hoặc vi); doc của `t`/`tc`/`tr` ghi bất biến "không bao giờ đưa văn bản tài liệu/người dùng vào `t`/`tc`/`tl!`" | Có — hook "display name" trong i18n |
 | `crates/ui-egui/src/lib.rs` | `pub mod nexus;` | Có — module white-label |
-| `crates/ui-egui/src/app/commands.rs` | `ui.discord` không mở Discord ArtCraft (`nexus::COMMUNITY_URL`); `ui.checkForUpdates` trả lỗi khi `nexus::UPDATES = false`; trạng thái engine chỉ qua `tl!` khi là key catalog (`i18n::is_catalog_key`), nên tên file/phông của người dùng giữ nguyên; lỗi "making Nexus Docs the default app…"/"Nexus Docs can't change the default apps…" đổi tại nguồn; `after_command` thành `pub(crate)` (test gọi trực tiếp) | Có — `COMMUNITY_URL: Option`, `UPDATES` |
+| `crates/ui-egui/src/app/commands.rs` | `ui.discord` không mở Discord ArtCraft (`nexus::COMMUNITY_URL`); `ui.checkForUpdates`/`help.checkForUpdates` không chạy updater khi `nexus::UPDATES = false` mà mở cửa sổ Check for Updates với `nexus::updates_message()` (en/vi: bản mới đến qua bộ cài NexusOffices); trạng thái engine chỉ qua `tl!` khi là key catalog (`i18n::is_catalog_key`), nên tên file/phông của người dùng giữ nguyên; lỗi "making Nexus Docs the default app…"/"Nexus Docs can't change the default apps…" đổi tại nguồn; `after_command` thành `pub(crate)` (test gọi trực tiếp) | Có — `COMMUNITY_URL: Option`, `UPDATES` |
 | `crates/ui-egui/src/windows.rs` | Tiêu đề cửa sổ (kể cả cửa sổ mới chưa có tên, không có tài liệu) = `nexus::APP_NAME` | Có — `APP_NAME` |
 | `crates/ui-egui/src/tests.rs` | Test `status_keeps_the_users_file_name` (phần key catalog chỉ chạy khi có craft-i18n); 3 dòng test theo nhãn mới (tiêu đề cửa sổ, nút "Make Nexus Docs the default…", trang Options nhận qua "Start-up") | Đi cùng `app/commands.rs` |
 | `crates/ui-egui/src/dialogs/dispatch.rs` | Tab About → `nexus::about_ui` (bỏ link getartcraft/Discord, mô tả "Crafting Apps from the ArtCraft team") | Có |
 | `crates/ui-egui/src/chrome.rs` | Ẩn nút Discord trên title bar; tiêu đề khi không có tài liệu qua `tl!` (→ Nexus Docs) | Có — `COMMUNITY_URL` |
-| `crates/ui-egui/src/ribbon/review.rs` | Ẩn nút Help › Community Discord (`COMMUNITY_URL`) và Help › Check for Updates (`UPDATES`) | Có — `COMMUNITY_URL`, `UPDATES` |
+| `crates/ui-egui/src/ribbon/review.rs` | Ẩn nút Help › Community Discord (`COMMUNITY_URL`) | Có — `COMMUNITY_URL` |
+| `crates/ui-egui/src/updates_ui.rs` | Khi `nexus::UPDATES = false`: cửa sổ Check for Updates không đồng bộ theo trạng thái updater (chỉ hiện thông báo NexusOffices) | Có — `UPDATES` |
+| `.github/workflows/sonarcloud.yml` | `if: github.repository == 'storytold/wordcraft'`: workflow upstream truyền mọi secret (`secrets: inherit`) cho `storytold/craft-common-actions@main`; không chạy trong fork | Không (CI của upstream) |
 | `crates/ui-egui/src/backstage.rs` | Ẩn mục "Discord community" trong File; trang Thông tin thiết kế lại (`section`/`stat`/`elide_middle`: tiêu đề có icon, số liệu lớn, đường dẫn rút gọn giữa). Icon cho cột File: **đã có ở upstream (#1714), bỏ patch** | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/options.rs` | Ẩn ô "Show the community button" (nút đã ẩn) | Có — `COMMUNITY_URL` |
 | `crates/ui-egui/src/options/tests.rs` | Test kittest tra nhãn "…when Nexus Docs starts" và tác giả mặc định "Nexus Docs User" | Đi cùng `options.rs` / `session/lifecycle.rs` |
@@ -46,7 +48,7 @@ khi nó là key catalog (`i18n::is_catalog_key`); tên kiểu và nhãn chú th�
 | `crates/formats/src/latex/export.rs` | Dòng đầu LaTeX: bỏ URL getartcraft, "Written by Nexus Docs" | Có — tên app qua biến build |
 | `crates/formats/src/tests.rs` | Test khẳng định dòng đầu LaTeX mới | Đi cùng `latex.rs` |
 | `crates/control-key/src/lib.rs` | Thư mục cấu hình `Nexus Docs` (macOS/Windows) / `nexus-docs` (XDG) — không đụng cấu hình WordCraft gốc (+ test) | Có — tên thư mục qua biến build |
-| `apps/wordcraft/src/main.rs` | Tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log; tên lệnh `nexus-docs` trong USAGE, `--version` và tiền tố stderr | Có |
+| `apps/wordcraft/src/main.rs` | Không bật kiểm tra cập nhật khi khởi động (`nexus::UPDATES`). Tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log; tên lệnh `nexus-docs` trong USAGE, `--version` và tiền tố stderr | Có |
 | `apps/wordcraft/src/logging.rs` | Tiền tố stderr của panic hook `nexus-docs:` (tên file log `wordcraft.log`, log target giữ nguyên) | Có — tên binary qua biến build |
 | `apps/wordcraft/src/print.rs` | Tên lệnh in trong hàng đợi máy in `"Nexus Docs document"` | Có — tên app qua biến build |
 | `apps/wordcraft/tests/it/help.rs` | Assert USAGE bắt đầu bằng `nexus-docs — ` và không chứa `wordcraft`/`WordCraft` | Đi cùng `main.rs` |
@@ -135,8 +137,11 @@ GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft`).
   (`tests/nexus_brand.rs`, `crates/doc/tests/collate_*.rs`) vẫn là file riêng, không sửa `it/main.rs`.
 - **craft-update** (Help › Check for Updates, kiểm tra khi khởi động, tự cập nhật trên Windows) tìm bản
   phát hành `storytold/wordcraft` và sẽ thay Nexus Docs bằng WordCraft: tắt bằng `nexus::UPDATES = false`
-  (`ribbon/review.rs` ẩn nút, `app/commands.rs` trả lỗi, `apps/wordcraft/src/main.rs` không bật kiểm tra
-  khi khởi động). `craft_update::self_update::finish` (chỉ chạy với `--finish-update`) giữ nguyên.
+  (`apps/wordcraft/src/main.rs` không bật kiểm tra khi khởi động; Help › Check for Updates mở cửa sổ nói
+  bản mới đến qua bộ cài NexusOffices, en/vi, `nexus::updates_message`; test
+  `check_for_updates_points_to_the_nexusoffices_installer`).
+- **sonarcloud.yml** (mới ở upstream) chạy trên PR với `secrets: inherit` tới
+  `storytold/craft-common-actions@main`: thêm điều kiện chỉ chạy ở `storytold/wordcraft`. `craft_update::self_update::finish` (chỉ chạy với `--finish-update`) giữ nguyên.
 - **Đã có ở upstream, bỏ patch:** icon cột File (#1714); thông báo Standard encryption (upstream đọc được);
   `blank_session` của CLI (`run` đi qua `file.new`, #3152); AppImage giữ `usr/share/doc`; macOS gọi
   `copy_docs` cho `Contents/Resources`.

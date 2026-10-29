@@ -2615,14 +2615,35 @@ fn status_keeps_the_users_file_name() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// NexusOffices: upstream's updater looks for WordCraft's releases, so Check for Updates is off
-/// (`nexus::UPDATES`): the command fails instead of starting a check.
+/// NexusOffices: upstream's updater looks for WordCraft's releases, so it stays off
+/// (`nexus::UPDATES`): Check for Updates opens its window with the NexusOffices installer
+/// message (English and Vietnamese) and starts no check, also after a frame.
 #[test]
-fn check_for_updates_is_off() {
-    let mut a = app();
-    let e = a.run("ui.checkForUpdates", json!({})).unwrap_err();
-    assert!(e.contains("NexusOffices installer"), "{e}");
-    assert!(a.run("help.checkForUpdates", json!({})).is_err());
+fn check_for_updates_points_to_the_nexusoffices_installer() {
+    use egui_kittest::kittest::Queryable;
+    let before = crate::i18n::current();
+    for (code, text) in [
+        ("en", "New versions of Nexus Docs come with the NexusOffices installer."),
+        ("vi", "Phiên bản mới của Nexus Docs được cập nhật qua bộ cài NexusOffices."),
+    ] {
+        crate::i18n::set_current(crate::i18n::Lang::from_code(code).unwrap());
+        let mut a = app();
+        a.run("ui.checkForUpdates", json!({})).unwrap();
+        assert_eq!(a.updates_rt.status_message.as_deref(), Some(text), "{code}");
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut WordApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            a,
+        );
+        h.run_steps(4);
+        assert!(h.query_by_label(text).is_some(), "{code}: the window shows the message");
+        assert!(h.state().updates_rt.manual_window_open, "{code}: no updater status closes it");
+        assert!(h.state_mut().run("help.checkForUpdates", json!({})).is_ok());
+    }
+    crate::i18n::set_current(before);
 }
 
 /// A fresh scratch folder for one test.
