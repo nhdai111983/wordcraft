@@ -128,3 +128,22 @@ fn scrolling_a_big_table_fingerprints_only_pages_coming_into_view() {
     assert!(max_textures <= 12, "textures kept while scrolling: {max_textures}");
     assert!(h.state().canvas.texture_count() >= 1, "the pages in view stay rendered");
 }
+
+/// NexusOffice: typing draws again only the band of the page it changes, not the whole page
+/// (a whole A4 page at 150 % is about 7 MB of pixels rasterised and sent to the GPU per key).
+#[test]
+fn typing_draws_only_the_changed_band_of_the_page() {
+    let mut h = harness(wordcraft_engine::sample::sample_document());
+    h.run_steps(6);
+    let (pages, bands) = (h.state().canvas.page_renders, h.state().canvas.band_renders);
+    assert!(pages >= 1, "the first page was drawn whole");
+    for c in "Xin chào".chars() {
+        h.event(egui::Event::Text(c.to_string()));
+        h.step();
+    }
+    h.run_steps(2);
+    let typed = h.state().session.doc.plain_text(StoryRef::Body);
+    assert!(typed.starts_with("Xin chào") || typed.contains("Xin chào"), "the text went in");
+    assert!(h.state().canvas.band_renders >= bands + 6, "bands drawn: {}", h.state().canvas.band_renders - bands);
+    assert!(h.state().canvas.page_renders <= pages + 1, "whole pages drawn while typing: {}", h.state().canvas.page_renders - pages);
+}
