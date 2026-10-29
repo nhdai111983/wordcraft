@@ -20,6 +20,11 @@ pub const SOURCE_URL: &str = "https://github.com/nhdai111983/wordcraft";
 /// The community link behind the title bar's button and Help › Community. NexusOffices has none
 /// yet, so both are hidden; upstream's (ArtCraft's Discord) must never be shown.
 pub const COMMUNITY_URL: Option<&str> = None;
+/// Whether the app checks for and installs newer releases itself (upstream's `craft-update`,
+/// Help › Check for Updates and the check at start). Off: upstream's updater looks for ArtCraft's
+/// WordCraft releases and would replace Nexus Docs with WordCraft; Nexus Docs is updated with the
+/// NexusOffices installer.
+pub const UPDATES: bool = false;
 
 /// The About page's attribution to upstream, which the MIT/Apache licences and ArtCraft's brand
 /// licence ask for (text only, no logo, no endorsement implied). Never branded.

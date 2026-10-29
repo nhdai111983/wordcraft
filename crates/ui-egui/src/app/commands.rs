@@ -488,6 +488,10 @@ impl WordApp {
         let s = |k: &str| p.get(k).and_then(Value::as_str);
         Some(Ok(match id {
             "ui.checkForUpdates" | "help.checkForUpdates" => {
+                // NexusOffices: never upstream's updater (`nexus::UPDATES`).
+                if !crate::nexus::UPDATES {
+                    return Some(Err("Nexus Docs is updated with the NexusOffices installer".into()));
+                }
                 crate::updates_ui::check(self);
                 Value::Null
             }

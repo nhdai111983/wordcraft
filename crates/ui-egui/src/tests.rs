@@ -2615,6 +2615,16 @@ fn status_keeps_the_users_file_name() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// NexusOffices: upstream's updater looks for WordCraft's releases, so Check for Updates is off
+/// (`nexus::UPDATES`): the command fails instead of starting a check.
+#[test]
+fn check_for_updates_is_off() {
+    let mut a = app();
+    let e = a.run("ui.checkForUpdates", json!({})).unwrap_err();
+    assert!(e.contains("NexusOffices installer"), "{e}");
+    assert!(a.run("help.checkForUpdates", json!({})).is_err());
+}
+
 /// A fresh scratch folder for one test.
 fn scratch(name: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("wordcraft-ui-{name}-{}", std::process::id()));
