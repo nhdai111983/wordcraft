@@ -330,14 +330,9 @@ pub fn table_grid_picker(ui: &mut Ui, app: &mut WordApp) {
                     egui::Stroke::new(1.0, if on { t.accent } else { t.border_strong }),
                     egui::StrokeKind::Inside,
                 );
-                // NexusOffice: screen readers and scripts find each cell by the size it inserts.
-                resp.widget_info(|| {
-                    egui::WidgetInfo::labeled(
-                        egui::Role::Button,
-                        true,
-                        crate::i18n::fmt(tl!("{cols}×{rows} Table"), &[("cols", &c.to_string()), ("rows", &r.to_string())]),
-                    )
-                });
+                // NexusOffice: screen readers and scripts find each cell by the size it inserts
+                // ("3×4", columns × rows; the label above the grid says "… Table").
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{c}×{r}")));
                 if resp.hovered() {
                     new_hover = (r, c);
                 }

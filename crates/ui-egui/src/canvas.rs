@@ -913,7 +913,10 @@ fn render_page_texture(app: &mut WordApp, ui: &Ui, r: PageRender<'_>) {
         h.finish()
     };
     let prints = page_prints(page);
-    let plain = !forced && app.canvas.table_preview_layout.is_none() && !app.session.view.show_markup;
+    // Markup shown with comments draws balloons and their leader lines across the page, which a
+    // band can't bound; without comments the markup a change draws stays on its own lines.
+    let markup = app.session.view.show_markup && !app.session.doc.comments.is_empty();
+    let plain = !forced && app.canvas.table_preview_layout.is_none() && !markup;
     let band = match (app.canvas.textures.get(&i), app.canvas.prints.get(&i), &prints) {
         (Some((tex_key, tex)), Some(before), Some(after)) if plain && before.tex_key == *tex_key && before.frame == frame => {
             let [tw, th] = tex.size();

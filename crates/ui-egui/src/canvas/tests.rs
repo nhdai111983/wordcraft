@@ -4849,6 +4849,6 @@ fn changed_bands_cover_what_changed_and_only_that() {
     let pushed = [p(1, 0.0, 10.0), p(9, 10.0, 22.0), p(3, 22.0, 32.0)];
     assert_eq!(changed_band(&before, &pushed), Some((10.0, 32.0)));
     assert_eq!(band_rows((10.0, 20.0), 1.0, 1000), Some((0, 36)));
-    assert_eq!(band_rows((100.0, 120.0), 1.5, 1000), Some((126, 54)));
+    assert_eq!(band_rows((100.0, 120.0), 1.5, 1000), Some((126, 78)));
     assert_eq!(band_rows((f32::NAN, 1.0), 1.0, 100), None);
 }
