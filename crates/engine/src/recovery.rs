@@ -46,6 +46,64 @@ impl Session {
         }
         None
     }
+    /// NexusOffice: writes the open document's recovery copy at the next tick instead of after
+    /// the interval (a document handed over from another window, whose copy there goes once this
+    /// one is on disk).
+    pub fn recovery_save_soon(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.recovery.is_some() {
+            self.recovery_slot.due = std::time::Instant::now();
+        }
+    }
+    /// NexusOffice: whether the open document's latest change is in its recovery copy on disk
+    /// (`false` without recovery, while a write is under way, or after one failed).
+    pub fn recovery_written(&self) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(r) = &self.recovery {
+            // `tick` marks the slot when it queues the write; a failed write takes the mark back
+            // (or leaves the error), so an idle worker without an error has written it.
+            let slot = &self.recovery_slot;
+            return r.ready && !r.busy && r.error.is_none() && slot.id.is_some() && slot.revision == Some(self.rev());
+        }
+        false
+    }
+    /// NexusOffice: removes the open document's recovery copy now, waiting for the worker, and
+    /// writes none for this revision again: the document moved to another window, which keeps a
+    /// copy of its own. An error leaves the copy (offered after a crash rather than lost).
+    pub fn recovery_discard_current(&mut self) -> Result<(), String> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(mut r) = self.recovery.take() {
+            let result = self.discard_current_within(&mut r);
+            self.recovery = Some(r);
+            result?;
+        }
+        Ok(())
+    }
+    /// [`Self::recovery_discard_current`]: waits out the job under way and the discard at most
+    /// [`desktop::DISCARD_WAIT`] each (the window's frame waits for one write at most, never for
+    /// a stuck disk). Out of time before the discard is queued: an error, the copy stays. Out of
+    /// time after: the worker removes it on its own and the next tick reads its answer.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn discard_current_within(&mut self, r: &mut Recovery) -> Result<(), String> {
+        if r.busy {
+            match r.receive_within(desktop::DISCARD_WAIT) {
+                Some(e) => self.apply_recovery(r, e),
+                None if r.busy => return Err("recovery is busy; the copy stays".into()),
+                None => {}
+            }
+        }
+        if let Some(id) = self.recovery_slot.id.clone()
+            && let Some(e) = r.discard_within(&id, Some(self.document_id()), desktop::DISCARD_WAIT)?
+        {
+            self.apply_recovery(r, e);
+            if self.recovery_slot.id.is_some() {
+                return Err(r.error.clone().unwrap_or_else(|| "the recovery copy could not be removed".into()));
+            }
+        }
+        // No copy is written again for this revision: the other window keeps its own.
+        self.recovery_slot.revision = Some(self.rev());
+        Ok(())
+    }
     pub fn recovery_ready(&self) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(r) = &self.recovery {

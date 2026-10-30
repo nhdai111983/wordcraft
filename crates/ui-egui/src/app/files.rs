@@ -180,6 +180,14 @@ impl WordApp {
         saved
     }
 
+    /// NexusOffice: typing that isn't in the document yet (a comment being edited or replied to,
+    /// held as a draft until its field loses focus), which moving the document to another window
+    /// would leave behind. `ctx` is kept for the NexusOffice host's call; the drafts live in the
+    /// app since upstream's #1348.
+    pub fn has_drafts(&self, _ctx: &egui::Context) -> bool {
+        panes::has_changing_comment_drafts(self)
+    }
+
     /// The window's close button (or the system) asked to quit. Returns true to let the window
     /// close; with unsaved changes it asks first and returns false.
     pub fn close_requested(&mut self) -> bool {

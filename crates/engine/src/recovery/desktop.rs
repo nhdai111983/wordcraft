@@ -13,6 +13,9 @@ const MAX_BYTES: u64 = 256 << 20;
 const MAX_RECORDS: usize = 128;
 const MAX_FILES: usize = 16;
 const DISK_BUDGET: u64 = 2 << 30;
+/// How long `Session::recovery_discard_current` waits for the worker each time (NexusOffice: on
+/// the UI thread).
+pub(crate) const DISCARD_WAIT: Duration = Duration::from_secs(2);
 /// Times a record lock held for a moment (by a process being started) is tried again.
 const LOCK_RETRIES: u32 = 10;
 
@@ -582,6 +585,36 @@ impl Recovery {
                 None
             }
         }
+    }
+    /// NexusOffice: [`receive`](Self::receive) waiting at most `limit` for the job under way;
+    /// `None` when it hasn't answered by then (it still runs; a later receive reads its answer).
+    pub fn receive_within(&mut self, limit: Duration) -> Option<Event> {
+        if !self.busy {
+            return None;
+        }
+        match self.rx.recv_timeout(limit) {
+            Ok(e) => {
+                self.busy = false;
+                self.ready = true;
+                self.documents.clone_from(&e.documents);
+                Some(e)
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => None,
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                self.busy = false;
+                self.alive = false;
+                if self.error.is_none() {
+                    self.error = Some("recovery worker is unavailable".into());
+                }
+                None
+            }
+        }
+    }
+    /// NexusOffice: queue the discard of record `id` (the worker must be idle) and wait at most
+    /// `limit` for it: `None` when it is still running (the worker removes the record on its own).
+    pub fn discard_within(&mut self, id: &str, document: Option<u64>, limit: Duration) -> Result<Option<Event>, String> {
+        self.queue(Job::Discard(id.into(), document))?;
+        Ok(self.receive_within(limit))
     }
     /// Run `job` now and wait for its answer.
     fn run_now(&mut self, job: Job) -> Result<Event, String> {

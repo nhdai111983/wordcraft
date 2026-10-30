@@ -619,3 +619,31 @@ fn finish_recovery_covers_every_open_document() {
     s.finish_recovery();
     assert_eq!(records(&t.0), [dirty]);
 }
+
+/// NexusOffice: a document handed to another window gets its copy at the next tick, says when
+/// that copy holds its latest change, and its copy goes at once (none written again for it).
+#[test]
+fn a_handed_over_document_is_written_soon_and_discarded_now() {
+    let profile = Temp::new();
+    let mut s = session(&profile.0);
+    assert!(!s.recovery_written(), "nothing changed: no copy");
+    s.run("document.setText", &json!({"text": "Bản nháp chuyển cửa sổ"})).unwrap();
+    s.recovery_save_soon();
+    s.recovery_tick();
+    assert!(!s.recovery_written(), "queued is not written");
+    settle(&mut s);
+    assert!(s.recovery_written(), "written at the next tick, not after the interval");
+    assert_eq!(s.recovery_documents().len(), 0, "the open document's own copy is not offered");
+    assert_eq!(records(&profile.0).len(), 1, "one copy on disk");
+    s.run("document.setText", &json!({"text": "Đổi nữa"})).unwrap();
+    assert!(!s.recovery_written(), "a newer change isn't in the copy");
+    s.recovery_discard_current().unwrap();
+    assert!(records(&profile.0).is_empty(), "removed before it returns");
+    save_now(&mut s);
+    assert!(records(&profile.0).is_empty(), "not written again for the same revision");
+    // Without recovery there is nothing to write or remove.
+    let mut off = Session::new(Document::new());
+    off.recovery_save_soon();
+    assert!(!off.recovery_written());
+    assert!(off.recovery_discard_current().is_ok());
+}

@@ -105,6 +105,19 @@ pub(crate) fn has_comment_drafts(app: &WordApp) -> bool {
     d.document == app.session.document_id() && !(d.edits.is_empty() && d.replies.is_empty())
 }
 
+/// NexusOffice: whether a draft would change the open document: an edit that differs from its
+/// comment's text, or a reply that isn't blank (what moving the document to another window would
+/// leave behind). Upstream's [`has_comment_drafts`] also counts an untouched edit or a blank reply.
+pub(crate) fn has_changing_comment_drafts(app: &WordApp) -> bool {
+    let d = &app.comment_drafts;
+    if d.document != app.session.document_id() {
+        return false;
+    }
+    let comments = &app.session.doc.comments;
+    d.edits.iter().any(|(id, t)| comments.get(id).is_some_and(|c| *t != app.session.doc.plain_text(StoryRef::Part(c.part))))
+        || d.replies.iter().any(|(id, t)| !t.trim().is_empty() && comments.contains_key(id))
+}
+
 fn drafts(app: &mut WordApp) -> &mut CommentDrafts {
     let document = app.session.document_id();
     app.comment_drafts.of(document)
@@ -237,4 +250,31 @@ pub(crate) fn flush_comment_drafts(app: &mut WordApp) -> Result<(), String> {
         }
     }
     first
+}
+
+#[cfg(test)]
+mod nexus_tests {
+    use super::drafts;
+    use crate::{Services, WordApp};
+    use serde_json::json;
+
+    /// NexusOffice: a comment edit or reply being typed is a draft; an edit back to the comment's
+    /// own text or a blank reply isn't.
+    #[test]
+    fn comment_typing_not_in_the_document_is_a_draft() {
+        let mut app = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Services::default());
+        let ctx = egui::Context::default();
+        assert!(!app.has_drafts(&ctx));
+        let id = app.run("review.newComment", json!({"text": "Ghi chú"})).unwrap()["id"].as_u64().unwrap() as u32;
+        assert!(!app.has_drafts(&ctx), "a posted comment is in the document");
+        drafts(&mut app).replies.insert(id, "  ".to_string());
+        assert!(!app.has_drafts(&ctx), "a blank reply posts nothing");
+        drafts(&mut app).replies.insert(id, "Đồng ý".to_string());
+        assert!(app.has_drafts(&ctx), "a reply being written");
+        drafts(&mut app).replies.remove(&id);
+        drafts(&mut app).edits.insert(id, "Ghi chú".to_string());
+        assert!(!app.has_drafts(&ctx), "the comment's own text");
+        drafts(&mut app).edits.insert(id, "Ghi chú mới".to_string());
+        assert!(app.has_drafts(&ctx), "an edit being typed");
+    }
 }
