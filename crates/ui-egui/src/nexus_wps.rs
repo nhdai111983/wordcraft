@@ -781,7 +781,8 @@ mod tests {
             a.run("text.insert", serde_json::json!({"text": "Xin chào "})).ok();
         });
         assert!(h.state().session.can_undo());
-        h.get_by_label_contains("Undo").click();
+        // Upstream's Undo has its own History arrow beside it (#701): the button by its name.
+        h.get_by_label("Undo Typing").click();
         h.run_steps(4);
         assert!(!h.state().session.can_undo(), "Undo undid the typing");
         h.get_by_label("Redo").click();

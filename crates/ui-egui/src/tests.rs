@@ -7106,7 +7106,7 @@ fn typing_after_inserting_a_table_from_the_grid_goes_into_its_cells() {
         };
         click(&mut h, "Insert");
         click(&mut h, "Add a Table");
-        click(&mut h, "3×3 Table");
+        click(&mut h, "3×3");
         assert!(!egui::Popup::is_any_open(&h.ctx), "wps {wps}: the click closed the menu");
         h.event(egui::Event::Text("Số tiền".into()));
         h.step();

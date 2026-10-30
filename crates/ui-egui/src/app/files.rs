@@ -253,6 +253,12 @@ impl WordApp {
         if last {
             self.no_document = Some(self.session.document_id());
             self.session.release_untitled_name();
+            // NexusOffice: embedded, the window is a tab of the NexusOffice window; closing its
+            // document closes the tab (the host reads `quit_requested`), as before upstream kept
+            // an empty window open (#1712).
+            if self.embedded {
+                self.quit_requested = true;
+            }
         }
         // The window that stays leaves the File page; another window that came forward keeps
         // its own.

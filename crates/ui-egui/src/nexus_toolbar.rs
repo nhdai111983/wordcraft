@@ -402,7 +402,8 @@ mod tests {
         h.get_by_label("Insert").click();
         h.run_steps(6);
         // Each ribbon group is a submenu.
-        h.get_by_label("Tables ⏵").hover();
+        // egui 0.37 names a submenu by its label alone (0.36 added "⏵").
+        h.get_by_label("Tables").hover();
         h.run_steps(6);
         h.get_by_label("Convert Text to Table");
         h.get_by_label("Nexus AI").click();

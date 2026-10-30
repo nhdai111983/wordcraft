@@ -109,6 +109,9 @@ const BAND_MARGIN_PT: f32 = 16.0;
 /// The raster rows (first, count) of band `(y0, y1)` (points) with [`BAND_MARGIN_PT`] around
 /// it, within a raster `height` rows tall at `scale` pixels a point.
 pub(super) fn band_rows((y0, y1): (f32, f32), scale: f32, height: usize) -> Option<(u32, u32)> {
+    if !(y0.is_finite() && y1.is_finite() && scale.is_finite()) {
+        return None;
+    }
     let top = ((y0 - BAND_MARGIN_PT) * scale).floor().max(0.0);
     let bottom = ((y1 + BAND_MARGIN_PT) * scale).ceil().min(height as f32);
     (top.is_finite() && bottom.is_finite() && bottom > top).then_some((top as u32, (bottom - top) as u32))
