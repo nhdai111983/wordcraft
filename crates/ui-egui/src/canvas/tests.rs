@@ -4798,3 +4798,57 @@ fn the_view_key_changes_when_a_drag_takes_an_object_off_the_page() {
     assert_ne!(hidden, view_key(&app, false, None), "the page without the dragged object is rendered again");
     assert_eq!(hidden, view_key(&app, false, Some(&object)), "the same drag keeps the key: no re-render every frame");
 }
+
+/// NexusOffice: an edit draws again only the band of the page it changed. The page then
+/// shows what drawing it whole would: the old raster with the band drawn again over it is
+/// the new page's raster, at 100 % and 150 %, for typed letters (Vietnamese marks included),
+/// a word and a new paragraph (the band grows to the rest of the page).
+#[test]
+fn a_page_with_its_changed_band_drawn_again_is_the_page_drawn_again() {
+    let mut s = wordcraft_engine::Session::new(wordcraft_engine::sample::sample_document());
+    let opts = screen_render_options();
+    let mut bands = 0;
+    for text in ["Đ", "ữ", " Việt Nam có dấu", "\nDòng mới"] {
+        let doc0 = s.doc.clone();
+        let before = s.layout();
+        s.run("text.insert", &serde_json::json!({ "text": text })).unwrap();
+        let after = s.layout();
+        for (pa, pb) in before.pages.iter().zip(after.pages.iter()) {
+            let (Some(a), Some(b)) = (page_prints(pa), page_prints(pb)) else { continue };
+            let Some(band) = changed_band(&a, &b) else { continue };
+            if pa.w != pb.w || pa.h != pb.h {
+                continue;
+            }
+            for scale in [1.0f32, 1.5] {
+                let mut old = wordcraft_render::render_page(&doc0, pa, scale, &opts);
+                let new = wordcraft_render::render_page(&s.doc, pb, scale, &opts);
+                let Some((y0, h)) = band_rows(band, scale, new.height as usize) else { continue };
+                let part = wordcraft_render::render_band(&s.doc, pb, scale, y0, h, &opts);
+                assert_eq!((part.width, part.height), (new.width, h));
+                let row = new.width as usize * 4;
+                let at = y0 as usize * row;
+                old.pixels[at..at + part.pixels.len()].copy_from_slice(&part.pixels);
+                let off = old.pixels.iter().zip(&new.pixels).filter(|(x, y)| x.abs_diff(**y) > 2).count();
+                assert_eq!(off, 0, "{text:?} at {scale}: {off} channels differ from the page drawn whole (band {band:?})");
+                bands += 1;
+            }
+        }
+    }
+    assert!(bands >= 6, "the edits changed bands of a page: {bands}");
+}
+
+/// The bands found: only items that changed count; a moved line counts where it was and where
+/// it is; nothing changed is no band.
+#[test]
+fn changed_bands_cover_what_changed_and_only_that() {
+    let p = |key, y0, y1| ItemPrint { key, y0, y1 };
+    let before = [p(1, 0.0, 10.0), p(2, 10.0, 20.0), p(3, 20.0, 30.0)];
+    assert_eq!(changed_band(&before, &before), None);
+    let typed = [p(1, 0.0, 10.0), p(9, 10.0, 20.0), p(3, 20.0, 30.0)];
+    assert_eq!(changed_band(&before, &typed), Some((10.0, 20.0)));
+    let pushed = [p(1, 0.0, 10.0), p(9, 10.0, 22.0), p(3, 22.0, 32.0)];
+    assert_eq!(changed_band(&before, &pushed), Some((10.0, 32.0)));
+    assert_eq!(band_rows((10.0, 20.0), 1.0, 1000), Some((0, 36)));
+    assert_eq!(band_rows((100.0, 120.0), 1.5, 1000), Some((126, 54)));
+    assert_eq!(band_rows((f32::NAN, 1.0), 1.0, 100), None);
+}

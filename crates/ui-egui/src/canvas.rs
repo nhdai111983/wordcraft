@@ -59,6 +59,9 @@ use navigation::{scrollbar_page_tip, viewed_page};
 #[cfg(test)]
 use pages::{DRAWING_GRID_MAX_LINES, DRAWING_GRID_MIN_PX};
 pub(crate) use pages::{PageKeys, page_doc, page_screen_scale, preview_sel, screen_render_options};
+#[cfg(test)]
+use pages::ItemPrint;
+use pages::{PagePrints, band_rows, changed_band, page_prints};
 use pages::{
     drawing_grid, drawing_grid_step, gridline_cells, page_image, page_key, page_render_options, shown_layout, texel_aligned_rect, view_key,
     visible_tiles,
@@ -90,6 +93,13 @@ const TEXTURE_KEEP_SCREENS: f32 = 3.0;
 
 pub struct CanvasState {
     textures: HashMap<usize, (u64, TextureHandle)>,
+    /// NexusOffice: what each page texture shows, item by item ([`page_prints`]), with its
+    /// texture key and the view/scale it was drawn at, so an edit redraws only the band of the
+    /// page that changed ([`changed_band`]).
+    prints: HashMap<usize, PagePrints>,
+    /// Whole-page and band renders so far (tests, the performance bench).
+    pub page_renders: u64,
+    pub band_renders: u64,
     /// Visible full-resolution tiles of pages too tall for one GPU texture.
     tiles: HashMap<(usize, usize), (u64, TextureHandle)>,
     /// Page content fingerprints of the current layout, for the texture cache (#811).
@@ -339,6 +349,9 @@ impl Default for CanvasState {
     fn default() -> Self {
         CanvasState {
             textures: HashMap::new(),
+            prints: HashMap::new(),
+            page_renders: 0,
+            band_renders: 0,
             tiles: HashMap::new(),
             page_keys: PageKeys::default(),
             markup_facts: std::cell::Cell::new(None),
@@ -908,16 +921,60 @@ fn paint_pages(pass: PagePaint<'_>) -> PagePaintOutput {
             let mut opts = page_render_options(app, dim_body);
             // Only on the page it is on: the `Pos` can't match an object of another page.
             opts.display.hide_object = hidden.as_ref().filter(|(page, _)| *page == i).map(|(_, p)| p.clone());
-            let img = wordcraft_render::render_page(page_doc(app), page, scale_px, &opts);
-            let ci = page_image(&img);
-            match app.canvas.textures.get_mut(&i) {
-                Some((k, tex)) => {
-                    tex.set(ci, egui::TextureOptions::LINEAR);
+            // NexusOffice: an edit redraws only the band of the page it changed (typing: a line or
+            // a paragraph), not the whole page, when the texture shows the same drawing (view,
+            // scale, size) and every item keeps to a band of its own. Not while a drag hides an
+            // object or Insert › Table previews a table: those draw the page whole.
+            let frame = {
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                (view, scale_px.to_bits(), page.w.to_bits(), page.h.to_bits(), app.session.view.show_markup).hash(&mut h);
+                h.finish()
+            };
+            let prints = page_prints(page);
+            let plain = !forced && app.canvas.table_preview_layout.is_none() && !app.session.view.show_markup;
+            let band = match (app.canvas.textures.get(&i), app.canvas.prints.get(&i), &prints) {
+                (Some((tex_key, tex)), Some(before), Some(after)) if plain && before.tex_key == *tex_key && before.frame == frame => {
+                    let [tw, th] = tex.size();
+                    changed_band(&before.items, after)
+                        .and_then(|b| band_rows(b, scale_px, th))
+                        // A band of more than half the page is drawn as the whole page.
+                        .filter(|(_, h)| (*h as usize).saturating_mul(2) < th && (page.w * scale_px).ceil() as usize == tw)
+                }
+                _ => None,
+            };
+            let mut done = false;
+            if let Some((y0_px, h_px)) = band
+                && let Some((k, tex)) = app.canvas.textures.get_mut(&i)
+            {
+                let img = wordcraft_render::render_band(&app.session.doc, page, scale_px, y0_px, h_px, &opts);
+                if img.width as usize == tex.size()[0] && img.height == h_px {
+                    tex.set_partial([0, y0_px as usize], page_image(&img), egui::TextureOptions::LINEAR);
                     *k = key;
+                    app.canvas.band_renders += 1;
+                    done = true;
+                }
+            }
+            if !done {
+                let img = wordcraft_render::render_page(page_doc(app), page, scale_px, &opts);
+                let ci = page_image(&img);
+                match app.canvas.textures.get_mut(&i) {
+                    Some((k, tex)) => {
+                        tex.set(ci, egui::TextureOptions::LINEAR);
+                        *k = key;
+                    }
+                    None => {
+                        let tex = ui.ctx().load_texture(format!("page{i}"), ci, egui::TextureOptions::LINEAR);
+                        app.canvas.textures.insert(i, (key, tex));
+                    }
+                }
+                app.canvas.page_renders += 1;
+            }
+            match prints {
+                Some(items) => {
+                    app.canvas.prints.insert(i, PagePrints { tex_key: key, frame, items });
                 }
                 None => {
-                    let tex = ui.ctx().load_texture(format!("page{i}"), ci, egui::TextureOptions::LINEAR);
-                    app.canvas.textures.insert(i, (key, tex));
+                    app.canvas.prints.remove(&i);
                 }
             }
             rendered += 1;
@@ -1363,6 +1420,8 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         let clip = ui.clip_rect();
         let near = clip.expand2(vec2(clip.width(), clip.height() * TEXTURE_KEEP_SCREENS));
         app.canvas.textures.retain(|k, _| *k < n && geo.rects.get(*k).is_some_and(|r| r.translate(content_origin.to_vec2()).intersects(near)));
+        let kept: HashSet<usize> = app.canvas.textures.keys().copied().collect();
+        app.canvas.prints.retain(|k, _| kept.contains(k));
         app.canvas.tiles.retain(|id, _| visible_tile_keys.contains(id));
         app.canvas.page_rects = rects.clone();
         let view_rect = ui.clip_rect();

@@ -156,6 +156,7 @@ Sinh bằng `python3 -c "import uuid; print(uuid.uuid4())"` ngày 2026-10-16.
 |---|---|---|
 | `crates/ui-egui/src/i18n/audit.rs` | Test audit i18n: danh sách miễn thêm "Nexus Docs" và "Nexus Docs User" (thay "WordCraft User") (tên creator của tài liệu mẫu hiện ở File › Info, là dữ liệu tài liệu) | Có — nếu tên app là hằng dùng chung |
 | `crates/pdf/src/tests.rs` | Bỏ qua trên Linux test `right_to_left_text_extracts_in_logical_order` (chữ Ả Rập bị lặp glyph với font Linux, đỏ cả trên upstream main); không liên quan thương hiệu, chờ sửa upstream | Không |
+| `crates/ui-egui/src/canvas.rs`, `canvas/pages.rs`, `canvas/tests.rs`, `crates/render/src/lib.rs` (`render_band`), `crates/ui-egui/src/tests/perf.rs` (hiệu năng, nhánh `nx/perf-typing`) | Gõ phím chỉ vẽ lại dải trang đã đổi (`page_prints`/`changed_band`/`band_rows`, `TextureHandle::set_partial`) thay vì cả trang (~7 MB điểm ảnh mỗi phím ở 150 %); trang có nội dung xoay/hiệu ứng, chế độ markup, đang kéo đối tượng, xem trước Chèn › Bảng, hoặc dải > nửa trang vẫn vẽ cả trang; test so dải vẽ lại với trang vẽ lại nguyên | Không — đáng gửi upstream (lợi cho mọi người dùng) |
 
 ## Rà soát gọi mạng (guard §5)
 `rg -n -i "artcraft|storytold|storyteller|discord|telemetry|update|crash|sentry|posthog|https?://" --type rust`:

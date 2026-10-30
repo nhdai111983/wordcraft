@@ -20,6 +20,100 @@ pub(super) fn view_key(app: &WordApp, dim_body: bool, hidden: Option<&Pos>) -> u
     h.finish()
 }
 
+/// NexusOffice: one laid-out item of a page, fingerprinted as [`page_content_key`] does, with the
+/// band of the page (points, top to bottom) it draws in.
+#[derive(Clone, Copy, PartialEq)]
+pub(super) struct ItemPrint {
+    pub(super) key: u64,
+    pub(super) y0: f32,
+    pub(super) y1: f32,
+}
+
+/// What a page texture shows: its key, the drawing it was made with (view, raster scale, page
+/// size) and its items.
+pub(super) struct PagePrints {
+    pub(super) tex_key: u64,
+    pub(super) frame: u64,
+    pub(super) items: Vec<ItemPrint>,
+}
+
+/// The band an item draws in, or `None` when it may draw outside one of its own: turned or
+/// rotated content, shape effects (shadows, glow), and anything unknown.
+fn item_band(it: &Placed) -> Option<(f32, f32)> {
+    let rect = |r: &wordcraft_geom::Rect| Some((r.y, r.y + r.h));
+    let level = |s: &wordcraft_geom::Spin| s.deg.abs() < 1e-3;
+    match it {
+        Placed::Lines { para, l0, l1, y, turn, .. } => {
+            if *turn != wordcraft_doc::props::TextDirection::Horizontal || l1 <= l0 {
+                return None;
+            }
+            let first = para.lines.get(*l0)?;
+            let last = para.lines.get(l1.checked_sub(1)?)?;
+            let h = last.top + last.height - first.top;
+            h.is_finite().then_some((*y, *y + h.max(0.0)))
+        }
+        Placed::Fill { rect: r, .. } => rect(r),
+        Placed::Rule { y0, y1, border, .. } => {
+            let w = border.width.max(0.0) + 1.0;
+            Some((y0.min(*y1) - w, y0.max(*y1) + w))
+        }
+        Placed::Image { rect: r, spin, .. } | Placed::Graphic { rect: r, spin, .. } if level(spin) => rect(r),
+        Placed::Shape { rect: r, spin, effects, .. } if level(spin) && *effects == Default::default() => rect(r),
+        Placed::Clip { rect: r, spin, .. } if level(spin) => rect(r),
+        // Hit-testing areas: nothing is drawn for them.
+        Placed::Cell { .. } | Placed::Object { .. } => Some((0.0, 0.0)),
+        _ => None,
+    }
+}
+
+/// The page's items as prints (body, header and footer, each fingerprinted with its list), or
+/// `None` when one of them has no band of its own ([`item_band`]): such a page is drawn whole.
+pub(super) fn page_prints(page: &Page) -> Option<Vec<ItemPrint>> {
+    let mut out = Vec::new();
+    for (n, list) in [&page.items, &page.header, &page.footer].into_iter().enumerate() {
+        for it in list.iter() {
+            let (y0, y1) = item_band(it)?;
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            n.hash(&mut h);
+            item_hash(it, &mut h);
+            out.push(ItemPrint { key: h.finish(), y0, y1 });
+        }
+    }
+    Some(out)
+}
+
+/// The band of the page (points) an edit changed: where the items that are in only one of the
+/// two drawings lie. `None` when nothing item-wise changed (something else did: draw it whole).
+pub(super) fn changed_band(before: &[ItemPrint], after: &[ItemPrint]) -> Option<(f32, f32)> {
+    let mut count: std::collections::HashMap<(u64, u32, u32), i64> = std::collections::HashMap::new();
+    let id = |p: &ItemPrint| (p.key, p.y0.to_bits(), p.y1.to_bits());
+    for p in before {
+        *count.entry(id(p)).or_default() += 1;
+    }
+    for p in after {
+        *count.entry(id(p)).or_default() -= 1;
+    }
+    let mut band: Option<(f32, f32)> = None;
+    for p in before.iter().chain(after) {
+        if count.get(&id(p)).is_some_and(|c| *c != 0) && p.y1 > p.y0 {
+            band = Some(band.map_or((p.y0, p.y1), |(a, b)| (a.min(p.y0), b.max(p.y1))));
+        }
+    }
+    band
+}
+
+/// Points around a changed band drawn again too: ink reaching past its line (stacked
+/// Vietnamese marks, italic swashes, underlines) is redrawn with it.
+const BAND_MARGIN_PT: f32 = 16.0;
+
+/// The raster rows (first, count) of band `(y0, y1)` (points) with [`BAND_MARGIN_PT`] around
+/// it, within a raster `height` rows tall at `scale` pixels a point.
+pub(super) fn band_rows((y0, y1): (f32, f32), scale: f32, height: usize) -> Option<(u32, u32)> {
+    let top = ((y0 - BAND_MARGIN_PT) * scale).floor().max(0.0);
+    let bottom = ((y1 + BAND_MARGIN_PT) * scale).ceil().min(height as f32);
+    (top.is_finite() && bottom.is_finite() && bottom > top).then(|| (top as u32, (bottom - top) as u32))
+}
+
 /// Fingerprint of a page's laid-out content. A layout never changes once made, so this is
 /// taken once per page and layout ([`PageKeys`]), not every frame.
 fn page_content_key(page: &Page) -> u64 {
@@ -28,27 +122,32 @@ fn page_content_key(page: &Page) -> u64 {
     for list in [&page.items, &page.header, &page.footer] {
         list.len().hash(&mut h);
         for it in list.iter() {
-            match it {
-                Placed::Lines { para, l0, l1, x, y, turn, .. } => {
-                    (std::sync::Arc::as_ptr(para) as usize, l0, l1, x.to_bits(), y.to_bits(), turn).hash(&mut h);
-                }
-                Placed::Fill { rect, color } => format!("{rect:?}{color:?}").hash(&mut h),
-                Placed::Rule { x0, y0, x1, y1, border } => format!("{x0}{y0}{x1}{y1}{border:?}").hash(&mut h),
-                Placed::Image { rect, media, spin, .. } => format!("{rect:?}{media}{spin:?}").hash(&mut h),
-                Placed::Shape { rect, kind, fill, stroke, stroke_width, effects, freeform, spin, extra, .. } => {
-                    format!("{rect:?}{kind:?}{fill:?}{stroke:?}{stroke_width}{effects:?}{spin:?}{extra:?}").hash(&mut h);
-                    freeform.as_ref().map(|f| std::sync::Arc::as_ptr(f) as usize).hash(&mut h);
-                }
-                Placed::Graphic { rect, graphic, spin, .. } => {
-                    (std::sync::Arc::as_ptr(graphic) as usize, rect.x.to_bits(), rect.y.to_bits(), rect.w.to_bits(), rect.h.to_bits()).hash(&mut h);
-                    format!("{spin:?}").hash(&mut h)
-                }
-                Placed::Clip { rect, spin, items } => format!("{rect:?}{spin:?}{items:?}").hash(&mut h),
-                Placed::Cell { .. } | Placed::Object { .. } => {}
-            }
+            item_hash(it, &mut h);
         }
     }
     h.finish()
+}
+
+/// One item's part of [`page_content_key`] (and its [`ItemPrint`]).
+fn item_hash(it: &Placed, h: &mut std::collections::hash_map::DefaultHasher) {
+    match it {
+        Placed::Lines { para, l0, l1, x, y, turn, .. } => {
+            (std::sync::Arc::as_ptr(para) as usize, l0, l1, x.to_bits(), y.to_bits(), turn).hash(h);
+        }
+        Placed::Fill { rect, color } => format!("{rect:?}{color:?}").hash(h),
+        Placed::Rule { x0, y0, x1, y1, border } => format!("{x0}{y0}{x1}{y1}{border:?}").hash(h),
+        Placed::Image { rect, media, spin, .. } => format!("{rect:?}{media}{spin:?}").hash(h),
+        Placed::Shape { rect, kind, fill, stroke, stroke_width, effects, freeform, spin, extra, .. } => {
+            format!("{rect:?}{kind:?}{fill:?}{stroke:?}{stroke_width}{effects:?}{spin:?}{extra:?}").hash(h);
+            freeform.as_ref().map(|f| std::sync::Arc::as_ptr(f) as usize).hash(h);
+        }
+        Placed::Graphic { rect, graphic, spin, .. } => {
+            (std::sync::Arc::as_ptr(graphic) as usize, rect.x.to_bits(), rect.y.to_bits(), rect.w.to_bits(), rect.h.to_bits()).hash(h);
+            format!("{spin:?}").hash(h)
+        }
+        Placed::Clip { rect, spin, items } => format!("{rect:?}{spin:?}{items:?}").hash(h),
+        Placed::Cell { .. } | Placed::Object { .. } => {}
+    }
 }
 
 /// The content fingerprints of one layout's pages, taken when a page is first needed (#811).
