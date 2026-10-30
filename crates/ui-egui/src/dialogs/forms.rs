@@ -330,6 +330,14 @@ pub fn table_grid_picker(ui: &mut Ui, app: &mut WordApp) {
                     egui::Stroke::new(1.0, if on { t.accent } else { t.border_strong }),
                     egui::StrokeKind::Inside,
                 );
+                // NexusOffice: screen readers and scripts find each cell by the size it inserts.
+                resp.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::Role::Button,
+                        true,
+                        crate::i18n::fmt(tl!("{cols}×{rows} Table"), &[("cols", &c.to_string()), ("rows", &r.to_string())]),
+                    )
+                });
                 if resp.hovered() {
                     new_hover = (r, c);
                 }
@@ -346,7 +354,9 @@ pub fn table_grid_picker(ui: &mut Ui, app: &mut WordApp) {
         ui.ctx().request_repaint();
     }
     if let Some((r, c)) = clicked {
-        let _ = app.run("insert.table", json!({"rows": r, "cols": c}));
+        // NexusOffice QC-DOC-01: the caret is in the first cell and typing goes there, as after
+        // every other ribbon command (the click in the menu took the page's keyboard focus).
+        crate::widgets::run_from_ribbon(app, "insert.table", json!({"rows": r, "cols": c}));
         ui.close();
     } else if new_hover.0 > 0 {
         // Word's Live Preview: the page shows the hovered table until a square is clicked.

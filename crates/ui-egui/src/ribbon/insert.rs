@@ -23,7 +23,13 @@ pub(super) fn insert(app: &mut WordApp, ui: &mut Ui) {
             ui.separator();
             mi(ui, app, "Insert Table…", "ui.dialog", json!({"name": "insertTable"}));
             let drawing = app.canvas.table_tool == Some(crate::table_pen::TableTool::Draw);
-            mi_check(ui, app, "Draw Table", drawing, "table.draw", json!({}));
+            // NexusOffice (QC-DOC-14): lined up with the items around it (no check-mark column in
+            // a menu where it is the only toggle); the pen being on shows as the selected state.
+            let enabled = crate::widgets::enabled(app, "table.draw");
+            if ui.add_enabled(enabled, egui::Button::new(tl!("Draw Table")).selected(drawing).min_size(egui::vec2(200.0, 0.0))).clicked() {
+                crate::widgets::run_from_ribbon(app, "table.draw", json!({}));
+                ui.close();
+            }
             mi(ui, app, "Convert Text to Table…", "table.fromText", json!({}));
             ui.menu_button(tl!("Quick Tables"), |ui| {
                 mi(ui, app, "Tabular List", "table.quick", json!({"kind": "tabular"}));
@@ -157,7 +163,8 @@ pub(super) fn insert(app: &mut WordApp, ui: &mut Ui) {
         });
         stack(ui, |ui| {
             small(ui, app, "signature", None, "Signature Line", crate::widgets::ButtonAction::new("insert.signatureLine", json!({}), false));
-            small(ui, app, "dateTime", None, "Date & Time", crate::widgets::ButtonAction::new("insert.dateTime", json!({}), false));
+            // NexusOffice (QC-DOC-03): today's date in the text's language, one format per item.
+            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("dateTime", None, "Date & Time", false, "insert.dateTime"), date_time_items);
             small(ui, app, "object", None, "Object", crate::widgets::ButtonAction::new("insert.object", json!({}), false));
         });
     });
@@ -206,4 +213,18 @@ fn drop_cap_items(ui: &mut Ui, app: &mut WordApp) {
     }
     ui.separator();
     mi(ui, app, "Drop Cap Options…", "ui.dialog", json!({"name": "dropCap"}));
+}
+
+/// Insert › Date & Time: today's date in each format offered for the caret's language (26/10/2026,
+/// "Thứ Hai, 26 tháng 10 năm 2026"… in Vietnamese text); a click inserts that one.
+fn date_time_items(ui: &mut Ui, app: &mut WordApp) {
+    use wordcraft_engine::cmd::insert as ins;
+    let lang = ins::caret_lang(&app.session);
+    for pic in ins::date_formats(lang.as_deref()) {
+        let sample = ins::format_date_in(pic, lang.as_deref());
+        if ui.add(egui::Button::new(sample).min_size(egui::vec2(200.0, 0.0))).clicked() {
+            crate::widgets::run_from_ribbon(app, "insert.dateTime", json!({"format": pic, "lang": lang}));
+            ui.close();
+        }
+    }
 }

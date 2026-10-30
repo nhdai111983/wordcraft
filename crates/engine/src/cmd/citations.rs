@@ -50,7 +50,9 @@ pub fn specs() -> Vec<CommandSpec> {
             r#"{"style": "APA|Chicago|GB/T 7714|GOST (name sort)|GOST (title sort)|Harvard (Anglia)|IEEE|ISO 690 (author-date)|ISO 690 (numerical)|MLA|SIST02|Turabian" (Word's style names work too)}"#,
         ),
         CommandSpec::new("references.bibliography", "Bibliography", "References › Citations & Bibliography", |s, v| {
-            let title = p::str(v, "title").unwrap_or(style(&s.bib_style).bib_title).to_string();
+            // NexusOffice (QC-DOC-04): the default heading in the text's language.
+            let lang = super::insert::caret_lang(s);
+            let title = p::str(v, "title").unwrap_or(crate::nexus_vi::doc_text(lang.as_deref(), style(&s.bib_style).bib_title)).to_string();
             generated_list(s, "BIBLIOGRAPHY", &title)?;
             sel_result(s)
         })

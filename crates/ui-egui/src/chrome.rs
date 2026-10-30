@@ -570,6 +570,8 @@ pub fn status_bar(app: &mut WordApp, ui: &mut Ui) {
                 } else {
                     l.caret_on(&app.session.sel.focus, app.session.page_hint).map(|c| c.page + 1).unwrap_or(1)
                 };
+                // NexusOffice (QC-DOC-13): the platform's own key text (Ctrl+G on Windows).
+                let goto_tip = crate::nexus_vi::with_key(tl!("Go To"), &crate::widgets::shortcut_text(app, "edit.goto"));
                 let st = |ui: &mut Ui, s: &str| {
                     let font = TypeRung::Caption.regular();
                     let track = TypeRung::Caption.tracking();
@@ -580,7 +582,7 @@ pub fn status_bar(app: &mut WordApp, ui: &mut Ui) {
                     resp
                 };
                 if st(ui, &crate::i18n::fmt(tl!("Page {page} of {pages}"), &[("page", &page.to_string()), ("pages", &l.pages.len().to_string())]))
-                    .on_hover_text(tl!("Go To (⌘⌥G)"))
+                    .on_hover_text(goto_tip)
                     .clicked()
                 {
                     let _ = app.run("ui.dialog", json!({"name": "goto"}));

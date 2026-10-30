@@ -102,7 +102,9 @@ impl WordApp {
     /// on any click elsewhere; only a click that left nothing focused counts, so a text field
     /// (font size, zoom, command search) keeps the focus it took, and clicks on a dialog, menu or
     /// popup, or while one is open, leave focus alone. Clicks on the page are the canvas's own.
-    pub(super) fn refocus_after_chrome_click(&mut self, ctx: &egui::Context) {
+    /// NexusOffice (QC-DOC-01): a click on a menu or popup item (Insert › Table's grid, a symbol,
+    /// a bullet) that closed it counts as a click on the chrome, when it left nothing focused.
+    pub(super) fn refocus_after_chrome_click(&mut self, ctx: &egui::Context, popup_at_start: bool) {
         if self.ui.backstage || self.dialog.is_some() || self.colors.is_some() {
             return;
         }
@@ -117,7 +119,9 @@ impl WordApp {
         if !on_focus_ribbon && (self.canvas.balloon.is_some() || self.canvas.viewport.is_some_and(|v| v.contains(pos))) {
             return;
         }
-        let on_chrome = on_focus_ribbon || ctx.layer_id_at(pos).is_none_or(|l| l.order == egui::Order::Background);
+        let layer = ctx.layer_id_at(pos);
+        let closed_a_menu = popup_at_start && layer.is_some_and(|l| l.order == egui::Order::Foreground);
+        let on_chrome = on_focus_ribbon || closed_a_menu || layer.is_none_or(|l| l.order == egui::Order::Background);
         if on_chrome && ctx.memory(|m| m.focused().is_none()) && !egui::Popup::is_any_open(ctx) {
             self.canvas.want_focus = true;
             // The page has already been drawn, so it only sees `want_focus` next frame, and its own

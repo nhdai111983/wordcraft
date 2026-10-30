@@ -39,6 +39,17 @@ const ROWS: &[(&str, &str)] = &[
     ("Indent Right", "Thụt lề phải"),
     ("Spacing Before", "Khoảng cách trước"),
     ("Spacing After", "Khoảng cách sau"),
+    // QC sweep 2026-10-26 (nx/qc-doc-1): no Microsoft product name for the margins preset
+    // (QC-DOC-05), Vietnamese theme and cover names (QC-DOC-06), Auto orientation (QC-DOC-08).
+    ("Office 2003 Default", "Cổ điển"),
+    ("Studio cover", "Bìa đơn giản"),
+    ("Craft", "Cơ bản"),
+    ("Studio", "Xưởng vẽ"),
+    ("Atelier", "Xưởng thủ công"),
+    ("Darkroom", "Phòng tối"),
+    ("Gallery", "Phòng tranh"),
+    ("Sketchbook", "Sổ phác thảo"),
+    ("Auto orientation", "Hướng tự động"),
     // @@NEXUS_VI_MORE@@
 ];
 

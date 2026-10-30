@@ -204,6 +204,18 @@ struct ComboSearch {
     view_h: f32,
 }
 
+/// The accessible name of the combo `id` (NexusOffice, QC-DOC-12), in English.
+fn combo_name(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "size" | "mini_size" | "nexus_size" => "Font Size",
+        "nexus_style" => "Styles",
+        "outlineLevel" => "Outline Level",
+        "outlineShowLevel" => "Show Level",
+        _ if id.ends_with("font") || id.ends_with("asian") => "Font",
+        _ => return None,
+    })
+}
+
 /// Draws an editable or searchable combo box: keeps temporary text and search state, supports
 /// keyboard selection, popup rows with recent and preview sections, an arrow and hint, and
 /// returns the chosen or committed text.
@@ -247,6 +259,10 @@ fn combo_impl(ui: &mut Ui, options: ComboOptions<'_>) -> Option<String> {
         // (#3172). The arrow says whose options it opens, as the split buttons' arrow does.
         if !tip.is_empty() {
             resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, ui.is_enabled(), tip));
+        } else if let Some(name) = combo_name(id) {
+            // NexusOffice (QC-DOC-12): the Nexus layout's combos without a tip are named too.
+            let name = tl!(name);
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, ui.is_enabled(), name));
         }
         keytip_badge(ui, resp.rect, "combo", id);
         focused = resp.has_focus();

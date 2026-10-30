@@ -30,7 +30,9 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
     let st = app.session.run("format.state", &json!({})).unwrap_or_default();
     let flag = |k: &str| st.get(k).and_then(Value::as_bool).unwrap_or(false);
     group(ui, "Clipboard", Some("edit.clipboardPane"), app, |ui, app| {
-        menu_button(ui, app, crate::widgets::MenuButtonOptions::new("paste", Some("Paste"), "Paste (⌘V)", true, "edit.paste"), |ui, app| {
+        // NexusOffice (QC-DOC-13): no hard-coded Mac key ("Paste (⌘V)" on Windows); the menu's
+        // Paste item shows the platform's own key.
+        menu_button(ui, app, crate::widgets::MenuButtonOptions::new("paste", Some("Paste"), "Paste", true, "edit.paste"), |ui, app| {
             mi(ui, app, "Paste", "edit.paste", json!({}));
             mi(ui, app, "Keep Text Only", "edit.pasteText", json!({}));
             mi(ui, app, "Merge Formatting", "edit.pasteMerge", json!({}));
@@ -278,7 +280,8 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
                     crate::widgets::MenuButtonOptions::new("lineSpacing", None, "Line and Paragraph Spacing", false, "para.lineSpacing"),
                     |ui, app| {
                         for v in [1.0, 1.15, 1.5, 2.0, 2.5, 3.0] {
-                            mi(ui, app, &format!("{v}"), "para.lineSpacing", json!({"value": v}));
+                            // NexusOffice (QC-DOC-10): 1,15 with a decimal comma.
+                            mi(ui, app, &crate::nexus_vi::num(v), "para.lineSpacing", json!({"value": v}));
                         }
                         ui.separator();
                         mi(ui, app, "Add Space Before Paragraph", "para.addSpaceBefore", json!({}));

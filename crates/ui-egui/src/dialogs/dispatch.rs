@@ -875,10 +875,10 @@ fn phonetic_dialog(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         combo.response.labelled_by(align_label.id);
         ui.end_row();
         let offset_label = ui.label(tl!("Offset (pt):"));
-        ui.add(egui::DragValue::new(offset).speed(0.5).range(-100.0..=100.0)).labelled_by(offset_label.id);
+        ui.add(crate::nexus_vi::regional(egui::DragValue::new(offset).speed(0.5).range(-100.0..=100.0))).labelled_by(offset_label.id);
         ui.end_row();
         let size_label = ui.label(tl!("Size (pt):"));
-        ui.add(egui::DragValue::new(size).speed(0.5).range(1.0..=200.0)).labelled_by(size_label.id);
+        ui.add(crate::nexus_vi::regional(egui::DragValue::new(size).speed(0.5).range(1.0..=200.0))).labelled_by(size_label.id);
         ui.end_row();
     });
     let mut remove = false;

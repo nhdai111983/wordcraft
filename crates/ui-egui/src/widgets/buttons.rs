@@ -154,7 +154,14 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
         label_line(ui, r.center().x, y, l, regular(11.5), if on { t.text } else { t.text_disabled }, menu && i + 1 == lines.len());
         y += LABEL_PITCH;
     }
-    let resp = tooltip(app, resp, &label.replace('\n', " "), id);
+    let name = label.replace('\n', " ");
+    let resp = tooltip(app, resp, &name, id);
+    // NexusOffice (QC-DOC-12): in the NexusOffice layout the big buttons (Pictures, Comment,
+    // Text Box…) have a name too. Upstream's ribbon leaves them unnamed (its tests find the status
+    // bar's View buttons by the same names).
+    if app.wps {
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, on, &name));
+    }
     command_menu(&resp, app, id);
     if resp.clicked() && on && !menu {
         run_from_ribbon(app, id, params);

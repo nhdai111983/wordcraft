@@ -206,8 +206,13 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
             let name = wordcraft_layout::fields::field_name(instr);
             match name.as_str() {
                 "DATE" | "TIME" | "CREATEDATE" | "SAVEDATE" | "PRINTDATE" => {
-                    let pic = date_picture(instr).unwrap_or_else(|| if name == "TIME" { "h:mm am/pm".into() } else { "M/d/yyyy".into() });
-                    updates.push((k, text_result(instr, crate::cmd::insert::format_date(&pic))));
+                    // NexusOffice (QC-DOC-03): names, and the picture a field without one gets, in
+                    // the document's language.
+                    let lang = crate::cmd::default_lang(s);
+                    let pic = date_picture(instr).unwrap_or_else(|| {
+                        if name == "TIME" { "h:mm am/pm".into() } else { crate::cmd::insert::default_date_picture(lang.as_deref()).into() }
+                    });
+                    updates.push((k, text_result(instr, crate::cmd::insert::format_date_in(&pic, lang.as_deref()))));
                 }
                 "REF" | "PAGEREF" => {
                     let f = FieldCode::parse(instr);
@@ -288,6 +293,7 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
 /// (`fields.updateAll`) and not on open, again as Word does. A field carrying `w:fldLock` keeps
 /// its stored result, which is what the lock is for.
 pub fn refresh_date_fields(doc: &mut wordcraft_doc::Document) {
+    let lang = crate::cmd::doc_lang(doc);
     let stories: Vec<StoryRef> = std::iter::once(StoryRef::Body).chain(doc.parts.keys().copied().map(StoryRef::Part)).collect();
     for story in stories {
         for path in doc.para_paths(story) {
@@ -300,8 +306,11 @@ pub fn refresh_date_fields(doc: &mut wordcraft_doc::Document) {
                     continue;
                 }
                 // Word's default picture when the code carries no `\@` switch.
-                let pic = date_picture(instr).unwrap_or_else(|| if name == "TIME" { "h:mm am/pm".into() } else { "M/d/yyyy".into() });
-                updates.push((k, text_result(instr, crate::cmd::insert::format_date(&pic))));
+                let pic = date_picture(instr).unwrap_or_else(|| {
+                    if name == "TIME" { "h:mm am/pm".into() } else { crate::cmd::insert::default_date_picture(lang.as_deref()).into() }
+                });
+                // NexusOffice (QC-DOC-03): names in the document's language.
+                updates.push((k, text_result(instr, crate::cmd::insert::format_date_in(&pic, lang.as_deref()))));
             }
             if updates.is_empty() {
                 continue;

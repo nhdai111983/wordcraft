@@ -421,6 +421,9 @@ pub fn restore_placeholder(s: &mut Session) -> Result<(), CmdError> {
 
 fn insert(s: &mut Session, v: &Value, kind: ControlKind) -> CmdResult {
     let mut ctl = ContentControl::new(kind);
+    // NexusOffice (QC-DOC-04): the placeholder in the text's language ("Chọn ngày.").
+    let lang = super::insert::caret_lang(s);
+    ctl.placeholder_text = crate::nexus_vi::doc_text(lang.as_deref(), &ctl.placeholder_text).to_string();
     ctl.id = Some(new_id(s));
     if let Some(t) = short(v, "title") {
         ctl.title = t;

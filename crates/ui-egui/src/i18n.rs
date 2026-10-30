@@ -35,7 +35,7 @@
 //! - [`fmt_plain`]: [`fmt`] without bidi isolate marks, for text that goes into the document.
 
 pub mod brand;
-mod nexus_vi;
+mod nexus_catalog;
 
 pub use brand::{brand, nexus_text};
 use std::cell::Cell;
@@ -328,9 +328,9 @@ pub fn has(lang: Lang, s: &str) -> bool {
     nexus_overlay(lang, s).is_some() || lang.i18n().get(lang.lang, "", s).is_some()
 }
 
-/// NexusOffice: the Nexus Vietnamese for `s` ([`nexus_vi`]) when `lang` is Vietnamese.
+/// NexusOffice: the Nexus Vietnamese for `s` ([`nexus_catalog`]) when `lang` is Vietnamese.
 fn nexus_overlay(lang: Lang, s: &str) -> Option<&'static str> {
-    if lang.code() == "vi" { nexus_vi::get(s) } else { None }
+    if lang.code() == "vi" { nexus_catalog::get(s) } else { None }
 }
 
 /// NexusOffice: is `s` an interface string (a catalog key)? Checked in the current language and
@@ -413,7 +413,7 @@ pub fn tr(lang: Lang, s: &str) -> &str {
     if pseudo::on() {
         return I18N.t(craft_i18n::Lang::PSEUDO, s);
     }
-    // NexusOffice: the Nexus Vietnamese rows ([`nexus_vi`]) come before craft-i18n's.
+    // NexusOffice: the Nexus Vietnamese rows ([`nexus_catalog`]) come before craft-i18n's.
     if let Some(v) = nexus_overlay(lang, s) {
         return v;
     }

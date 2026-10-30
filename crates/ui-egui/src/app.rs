@@ -26,7 +26,9 @@ impl WordApp {
     /// Creates the app: adopts the system locale, then initializes the document session, UI state,
     /// services, printing, canvas, dialogs, previews, control and screenshot state, font and theme
     /// tracking.
-    pub fn new(session: Session, services: Services) -> Self {
+    pub fn new(mut session: Session, services: Services) -> Self {
+        // NexusOffice (QC-CHUNG-05): comments and tracked changes are by the computer's user.
+        crate::nexus_vi::os_author(&mut session);
         // Numeral › System follows the system locale, found here rather than in layout.
         if let Some(tag) = sys_locale::get_locale() {
             wordcraft_engine::set_system_locale(&tag);
@@ -129,6 +131,8 @@ impl WordApp {
             desktop_theme: desktop_theme::DesktopTheme::default(),
             desktop_dark: None,
             applied_editing: None,
+            nexus_host_region: None,
+            nexus_region_set: None,
             system_animations: None,
             applied_animations: None,
             frame_ms: 0.0,
@@ -238,6 +242,7 @@ impl WordApp {
             self.session.set_editing_language(editing.as_deref());
             self.applied_editing = Some((lang, editing));
         }
+        crate::nexus_vi::sync_region(self, lang.code());
         options::sync(self);
         self.settle_async_saves();
         // Chinese text wants the Chinese face before the Japanese one (one glyph style per line).
@@ -438,9 +443,11 @@ impl WordApp {
         // NexusOffice: a click that closed the Backstage (its Back button) belongs to it, not to
         // the chrome under it (see `refocus_after_chrome_click`).
         let backstage_at_start = self.ui.backstage;
+        // NexusOffice QC-DOC-01: a click on a menu item that closed its menu hands focus back too.
+        let popup_at_start = egui::Popup::is_any_open(&ctx);
         self.paint_window(ui, &ctx, t);
         if !moved(self) {
-            self.show_overlays(ui, &ctx, backstage_at_start);
+            self.show_overlays(ui, &ctx, backstage_at_start, popup_at_start);
         }
         if !moved(self) {
             self.sync_title_and_frame(&ctx, t0);

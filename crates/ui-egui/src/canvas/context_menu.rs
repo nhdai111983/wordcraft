@@ -110,6 +110,18 @@ pub(super) fn context_menu(app: &mut WordApp, ui: &mut Ui) {
     }
     item(ui, app, "Font…", "ui.dialog", json!({"name": "font"}));
     item(ui, app, "Paragraph…", "ui.dialog", json!({"name": "paragraph"}));
+    // NexusOffice (QC-DOC-17): lists and the common styles without going to the ribbon.
+    if app.canvas.context_issue.is_none() && !crate::ribbon::has_picture_selected(&app.session) {
+        item(ui, app, "Bullets", "para.bullets", json!({}));
+        item(ui, app, "Numbering", "para.numbering", json!({}));
+        ui.menu_button(tl!("Styles"), |ui| {
+            for (label, id) in
+                [("Normal", "Normal"), ("Title", "Title"), ("Heading 1", "Heading1"), ("Heading 2", "Heading2"), ("Heading 3", "Heading3")]
+            {
+                item(ui, app, label, "para.style", json!({"style": id}));
+            }
+        });
+    }
     item(ui, app, "Link…", "ui.dialog", json!({"name": "link"}));
     item(ui, app, "New Comment", "review.newComment", json!({}));
     if !wordcraft_engine::cmd::fields::selected(&app.session).is_empty() {

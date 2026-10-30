@@ -354,3 +354,49 @@ fn date_pictures() {
     assert_eq!(date_picture(r#"TIME \@ HH:mm"#).as_deref(), Some("HH:mm"));
     assert_eq!(date_picture("DATE"), None);
 }
+
+/// NexusOffice QC-DOC-03: Vietnamese dates (Monday 26 October 2026, 14:05).
+#[test]
+fn vietnamese_date_pictures() {
+    let f = |pic: &str, lang: Option<&str>| format_date_parts_in(pic, lang, 2026, 10, 26, (14, 5, 9), 20752);
+    let vi = Some("vi-VN");
+    assert_eq!(f("dd/MM/yyyy", vi), "26/10/2026");
+    assert_eq!(f("dddd, d 'tháng' M 'năm' yyyy", vi), "Thứ Hai, 26 tháng 10 năm 2026");
+    assert_eq!(f("'ngày' d 'tháng' M 'năm' yyyy", vi), "ngày 26 tháng 10 năm 2026");
+    assert_eq!(f("ddd dd/MM, MMMM, MMM", vi), "T2 26/10, tháng 10, thg 10");
+    assert_eq!(f("h:mm am/pm", vi), "2:05 CH");
+    assert_eq!(f("HH:mm:ss", vi), "14:05:09");
+    // English is unchanged; quotes are literal there too ('' is a quote).
+    assert_eq!(f("dddd, MMMM d, yyyy", None), "Monday, October 26, 2026");
+    assert_eq!(f("M/d/yyyy h:mm am/pm", Some("en-US")), "10/26/2026 2:05 PM");
+    assert_eq!(f("'Today''s' d", None), "Today's 26");
+    assert_eq!(f("'unclosed d", None), "unclosed d");
+    // "vie" or "video" is not Vietnamese.
+    assert_eq!(f("dddd", Some("vie")), "Monday");
+    for pic in DATE_FORMATS_VI {
+        assert!(!f(pic, vi).contains('\''), "{pic}");
+    }
+    assert_eq!(default_date_picture(vi), "dd/MM/yyyy");
+    assert_eq!(default_date_picture(Some("en-US")), "M/d/yyyy");
+    assert_eq!(date_formats(Some("vi")).first(), Some(&"dd/MM/yyyy"));
+}
+
+/// The command writes the date in the text's language: a Vietnamese document gets dd/MM/yyyy.
+#[test]
+fn date_time_follows_the_text_language() {
+    let today = |lang: Option<&str>| format_date_in(default_date_picture(lang), lang);
+    let mut s = Session::new(wordcraft_doc::Document::new());
+    s.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();
+    s.run("insert.dateTime", &json!({})).unwrap();
+    let text = s.doc.plain_text(StoryRef::Body);
+    // The clock may tick over midnight between the two reads.
+    assert!(text == today(Some("vi-VN")) || text.split('/').map(str::len).collect::<Vec<_>>() == [2, 2, 4], "{text}");
+    let mut e = Session::new(wordcraft_doc::Document::new());
+    e.run("insert.dateTime", &json!({})).unwrap();
+    assert_eq!(e.doc.plain_text(StoryRef::Body).matches('/').count(), 2);
+    // An explicit `lang` wins.
+    let mut x = Session::new(wordcraft_doc::Document::new());
+    x.run("insert.dateTime", &json!({"format": "dddd", "lang": "vi"})).unwrap();
+    let day = x.doc.plain_text(StoryRef::Body);
+    assert!(day.starts_with("Thứ ") || day == "Chủ Nhật", "{day}");
+}

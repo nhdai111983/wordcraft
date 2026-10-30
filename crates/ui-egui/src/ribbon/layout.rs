@@ -18,6 +18,12 @@ pub(super) fn margins_items(ui: &mut Ui, app: &mut WordApp) {
     ] {
         let label = match uniform {
             Some(pt) => crate::i18n::fmt(tl!(l), &[("size", &crate::options::length(pt))]),
+            // NexusOffice (QC-DOC-05): no Microsoft product name in the menu; the preset is named
+            // by what it is (1" top and bottom, 1.25" left and right).
+            None if k == "office2003" => crate::i18n::fmt(
+                crate::i18n::nexus_text("Classic  {size} left and right", "Cổ điển  trái, phải {size}"),
+                &[("size", &crate::options::length(90.0))],
+            ),
             None => l.to_string(),
         };
         // Mirrored margins come from the document as well as from the preset (#1181).

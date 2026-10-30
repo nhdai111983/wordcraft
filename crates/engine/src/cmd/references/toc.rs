@@ -364,7 +364,9 @@ pub(super) fn insert_toc(s: &mut Session, v: &Value) -> CmdResult {
         }
         None => delete_selection(s)?,
     };
-    let title = p::str(v, "title").unwrap_or("Contents").to_string();
+    // NexusOffice (QC-DOC-04): the default heading in the text's language ("Mục lục").
+    let lang = crate::cmd::insert::caret_lang(s);
+    let title = p::str(v, "title").unwrap_or(crate::nexus_vi::doc_text(lang.as_deref(), "Contents")).to_string();
     if at.story != StoryRef::Body || at.path.depth() > 0 {
         return Err(CmdError::Failed("a table of contents goes in the main text".into()));
     }

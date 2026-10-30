@@ -7068,3 +7068,57 @@ fn focus_hides_the_ribbon_and_escape_brings_it_back() {
     h.step();
     assert!(h.state().session.view.read_mode && shown(&h, "Focus"), "Immersive Reader keeps the status bar");
 }
+
+/// NexusOffice QC-DOC-01: Insert › Table, a click on the grid, then typing: the text goes into
+/// the first cell and Tab moves to the next, in the ribbon and in the WPS layout. The click in
+/// the menu took the page's keyboard focus, so the typing was silently lost.
+#[test]
+fn typing_after_inserting_a_table_from_the_grid_goes_into_its_cells() {
+    use egui::accesskit::Role;
+
+    for wps in [false, true] {
+        let mut a = app();
+        a.wps = wps;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut WordApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            a,
+        );
+        for _ in 0..12 {
+            h.step();
+        }
+        // Real pointer clicks, as a mouse makes them: move there, press, release.
+        let click = |h: &mut egui_kittest::Harness<'_, WordApp>, label: &str| {
+            let at = h.get_by_role_and_label(Role::Button, label).rect().center();
+            h.event(egui::Event::PointerMoved(at));
+            h.step();
+            for pressed in [true, false] {
+                h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() });
+                h.step();
+            }
+            // The WPS strip settles its stacks and its "…" fold over a few frames.
+            for _ in 0..8 {
+                h.step();
+            }
+        };
+        click(&mut h, "Insert");
+        click(&mut h, "Add a Table");
+        click(&mut h, "3×3 Table");
+        assert!(!egui::Popup::is_any_open(&h.ctx), "wps {wps}: the click closed the menu");
+        h.event(egui::Event::Text("Số tiền".into()));
+        h.step();
+        h.event(egui::Event::Key { key: egui::Key::Tab, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() });
+        h.step();
+        h.event(egui::Event::Text("1.250.000 ₫".into()));
+        h.step();
+        let doc = &h.state().session.doc;
+        let Some(wordcraft_doc::Block::Table(t)) = doc.body.first().map(|b| &**b) else { panic!("wps {wps}: no table") };
+        assert_eq!((t.rows.len(), t.grid.len()), (3, 3), "wps {wps}");
+        let cell = |c: usize| t.rows[0].cells[c].blocks[0].as_para().map(|p| p.text.clone()).unwrap_or_default();
+        assert_eq!(cell(0), "Số tiền", "wps {wps}: typing went into the first cell");
+        assert_eq!(cell(1), "1.250.000 ₫", "wps {wps}: Tab moved to the next cell");
+    }
+}

@@ -164,6 +164,12 @@ impl<'a> Exempt<'a> {
             names.extend(c.categories.iter().cloned());
             names.extend(c.series.iter().map(|s| s.name.clone()));
         }
+        // NexusOffice: Insert › Date & Time's menu shows today's date in each format: data.
+        for lang in [None, Some("vi-VN")] {
+            for pic in wordcraft_engine::cmd::insert::date_formats(lang) {
+                names.insert(wordcraft_engine::cmd::insert::format_date_in(pic, lang));
+            }
+        }
         for m in crate::credits::MODELS {
             names.extend([m.company, m.model, m.version].map(str::to_string));
         }

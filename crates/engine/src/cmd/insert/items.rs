@@ -42,8 +42,13 @@ pub(super) fn page_number(s: &mut Session, v: &Value) -> CmdResult {
 }
 
 pub(super) fn date_time(s: &mut Session, v: &Value) -> CmdResult {
-    let fmt = p::str(v, "format").unwrap_or("M/d/yyyy");
-    let text = format_date(fmt);
+    // NexusOffice (QC-DOC-03): the date is written in the text's language (the `lang` param, else
+    // the caret's, else the document's): a Vietnamese document gets 26/10/2026 and Vietnamese
+    // names; every other language keeps Word's US default.
+    let lang = p::str(v, "lang").map(str::to_string).or_else(|| caret_lang(s));
+    let lang = lang.as_deref();
+    let fmt = p::str(v, "format").unwrap_or_else(|| default_date_picture(lang));
+    let text = format_date_in(fmt, lang);
     if p::bool(v, "update").unwrap_or(false) {
         let props = s.typing_props();
         let at = delete_selection(s)?;
@@ -59,33 +64,122 @@ pub(super) fn date_time(s: &mut Session, v: &Value) -> CmdResult {
     sel_result(s)
 }
 
+/// The language text typed at the caret is in: its own, else the document's (see
+/// [`crate::cmd::default_lang`]).
+pub fn caret_lang(s: &Session) -> Option<String> {
+    s.typing_props().lang.or_else(|| crate::cmd::default_lang(s))
+}
+
+fn is_vi(lang: Option<&str>) -> bool {
+    crate::nexus_vi::is_vi(lang)
+}
+
+/// Insert › Date & Time's default picture for text in `lang`: `dd/MM/yyyy` in Vietnamese, Word's
+/// US `M/d/yyyy` otherwise.
+pub fn default_date_picture(lang: Option<&str>) -> &'static str {
+    if is_vi(lang) { "dd/MM/yyyy" } else { "M/d/yyyy" }
+}
+
+/// NexusOffice (QC-DOC-03): the date pictures Insert › Date & Time offers for Vietnamese text
+/// (day before month, names written out, 24-hour time). Text in `'…'` is literal.
+pub const DATE_FORMATS_VI: &[&str] = &[
+    "dd/MM/yyyy",
+    "dddd, d 'tháng' M 'năm' yyyy",
+    "'ngày' d 'tháng' M 'năm' yyyy",
+    "d/M/yyyy",
+    "dd/MM/yy",
+    "dd-MM-yyyy",
+    "yyyy-MM-dd",
+    "'tháng' M/yyyy",
+    "dd/MM/yyyy HH:mm",
+    "HH:mm",
+    "HH:mm:ss",
+];
+
+/// The date pictures Insert › Date & Time offers for text in `lang`.
+pub fn date_formats(lang: Option<&str>) -> &'static [&'static str] {
+    if is_vi(lang) {
+        DATE_FORMATS_VI
+    } else {
+        &[
+            "M/d/yyyy",
+            "dddd, MMMM d, yyyy",
+            "MMMM d, yyyy",
+            "M/d/yy",
+            "yyyy-MM-dd",
+            "d-MMM-yy",
+            "d MMMM yyyy",
+            "MMMM yy",
+            "M/d/yyyy h:mm am/pm",
+            "h:mm am/pm",
+            "HH:mm",
+        ]
+    }
+}
+
 /// Format today's date with a Word picture (`M/d/yyyy`, `MMMM d, yyyy`, `yyyy-MM-dd`, `dddd`…).
 pub fn format_date(fmt: &str) -> String {
-    let iso = crate::cmd::now_iso();
+    format_date_in(fmt, None)
+}
+
+/// [`format_date`] with day and month names, and AM/PM, in `lang` (Vietnamese or English).
+pub fn format_date_in(fmt: &str, lang: Option<&str>) -> String {
+    // NexusOffice: the user's local date and time, not UTC.
+    let secs = crate::cmd::now_unix().saturating_add_signed(crate::cmd::local_offset_secs());
+    let iso = crate::cmd::iso_from_unix_secs(secs);
     let y: i64 = iso.get(0..4).and_then(|x| x.parse().ok()).unwrap_or(2026);
     let m: usize = iso.get(5..7).and_then(|x| x.parse().ok()).unwrap_or(1);
     let d: u32 = iso.get(8..10).and_then(|x| x.parse().ok()).unwrap_or(1);
     let hh: u32 = iso.get(11..13).and_then(|x| x.parse().ok()).unwrap_or(0);
     let mm: u32 = iso.get(14..16).and_then(|x| x.parse().ok()).unwrap_or(0);
     let ss: u32 = iso.get(17..19).and_then(|x| x.parse().ok()).unwrap_or(0);
-    format_date_parts(fmt, y, m, d, (hh, mm, ss), (crate::cmd::now_unix() / 86_400) as i64)
+    format_date_parts_in(fmt, lang, y, m, d, (hh, mm, ss), (secs / 86_400) as i64)
 }
 
 /// Format a date and time with a Word picture; `days_since` (days since 1970-01-01) gives the weekday.
-pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, (hh, mm, ss): (u32, u32, u32), days_since: i64) -> String {
+pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, hms: (u32, u32, u32), days_since: i64) -> String {
+    format_date_parts_in(fmt, None, y, m, d, hms, days_since)
+}
+
+/// [`format_date_parts`] with names in `lang`. Vietnamese: `dddd` "Thứ Hai", `ddd` "T2", `MMMM`
+/// "tháng 10", `MMM` "thg 10", AM/PM "SA"/"CH". Text in single quotes is copied as it is
+/// (`'ngày' d` → "ngày 26"); `''` inside is one quote.
+pub fn format_date_parts_in(fmt: &str, lang: Option<&str>, y: i64, m: usize, d: u32, (hh, mm, ss): (u32, u32, u32), days_since: i64) -> String {
     const MONTHS: [&str; 12] =
         ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const DAYS: [&str; 7] = ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"];
+    const VI_DAYS: [&str; 7] = ["Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư"];
+    const VI_DAYS_SHORT: [&str; 7] = ["T5", "T6", "T7", "CN", "T2", "T3", "T4"];
+    let vi = is_vi(lang);
+    let weekday = days_since.rem_euclid(7) as usize;
     let month = MONTHS.get(m.saturating_sub(1)).copied().unwrap_or("January");
-    let day = DAYS.get(days_since.rem_euclid(7) as usize).copied().unwrap_or("Monday");
+    let day = DAYS.get(weekday).copied().unwrap_or("Monday");
+    let (am, pm) = if vi { ("SA", "CH") } else { ("AM", "PM") };
     let mut out = String::new();
     let chars: Vec<char> = fmt.chars().collect();
     let mut i = 0;
     while i < chars.len() {
         let c = chars.get(i).copied().unwrap_or(' ');
+        // `'literal'`: copied as it is, `''` is a quote.
+        if c == '\'' {
+            i += 1;
+            while let Some(&q) = chars.get(i) {
+                i += 1;
+                if q == '\'' {
+                    if chars.get(i) == Some(&'\'') {
+                        out.push('\'');
+                        i += 1;
+                        continue;
+                    }
+                    break;
+                }
+                out.push(q);
+            }
+            continue;
+        }
         // `am/pm` (any case) is one token: AM or PM.
         if chars.get(i..i + 5).is_some_and(|w| w.iter().collect::<String>().eq_ignore_ascii_case("am/pm")) {
-            out.push_str(if hh < 12 { "AM" } else { "PM" });
+            out.push_str(if hh < 12 { am } else { pm });
             i += 5;
             continue;
         }
@@ -94,6 +188,11 @@ pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, (hh, mm, ss): (u32
             n += 1;
         }
         match (c, n) {
+            ('M', 4..) if vi => out.push_str(&format!("tháng {m}")),
+            ('M', 3) if vi => out.push_str(&format!("thg {m}")),
+            ('d' | 'D', 4..) if vi => out.push_str(VI_DAYS.get(weekday).copied().unwrap_or("Thứ Hai")),
+            ('d' | 'D', 3) if vi => out.push_str(VI_DAYS_SHORT.get(weekday).copied().unwrap_or("T2")),
+            ('a' | 'A', _) if vi => out.push_str(if hh < 12 { am } else { pm }),
             ('y' | 'Y', 4..) => out.push_str(&format!("{y:04}")),
             ('y' | 'Y', _) => out.push_str(&format!("{:02}", y % 100)),
             ('M', 4..) => out.push_str(month),

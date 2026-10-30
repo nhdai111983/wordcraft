@@ -48,6 +48,7 @@ pub mod mini_toolbar;
 pub mod nexus;
 pub mod nexus_save_prompt;
 pub mod nexus_toolbar;
+pub mod nexus_vi;
 pub mod nexus_wps;
 pub mod objects;
 pub mod options;
@@ -570,6 +571,10 @@ pub struct WordApp {
     /// The interface language and the editing language the session last got for it
     /// ([`i18n::Lang::editing_lang`], or for English the region's English).
     applied_editing: Option<(i18n::Lang, Option<String>)>,
+    /// NexusOffice (QC-DOC-02, [`nexus_vi::sync_region`]): the region the host gave the session,
+    /// and the one this window last set for the interface language.
+    nexus_host_region: Option<wordcraft_engine::Region>,
+    nexus_region_set: Option<wordcraft_engine::Region>,
     /// What the system last said about its animation effects ([`Services::animations_enabled`]).
     system_animations: Option<bool>,
     /// Whether egui's own animations were last switched on or off ([`theme::apply_animations`]).

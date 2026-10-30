@@ -17,6 +17,8 @@ pub mod keymap;
 pub(crate) mod locale;
 pub mod math_gallery;
 pub(crate) mod prefs;
+pub mod nexus_samples_vi;
+pub mod nexus_vi;
 pub mod print;
 pub mod recovery;
 pub mod ribbon;

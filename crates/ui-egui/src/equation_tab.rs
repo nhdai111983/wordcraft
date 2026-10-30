@@ -238,6 +238,10 @@ pub fn insert_button(ui: &mut Ui, app: &mut WordApp) {
         t.accent,
     );
     crate::widgets::label_line(ui, r.center().x, r.min.y + g.label_y, label, regular(11.5), t.text, true);
+    // NexusOffice (QC-DOC-12): both halves have a name.
+    rt.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+    let more = format!("{label} – {}", crate::i18n::nexus_text("More options", "Tùy chọn khác"));
+    rb.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &more));
     if rt.on_hover_text(tl!("Insert a new equation (Alt+=)")).clicked() {
         let _ = app.run("insert.equation", json!({}));
         app.canvas.want_focus = true;

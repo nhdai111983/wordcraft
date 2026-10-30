@@ -8,6 +8,10 @@ use super::sel_result;
 use crate::{CmdError, CmdResult, CommandSpec, Session, p};
 
 /// Our own themes: (name, heading font, body font, accent colours).
+///
+/// NexusOffice (QC-DOC-06): the fonts are ones Windows installs, with every Vietnamese letter
+/// (upstream named macOS fonts: Helvetica Neue, Palatino, Futura, Avenir Next, Gill Sans, which a
+/// Windows PC doesn't have). Elsewhere they resolve to open substitutes (`wordcraft_fonts::word`).
 pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
     (
         "Craft",
@@ -23,26 +27,26 @@ pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
     ),
     (
         "Gallery",
-        "Helvetica Neue",
-        "Helvetica Neue",
+        "Arial",
+        "Arial",
         [Rgb(0x22, 0x22, 0x22), Rgb(0xE6, 0x39, 0x46), Rgb(0x45, 0x7B, 0x9D), Rgb(0x1D, 0x35, 0x57), Rgb(0xA8, 0xDA, 0xDC), Rgb(0xF4, 0xA2, 0x61)],
     ),
     (
         "Atelier",
-        "Palatino",
-        "Palatino",
+        "Palatino Linotype",
+        "Palatino Linotype",
         [Rgb(0x6D, 0x59, 0x7A), Rgb(0xB5, 0x65, 0x76), Rgb(0xE5, 0x6B, 0x6F), Rgb(0xEA, 0xAC, 0x8B), Rgb(0x35, 0x50, 0x70), Rgb(0x8E, 0x9A, 0xAF)],
     ),
     (
         "Darkroom",
-        "Futura",
-        "Avenir Next",
+        "Segoe UI Semibold",
+        "Segoe UI",
         [Rgb(0x26, 0x46, 0x53), Rgb(0x2A, 0x9D, 0x8F), Rgb(0xE9, 0xC4, 0x6A), Rgb(0xF4, 0xA2, 0x61), Rgb(0xE7, 0x6F, 0x51), Rgb(0x5E, 0x54, 0x8E)],
     ),
     (
         "Sketchbook",
-        "Gill Sans",
-        "Gill Sans",
+        "Tahoma",
+        "Tahoma",
         [Rgb(0x58, 0x81, 0x57), Rgb(0x3A, 0x5A, 0x40), Rgb(0xA3, 0xB1, 0x8A), Rgb(0xDA, 0xD7, 0xCD), Rgb(0x34, 0x4E, 0x41), Rgb(0xBC, 0x6C, 0x25)],
     ),
 ];

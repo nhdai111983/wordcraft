@@ -98,17 +98,19 @@ pub fn body(app: &mut WordApp, ui: &mut Ui, d: &mut InsertDialog) -> bool {
 pub(crate) fn buttons(ui: &mut Ui, ok: &str, cancel: &str, ok_enabled: bool) -> (bool, bool) {
     let mut r = (false, false);
     ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let (okb, cancelb) =
-                crate::dialogs::ok_cancel_responses(ui, |ui| ui.add_enabled(ok_enabled, crate::widgets::primary_button(ui, tl!(ok))), tl!(cancel));
-            if cancelb.clicked() || crate::dialogs::cancel_key_pressed(ui) {
-                r.1 = true;
-            }
-            if okb.clicked() || (ok_enabled && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
-                r.0 = true;
-            }
-        });
+    // NexusOffice (QC-DOC-14): a row exactly as tall as the buttons. A right-to-left layout
+    // inside `horizontal` takes all the height left, so a dialog in a window with room to grow
+    // (SmartArt) stretched to the bottom of the screen with its buttons far below the content.
+    let row = egui::vec2(ui.available_width(), ui.spacing().interact_size.y.max(24.0));
+    ui.allocate_ui_with_layout(row, egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        let (okb, cancelb) =
+            crate::dialogs::ok_cancel_responses(ui, |ui| ui.add_enabled(ok_enabled, crate::widgets::primary_button(ui, tl!(ok))), tl!(cancel));
+        if cancelb.clicked() || crate::dialogs::cancel_key_pressed(ui) {
+            r.1 = true;
+        }
+        if okb.clicked() || (ok_enabled && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
+            r.0 = true;
+        }
     });
     r
 }
