@@ -1069,3 +1069,212 @@ fn elide_middle_cuts_on_character_boundaries() {
         let _ = elide_middle(p, k);
     }
 }
+
+/// A profile folder holding one recovery copy per `(name, text)`, like a crashed earlier
+/// session's, and a window with recovery on in the WPS layout (embedded, as in the
+/// NexusOffice window) in `lang`.
+#[cfg(not(target_arch = "wasm32"))]
+fn wps_recovery(lang: &str, size: (f32, f32), drafts: &[(&str, &str)]) -> (egui_kittest::Harness<'static, WordApp>, std::path::PathBuf) {
+    let root = std::env::temp_dir().join(format!(
+        "wordcraft-recovery-wps-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+    ));
+    for (i, (name, text)) in drafts.iter().enumerate() {
+        let id = format!("{i:032x}");
+        let dir = root.join(&id);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("snapshot-00000000000000000001.json"),
+            serde_json::to_vec(&json!({
+                "version": 1, "generation": 1, "info": {"id": id, "name": name, "savedAt": format!("2026-10-11T10:4{i}:00Z")},
+                "document": wordcraft_doc::Document::from_text(text)
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+    let mut app = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Services::default());
+    app.wps = true;
+    app.embedded = true;
+    app.ui.language = lang.into();
+    app.session.enable_recovery(root.clone(), std::sync::Arc::new(|| {})).unwrap();
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(size.0, size.1)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    settle_recovery(&mut h);
+    (h, root)
+}
+
+/// Perceived brightness (0–255) of a pixel at `p` (points) of `img`.
+fn brightness(img: &image::RgbaImage, ppp: f32, p: egui::Pos2) -> u32 {
+    let px = img.get_pixel((p.x * ppp) as u32, (p.y * ppp) as u32).0;
+    (u32::from(px[0]) * 3 + u32::from(px[1]) * 6 + u32::from(px[2])) / 10
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+/// Every text drawn in the last frame with where it was drawn and whether egui shortened it.
+fn drawn_texts(h: &egui_kittest::Harness<'_, WordApp>) -> Vec<(String, egui::Rect, bool)> {
+    fn walk(shape: &egui::Shape, out: &mut Vec<(String, egui::Rect, bool)>) {
+        match shape {
+            egui::Shape::Text(t) => out.push((t.galley.text().to_string(), t.galley.rect.translate(t.pos.to_vec2()), t.galley.elided)),
+            egui::Shape::Vec(v) => v.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    h.output().shapes.iter().for_each(|c| walk(&c.shape, &mut out));
+    out
+}
+
+/// NexusOffice (Windows test, 2026-10-24): in the WPS layout File opened a Backstage in
+/// upstream's colours (and the Recover page on black). Every page now keeps the window's
+/// chrome: the side menu on the light grey of the title bar, the page white, the open page
+/// tinted, a labelled Back button; with the dark theme, the dark chrome. Upstream's layout
+/// keeps upstream's look.
+#[test]
+fn wps_backstage_uses_the_light_chrome_on_every_page() {
+    for (wps, dark) in [(true, false), (true, true), (false, false)] {
+        let mut a = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("Synthetic text")), Services::default());
+        a.wps = wps;
+        a.embedded = true;
+        if dark {
+            a.run("ui.theme", json!({"value": "dark"})).unwrap();
+        }
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut WordApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            a,
+        );
+        h.run_steps(4);
+        for page in ["home", "new", "open", "info", "recover", "saveAs", "print", "export", "options"] {
+            h.state_mut().run("ui.backstage", json!({"value": true, "page": page})).unwrap();
+            h.run_steps(4);
+            let img = h.render().unwrap();
+            let ppp = h.ctx.pixels_per_point();
+            // Below the side menu's last page, and the page's bottom-right margin.
+            let nav = brightness(&img, ppp, egui::pos2(100.0, 700.0));
+            let content = brightness(&img, ppp, egui::pos2(1420.0, 880.0));
+            match (wps, dark) {
+                (true, false) => {
+                    assert!((215..250).contains(&nav), "{page}: side menu {nav} is the chrome's light grey");
+                    assert!(content > 245, "{page}: page {content} is white");
+                }
+                (true, true) => assert!(nav < 60 && content < 70, "{page}: dark chrome, menu {nav} page {content}"),
+                _ => assert!(nav < 130, "{page}: upstream's side menu {nav} in the app colour or black"),
+            }
+        }
+        if !wps {
+            assert!(h.query_by_label("Back").is_none(), "upstream's back arrow has no label");
+            continue;
+        }
+        // The open page's row is tinted, unlike the rest of the menu.
+        h.state_mut().run("ui.backstage", json!({"value": true, "page": "info"})).unwrap();
+        h.run_steps(4);
+        // The side menu's Info, not the page's heading.
+        let row = h.get_all_by_label("Info").map(|n| n.rect()).min_by(|a, b| a.min.x.total_cmp(&b.min.x)).unwrap();
+        let img = h.render().unwrap();
+        let ppp = h.ctx.pixels_per_point();
+        let open = img.get_pixel(((row.max.x - 14.0) * ppp) as u32, (row.center().y * ppp) as u32).0;
+        let menu = img.get_pixel((100.0 * ppp) as u32, (700.0 * ppp) as u32).0;
+        assert_ne!(open, menu, "the open page stands out");
+        h.get_by_label("Back").click();
+        h.run_steps(4);
+        assert!(!h.state().ui.backstage, "Back returns to the document");
+    }
+}
+
+/// NexusOffice: the Recover page in Vietnamese names a copy without a file "Bản nháp chưa
+/// đặt tên" (it said "Untitled draft"), and its buttons show their whole labels, in Vietnamese
+/// and English, in a wide and a narrow window; in the WPS layout they are light.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn wps_recover_page_is_translated_and_its_buttons_are_whole() {
+    for lang in ["vi", "en"] {
+        for width in [1440.0, 1024.0] {
+            let (mut h, root) = wps_recovery(lang, (width, 900.0), &[("Untitled draft", "Synthetic work")]);
+            assert!(h.state().ui.backstage && h.state().ui.backstage_page == "recover", "start-up opens Recover");
+            h.run_steps(4);
+            if lang == "vi" {
+                assert!(h.query_by_label("Bản nháp chưa đặt tên").is_some(), "the copy's name is translated");
+                assert!(h.query_by_label("Untitled draft").is_none());
+                assert!(h.query_by_label("Khôi phục tài liệu").is_some());
+            }
+            let l = crate::i18n::Lang::from_code(lang).unwrap();
+            let texts = drawn_texts(&h);
+            for label in ["Restore", "Discard…", "Continue without restoring"] {
+                let label = crate::i18n::tr(l, label);
+                let button = h.get_all_by_label(label).map(|n| n.rect()).find(|r| r.min.x > 210.0).unwrap();
+                let drawn = texts.iter().find(|(t, r, _)| t == label && button.expand(0.5).contains_rect(*r));
+                let (_, r, elided) = drawn.unwrap_or_else(|| panic!("{lang} {width}: {label:?} is not drawn whole inside its button {button:?}"));
+                assert!(!elided, "{lang} {width}: {label:?} is shortened");
+                assert!(r.width() + 8.0 <= button.width(), "{lang} {width}: {label:?} has padding");
+            }
+            if width == 1440.0 {
+                let r = h.get_by_label(crate::i18n::tr(l, "Continue without restoring")).rect();
+                let img = h.render().unwrap();
+                let lum = brightness(&img, h.ctx.pixels_per_point(), egui::pos2(r.min.x + 4.0, r.center().y));
+                assert!(lum > 180, "{lang}: the button {lum} is light on the light page");
+            }
+            drop(h);
+            let _ = std::fs::remove_dir_all(root);
+        }
+    }
+}
+
+/// NexusOffice (Windows test): the Recover page listed this window's own copy of the open
+/// document. A restored copy becomes the window's own (its later autosaves go there), so it
+/// leaves the list; copies left by other sessions stay.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn recover_page_leaves_out_the_windows_own_copy() {
+    let (mut h, root) = wps_recovery("en", (1440.0, 900.0), &[("First synthetic draft", "First"), ("Second synthetic draft", "Second")]);
+    assert!(h.query_by_label("First synthetic draft").is_some() && h.query_by_label("Second synthetic draft").is_some());
+    let id = h.state().session.recovery_documents().into_iter().find(|d| d.name == "First synthetic draft").unwrap().id;
+    h.state_mut().run("file.recover", json!({"restore": id})).unwrap();
+    settle_recovery(&mut h);
+    assert_eq!(h.state().session.doc.plain_text(wordcraft_doc::StoryRef::Body), "First");
+    assert_eq!(h.state().session.recovery_current(), Some(id.as_str()), "the restored copy is the window's own");
+    h.state_mut().run("file.recover", json!({})).unwrap();
+    h.run_steps(4);
+    assert_eq!(h.state().ui.backstage_page, "recover");
+    assert!(h.query_by_label("First synthetic draft").is_none(), "the window's own copy isn't offered");
+    assert!(h.query_by_label("Second synthetic draft").is_some(), "another session's copy is");
+    drop(h);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// Start-up opens the Recover page once when an earlier session left copies (upstream's
+/// choice). File afterwards opens Info, not that page again; Recover stays one click away.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn file_opens_info_after_the_start_up_recover_page() {
+    let (mut h, root) = wps_recovery("en", (1440.0, 900.0), &[("Synthetic draft", "Synthetic work")]);
+    assert!(h.state().ui.backstage && h.state().ui.backstage_page == "recover");
+    h.get_by_label("Continue without restoring").click();
+    h.run_steps(4);
+    assert!(!h.state().ui.backstage);
+    h.state_mut().run("ui.tab", json!({"tab": "File"})).unwrap();
+    h.run_steps(4);
+    assert!(h.state().ui.backstage);
+    assert_eq!(h.state().ui.backstage_page, "info", "File opens Info");
+    h.get_by_label("Recover").click();
+    h.run_steps(4);
+    assert_eq!(h.state().ui.backstage_page, "recover");
+    // Leaving with Back and coming back with File: Info again.
+    h.get_by_label("Back").click();
+    h.run_steps(4);
+    h.state_mut().run("ui.tab", json!({"tab": "File"})).unwrap();
+    assert_eq!(h.state().ui.backstage_page, "info");
+    drop(h);
+    let _ = std::fs::remove_dir_all(root);
+}
+

@@ -499,7 +499,7 @@ mod tests {
         assert!(seen.recv_timeout(WAIT).unwrap().get("key").is_none());
     }
 
-    /// NexusOffices: the errors an agent sees name the app as installed (Nexus Docs).
+    /// NexusOffice: the errors an agent sees name the app as installed (Nexus Docs).
     #[test]
     fn errors_name_nexus_docs() {
         // The app refuses the key every time.

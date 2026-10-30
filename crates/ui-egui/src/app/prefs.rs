@@ -41,6 +41,9 @@ impl WordApp {
         if let Some(dark) = self.ui.legacy_dark.take() {
             self.ui.theme = if dark { theme::Appearance::Dark } else { theme::Appearance::Light };
         }
+        // NexusOffice: the user's accent colour (a junk value reads as the app's own colour).
+        theme::set_accent(self.ui.accent.as_deref().and_then(theme::parse_hex));
+        self.applied_theme = None;
         // A `ui.json` from before #822: its interface size was on top of the display scale, so it
         // becomes absolute on the first frame that knows that scale (`logic`). A chosen `uiScale`
         // (the current key) wins; "auto" can't be told from a missing key, so the old size does.

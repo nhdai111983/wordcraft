@@ -36,6 +36,16 @@ impl Session {
         }
         Vec::new()
     }
+    /// NexusOffice: the id of the recovery copy that belongs to the open document (its own
+    /// autosave copy, written by this session), if there is one. A window lists the other copies
+    /// for restoring, never its own.
+    pub fn recovery_current(&self) -> Option<&str> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.recovery.is_some() {
+            return self.recovery_slot.id.as_deref();
+        }
+        None
+    }
     pub fn recovery_ready(&self) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(r) = &self.recovery {

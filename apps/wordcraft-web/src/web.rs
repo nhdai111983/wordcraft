@@ -73,6 +73,8 @@ pub fn start() {
                         bridge.connect(&mut services, inbox.clone(), cc.egui_ctx.clone());
                     }
                     let mut app = WordApp::new(session, services);
+                    // NexusOffice layout in the style of WPS Office (no title bar; tabs and a flat command strip).
+                    app.wps = true;
                     // Pasted pictures wait apart from dropped files: the app inserts one only when the page is the edit target (#1349).
                     app.services.pasted = Some(pasted);
                     app.autosave = false;

@@ -16,7 +16,7 @@ pub fn has_shape_selected(s: &wordcraft_engine::Session) -> bool {
 }
 
 /// Reading controls replace editing tabs entirely. All settings are transient view controls.
-pub(super) fn reading_toolbar(app: &mut WordApp, ui: &mut Ui, t: Tokens) {
+pub(crate) fn reading_toolbar(app: &mut WordApp, ui: &mut Ui, t: Tokens) {
     egui::Panel::top("reading_toolbar")
         .exact_size(46.0)
         .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(12, 6)).stroke(Stroke::new(1.0, t.border)))

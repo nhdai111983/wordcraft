@@ -1,6 +1,6 @@
 #[cfg(test)]
 use super::TALL_GROUPS;
-use super::buttons::{BIG_ICON_Y, BIG_LABEL_Y, CONTENT_H, DROPDOWN, LABEL_H, bg, label_line};
+use super::buttons::{BIG_ICON_Y, BIG_LABEL_Y, CONTENT_H, DROPDOWN, LABEL_H, bg, content_h, label_line};
 use super::{Align2, Rect, Response, Sense, Stroke, Tokens, Ui, WordApp, icons, pos2, regular, vec2};
 
 /// A ribbon group: content, a centred label below and a divider on the right.
@@ -11,7 +11,14 @@ pub fn group(ui: &mut Ui, title: &str, launcher: Option<&str>, app: &mut WordApp
 
 /// A ribbon group whose title is shown as is (a custom group's name, Customize Ribbon).
 pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&str>, app: &mut WordApp, add: impl FnOnce(&mut Ui, &mut WordApp)) {
+    // NexusOffice WPS layout: a group may be left for the "…" menu (or be drawn only there), and
+    // its dialog launcher moves to the group's right-click menu.
+    let Some(slot) = crate::nexus_wps::group_begin(ui) else { return };
+    let (launcher, launcher_menu) = if slot.is_wps() { (None, launcher) } else { (launcher, None) };
+    let group_menu = launcher_menu.map(|cmd| (crate::nexus_wps::group_menu_area(ui, id_title), cmd));
     let t = Tokens::get(ui.ctx());
+    let h = content_h(ui);
+    let titles = crate::nexus::look::GROUP_TITLES;
     let start = ui.cursor().min;
     // #662: the window may be too narrow for the tab; the plan says how this group fits.
     let position = crate::ribbon_fit::position(ui.ctx());
@@ -23,35 +30,42 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
         ui.data_mut(|d| d.remove::<bool>(collapsed_open_id(ui, id_title, position)));
         let label_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(title.to_string(), regular(11.0), t.group_label).size().x);
         let inner = ui.vertical(|ui| {
-            ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
+            if titles {
+                ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
+            }
             crate::ribbon_fit::set_compact(ui.ctx(), level == crate::ribbon_fit::COMPACT);
-            let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), CONTENT_H), egui::Layout::left_to_right(egui::Align::Min), |ui| {
+            let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), h), egui::Layout::left_to_right(egui::Align::Min), |ui| {
                 ui.spacing_mut().item_spacing = vec2(1.0, 1.0);
                 add(ui, app);
             });
             crate::ribbon_fit::end_compact(ui.ctx());
             #[cfg(test)]
-            if content.response.rect.height() > CONTENT_H + 0.5 {
+            if content.response.rect.height() > h + 0.5 {
                 TALL_GROUPS.with(|g| g.borrow_mut().push(format!("{id_title}: {:.1}", content.response.rect.height())));
             }
             #[cfg(not(test))]
             let _ = content;
         });
         let r = inner.response.rect;
-        title_row(
-            ui,
-            Rect::from_min_max(pos2(start.x, start.y + CONTENT_H), pos2(r.max.x, start.y + CONTENT_H + LABEL_H)),
-            id_title,
-            title,
-            launcher,
-            app,
-        );
+        if titles {
+            title_row(ui, Rect::from_min_max(pos2(start.x, start.y + h), pos2(r.max.x, start.y + h + LABEL_H)), id_title, title, launcher, app);
+        } else if let Some(cmd) = launcher {
+            // NexusOffice look: without titles the launcher gets its own narrow column right of
+            // the controls, level with their bottom row.
+            let (col, _) = ui.allocate_exact_size(vec2(13.0, h), Sense::hover());
+            launcher_button(ui, Rect::from_center_size(pos2(col.center().x, col.max.y - 7.0), vec2(11.0, 11.0)), id_title, title, cmd, app);
+        }
     }
     ui.add_space(5.0);
     let x = ui.cursor().min.x;
-    ui.painter().line_segment([pos2(x, start.y + 4.0), pos2(x, start.y + CONTENT_H + LABEL_H - 4.0)], Stroke::new(1.0, t.border));
+    ui.painter().line_segment([pos2(x, start.y + 4.0), pos2(x, start.y + h + LABEL_H - 4.0)], Stroke::new(1.0, t.border));
     ui.add_space(6.0);
+    if let Some((area, cmd)) = group_menu {
+        let r = Rect::from_min_max(start, pos2(x, start.y + h + LABEL_H));
+        crate::nexus_wps::group_menu(ui, area, r, title, cmd, app);
+    }
     crate::ribbon_fit::record(ui.ctx(), id_title, level, ui.cursor().min.x - start.x);
+    crate::nexus_wps::group_end(ui, slot, ui.cursor().min.x - start.x);
 }
 
 /// A group's title row (`r`): the centred title and, with a `launcher`, its dialog launcher.
@@ -60,15 +74,20 @@ fn title_row(ui: &mut Ui, r: Rect, id_title: &str, title: &str, launcher: Option
     let title_y = r.center().y;
     ui.painter().text(pos2(r.center().x, title_y), Align2::CENTER_CENTER, title, regular(11.0), t.group_label);
     if let Some(cmd) = launcher {
-        let lr = Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0));
-        let resp = ui.interact(lr, ui.scope_id().with(("launch", id_title)), Sense::click());
-        if resp.hovered() {
-            ui.painter().rect_filled(lr.expand(2.0), 2.0, t.hover);
-        }
-        icons::paint(ui.painter(), lr, "launcher", t.text_dim, t.accent);
-        if resp.on_hover_text(crate::i18n::fmt(tl!("{group} settings"), &[("group", title)])).clicked() {
-            let _ = app.run(cmd, serde_json::json!({}));
-        }
+        launcher_button(ui, Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0)), id_title, title, cmd, app);
+    }
+}
+
+/// A group's dialog launcher at `lr`.
+fn launcher_button(ui: &mut Ui, lr: Rect, id_title: &str, title: &str, cmd: &str, app: &mut WordApp) {
+    let t = Tokens::get(ui.ctx());
+    let resp = ui.interact(lr, ui.scope_id().with(("launch", id_title)), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(lr.expand(2.0), 2.0, t.hover);
+    }
+    icons::paint(ui.painter(), lr, "launcher", t.text_dim, t.accent);
+    if resp.on_hover_text(crate::i18n::fmt(tl!("{group} settings"), &[("group", title)])).clicked() {
+        let _ = app.run(cmd, serde_json::json!({}));
     }
 }
 

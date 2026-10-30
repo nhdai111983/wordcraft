@@ -1,6 +1,6 @@
 use super::common::{mi, stack};
 use super::language::mi_check;
-use super::{CONTENT_H, Rect, Sense, Stroke, Target, Tokens, Ui, WordApp, big, big_toggle, group, icons, json, menu_button, pos2, split, vec2};
+use super::{Rect, Sense, Stroke, Target, Tokens, Ui, WordApp, big, big_toggle, group, icons, json, menu_button, pos2, split, vec2};
 
 pub(super) fn draw(app: &mut WordApp, ui: &mut Ui) {
     use wordcraft_doc::freeform::InkTool;
@@ -94,7 +94,7 @@ fn update_gallery_pen(app: &mut WordApp, custom: Option<usize>, tool: wordcraft_
 fn gallery_pen(ui: &mut Ui, app: &mut WordApp, i: usize, pen: wordcraft_engine::cmd::draw::CustomPen, active: bool) {
     use wordcraft_doc::freeform::InkTool;
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(34.0, CONTENT_H), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(34.0, crate::widgets::content_h(ui)), Sense::click());
     crate::widgets::bg(ui, r, &resp, active, &t);
     let icon = match pen.kind {
         InkTool::Pen => "pen",

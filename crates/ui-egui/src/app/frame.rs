@@ -1,8 +1,8 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::file_browser;
 use super::{
-    WordApp, backstage, canvas, chrome, colors, content_controls, dialogs, documents, keys, now_ms, panes, read_aloud, ribbon, theme, updates_ui,
-    zotero,
+    WordApp, backstage, canvas, chrome, colors, content_controls, dialogs, documents, keys, nexus_toolbar, nexus_wps, now_ms, panes, read_aloud, ribbon,
+    theme, updates_ui, zotero,
 };
 
 impl WordApp {
@@ -40,8 +40,12 @@ impl WordApp {
             backstage::show(self, ui);
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
-            chrome::title_bar(self, ui);
-            ribbon::show(self, ui);
+            if self.wps {
+                nexus_wps::show(self, ui, true);
+            } else {
+                chrome::title_bar(self, ui);
+                if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
+            }
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
@@ -50,15 +54,27 @@ impl WordApp {
             self.focus_ribbon &= screen == chrome::Screen::Focus;
             if screen != chrome::Screen::Normal {
                 chrome::screen_bar(self, ui, screen);
+            } else if self.wps {
+                // NexusOffice: the WPS layout's top row holds the tabs and their strip.
+                nexus_wps::show(self, ui, true);
+                if moved(self) {
+                    return;
+                }
             } else {
                 chrome::title_bar(self, ui);
                 if moved(self) {
                     return;
                 }
-                ribbon::show(self, ui);
+                if self.toolbar {
+                    nexus_toolbar::show(self, ui);
+                } else {
+                    ribbon::show(self, ui);
+                }
                 if moved(self) {
                     return;
                 }
+            }
+            if screen == chrome::Screen::Normal {
                 chrome::status_bar(self, ui);
                 panes::show(self, ui);
             }
@@ -77,7 +93,7 @@ impl WordApp {
 
     /// Dialogs, panes and other overlays drawn over the window. A command that brings another
     /// window's state in ends the drawing: the rest would be the other window's.
-    pub(super) fn show_overlays(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    pub(super) fn show_overlays(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, backstage_at_start: bool) {
         let window = self.windows.shown();
         let moved = |app: &WordApp| app.windows.shown() != window;
         content_controls::popup(self, ctx);
@@ -99,7 +115,9 @@ impl WordApp {
         if moved(self) {
             return;
         }
-        self.refocus_after_chrome_click(ctx);
+        if !backstage_at_start {
+            self.refocus_after_chrome_click(ctx);
+        }
         if let Some(url) = self.canvas.open_url.take() {
             ctx.open_url(egui::OpenUrl::new_tab(url));
         }
@@ -109,7 +127,7 @@ impl WordApp {
     pub(super) fn sync_title_and_frame(&mut self, ctx: &egui::Context, t0: f64) {
         // With native windows the viewport driver gives the window its title.
         let title = self.window_title();
-        if title != self.sent_title {
+        if title != self.sent_title && !self.embedded {
             if !self.windows.driven() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             }

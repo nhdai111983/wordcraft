@@ -32,6 +32,14 @@ impl WordApp {
         // close, New or Open counts it as a change (#1348). A draft the document refuses is not
         // part of it: saving and exporting go on without it (the refusal stays on the status
         // line), and replacing the document asks Save / Don't Save / Cancel about it.
+        // NexusOffice: the host's tabs take new documents; this one stays as it is.
+        if id == "file.new"
+            && let Some(new) = &self.services.new_document
+        {
+            new(params);
+            self.ui.backstage = false;
+            return Ok(json!({"host": "file.new"}));
+        }
         let refused = if flushes_comment_drafts(id, &params) { panes::flush_comment_drafts(self).err() } else { None };
         if id == "file.recover" && params.as_object().is_none_or(|p| p.is_empty()) {
             self.ui.backstage = true;
@@ -385,7 +393,7 @@ impl WordApp {
         if !self.session.status.is_empty() {
             // Engine messages are English; the catalog translates the ones it knows.
             let s = std::mem::take(&mut self.session.status);
-            // NexusOffices: only a catalog string is looked up (and so branded, `i18n::t`); a
+            // NexusOffice: only a catalog string is looked up (and so branded, `i18n::t`); a
             // status quoting the user's file or font name is shown as it is.
             let s = if i18n::is_catalog_key(&s) { tl!(&s).to_string() } else { s };
             self.status(s);
@@ -502,6 +510,12 @@ impl WordApp {
                 let tab = s("tab").unwrap_or("Home").to_string();
                 if tab == "File" {
                     self.ui.backstage = true;
+                    // NexusOffice: the Recover page opens by itself once, at start-up, when copies
+                    // are left from an earlier session; File afterwards opens Info (Home without a
+                    // document) rather than that page again.
+                    if self.ui.backstage_page == "recover" {
+                        self.ui.backstage_page = if self.has_document() { "info" } else { "home" }.into();
+                    }
                 } else {
                     self.ui.tab = tab;
                     self.ui.backstage = false;
@@ -613,6 +627,26 @@ impl WordApp {
                     }
                 }
                 json!({"theme": self.ui.theme.code(), "dark": self.ui_is_dark()})
+            }
+            "ui.accent" => {
+                // NexusOffice: `#RRGGBB` sets the accent colour, `null` or "" goes back to the
+                // app's own; no value reads it.
+                if let Some(v) = p.get("value") {
+                    let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
+                    match hex.map(theme::parse_hex) {
+                        Some(None) => return Some(Err(format!("unknown colour {v}; use #RRGGBB"))),
+                        Some(Some(c)) => {
+                            self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
+                            theme::set_accent(Some(c));
+                        }
+                        None => {
+                            self.ui.accent = None;
+                            theme::set_accent(None);
+                        }
+                    }
+                    self.applied_theme = None;
+                }
+                json!({"accent": self.ui.accent})
             }
             "ui.interfaceSize" => {
                 // `auto` (the display scale the system reports) or an absolute size in percent,
@@ -741,7 +775,7 @@ impl WordApp {
                 ));
             }
             "ui.discord" => {
-                // NexusOffices: upstream's community (ArtCraft's Discord) is never opened.
+                // NexusOffice: upstream's community (ArtCraft's Discord) is never opened.
                 let Some(url) = crate::nexus::COMMUNITY_URL else { return Some(Err("no community link in this build".into())) };
                 self.canvas.open_url = Some(url.into());
                 json!({})
@@ -1019,6 +1053,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.keytips"
             | "ui.dark"
             | "ui.theme"
+            | "ui.accent"
             | "ui.interfaceSize"
             | "ui.animations"
             | "ui.language"

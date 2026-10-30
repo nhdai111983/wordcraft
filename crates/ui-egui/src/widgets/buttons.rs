@@ -5,8 +5,9 @@ use super::{Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, Tokens
 /// Height of the ribbon content area (without group labels).
 pub const CONTENT_H: f32 = 66.0;
 
-/// Height of the group title row under the content.
-pub const LABEL_H: f32 = 18.0;
+/// Height of the group title row under the content (none in the NexusOffice look, see
+/// [`crate::nexus::look::GROUP_TITLES`]).
+pub const LABEL_H: f32 = if crate::nexus::look::GROUP_TITLES { 18.0 } else { 0.0 };
 
 /// Large buttons: centre of the 32 px icon, top of the first label line, and the pitch and
 /// height of a label line (`regular(11.5)`; a test checks the font's real line height).
@@ -17,6 +18,44 @@ pub const BIG_LABEL_Y: f32 = 36.0;
 pub const LABEL_PITCH: f32 = 13.0;
 
 pub const LABEL_LINE_H: f32 = 14.0;
+
+/// Height of the content in the NexusOffice WPS strip ([`crate::nexus_wps`]): two rows of small
+/// buttons; a large button is a 20 px icon over one label line there.
+pub const COMPACT_H: f32 = 50.0;
+const COMPACT_ICON_Y: f32 = 15.0;
+const COMPACT_ICON: f32 = 20.0;
+const COMPACT_LABEL_Y: f32 = 30.0;
+const _: () = assert!(COMPACT_LABEL_Y + LABEL_LINE_H <= COMPACT_H);
+const _: () = assert!(COMPACT_ICON_Y + COMPACT_ICON / 2.0 <= COMPACT_LABEL_Y);
+
+/// Height of the ribbon content being drawn: [`COMPACT_H`] in the WPS strip, else [`CONTENT_H`].
+pub fn content_h(ui: &Ui) -> f32 {
+    if crate::nexus_wps::compact(ui) { COMPACT_H } else { CONTENT_H }
+}
+
+/// Where a large button draws: icon centre (from the top) and size, the first label line's top,
+/// and whether its label is kept to one line (the WPS strip).
+#[derive(Clone, Copy, Debug)]
+pub struct BigLayout {
+    pub icon_y: f32,
+    pub icon: f32,
+    pub label_y: f32,
+    pub one_line: bool,
+}
+
+/// The large-button geometry for the ribbon being drawn.
+pub fn big_layout(ui: &Ui) -> BigLayout {
+    if crate::nexus_wps::compact(ui) {
+        BigLayout { icon_y: COMPACT_ICON_Y, icon: COMPACT_ICON, label_y: COMPACT_LABEL_Y, one_line: true }
+    } else {
+        BigLayout { icon_y: BIG_ICON_Y, icon: 32.0, label_y: BIG_LABEL_Y, one_line: false }
+    }
+}
+
+/// A large button's label lines: as written, or on one line in the WPS strip.
+fn big_lines(label: &str, one_line: bool) -> Vec<String> {
+    if one_line { vec![label.split('\n').map(str::trim).collect::<Vec<_>>().join(" ")] } else { label.split('\n').map(str::to_string).collect() }
+}
 
 /// Whether a command exists and is enabled.
 pub fn enabled(app: &WordApp, id: &str) -> bool {
@@ -99,18 +138,18 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
     let BigState { menu, checked } = state;
     let label = tl!(label);
     let t = Tokens::get(ui.ctx());
-    let galley_w =
-        label.split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
+    let g = big_layout(ui);
+    let lines = big_lines(label, g.one_line);
+    let galley_w = lines.iter().map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
     let w = (galley_w + 12.0).max(44.0);
-    let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(w, content_h(ui)), Sense::click());
     keytip_badge(ui, r, id, &label.replace('\n', " "));
     let on = enabled(app, id);
     bg(ui, r, &resp, checked, &t);
-    let ic = Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0));
+    let ic = Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon, g.icon));
     let (c, a) = if on { (t.icon, t.accent) } else { (t.text_disabled, t.text_disabled) };
     icons::paint(ui.painter(), ic, icon, c, a);
-    let mut y = r.min.y + BIG_LABEL_Y;
-    let lines: Vec<&str> = label.split('\n').collect();
+    let mut y = r.min.y + g.label_y;
     for (i, l) in lines.iter().enumerate() {
         label_line(ui, r.center().x, y, l, regular(11.5), if on { t.text } else { t.text_disabled }, menu && i + 1 == lines.len());
         y += LABEL_PITCH;
@@ -241,18 +280,16 @@ pub fn menu_button(ui: &mut Ui, app: &mut WordApp, options: MenuButtonOptions<'_
     let on = menu_enabled(app, id);
     let (c, a, text) = if on { (t.icon, t.accent, t.text) } else { (t.text_disabled, t.text_disabled, t.text_disabled) };
     let resp = if big_btn {
-        let galley_w = label
-            .unwrap_or("")
-            .split('\n')
-            .map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x))
-            .fold(0.0, f32::max);
+        let g = big_layout(ui);
+        let lines = big_lines(label.unwrap_or(""), g.one_line);
+        let galley_w =
+            lines.iter().map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
         let w = (galley_w + 22.0).max(44.0);
-        let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
+        let (r, resp) = ui.allocate_exact_size(vec2(w, content_h(ui)), Sense::click());
         keytip_badge(ui, r, "menu", tip);
         bg(ui, r, &resp, false, &t);
-        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0)), icon, c, a);
-        let lines: Vec<&str> = label.unwrap_or("").split('\n').collect();
-        let mut y = r.min.y + BIG_LABEL_Y;
+        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon, g.icon)), icon, c, a);
+        let mut y = r.min.y + g.label_y;
         for (i, l) in lines.iter().enumerate() {
             label_line(ui, r.center().x, y, l, regular(11.5), text, i + 1 == lines.len());
             y += LABEL_PITCH;

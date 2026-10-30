@@ -21,6 +21,99 @@ const PAGES: [(&str, &str, &str); 11] = [
     ("options", "Options", "options"),
 ];
 
+/// The Backstage's colours. Upstream draws the side menu in the theme's `nav` colour with white
+/// text. NexusOffice's WPS layout ([`WordApp::wps`]) keeps the window's own
+/// chrome instead, light or dark with the theme: the side menu on the title bar's grey, the open
+/// page on the accent's tint with an accent bar and accent text, the pages on the ribbon's white
+/// with the body text.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Look {
+    /// The side menu's fill.
+    pub nav: egui::Color32,
+    /// The page's fill.
+    pub page: egui::Color32,
+    pub text: egui::Color32,
+    pub text_off: egui::Color32,
+    /// The open page's row, and its text.
+    pub active: egui::Color32,
+    pub active_text: egui::Color32,
+    pub hover: egui::Color32,
+    /// WPS: the accent bar beside the open page, and the line between the menu and the page.
+    pub bar: Option<egui::Color32>,
+    pub divider: Option<egui::Color32>,
+}
+
+impl Look {
+    pub(crate) fn new(t: &Tokens, wps: bool) -> Self {
+        if wps {
+            return Look {
+                nav: t.title_bar,
+                page: t.ribbon,
+                text: t.text,
+                text_off: t.text_disabled,
+                active: t.checked,
+                active_text: crate::nexus_wps::file_ink(t, t.checked),
+                // The plain hover grey barely shows on the light menu's own grey.
+                hover: if t.dark { t.hover } else { t.pressed },
+                bar: Some(t.accent),
+                divider: Some(t.border),
+            };
+        }
+        Look {
+            nav: t.nav,
+            page: t.ribbon,
+            text: egui::Color32::WHITE,
+            text_off: egui::Color32::from_white_alpha(110),
+            active: egui::Color32::from_white_alpha(46),
+            active_text: egui::Color32::WHITE,
+            hover: egui::Color32::from_white_alpha(26),
+            bar: None,
+            divider: None,
+        }
+    }
+}
+
+/// The side menu's back button (it closes the Backstage). Upstream: a white chevron. WPS: a
+/// bordered "‹ Back" button, so the way back to the document is plain to see.
+fn back_button(ui: &mut Ui, look: &Look, band: Rect, x: f32) -> egui::Response {
+    let id = ui.scope_id().with("backstage_back");
+    if look.bar.is_none() {
+        let c = pos2(x, band.center().y);
+        let resp = ui.interact(Rect::from_center_size(c, vec2(22.0, band.height())), id, Sense::click());
+        icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", look.text, look.text);
+        return resp;
+    }
+    let t = Tokens::get(ui.ctx());
+    let label = tl!("Back");
+    let font = medium(13.5);
+    let tw = ui.painter().layout_no_wrap(label.to_string(), font.clone(), look.text).size().x;
+    let r = Rect::from_min_size(pos2(x - 12.0, band.center().y - 15.0), vec2(12.0 + 16.0 + 6.0 + tw + 14.0, 30.0));
+    let resp = ui.interact(r, id, Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
+    let fill = if resp.hovered() { look.hover } else { t.ribbon };
+    ui.painter().rect(r, 6.0, fill, Stroke::new(1.0, t.border_strong), egui::StrokeKind::Inside);
+    icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(16.0, 16.0)), "chevronLeft", look.text, look.text);
+    ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, label, font, look.text);
+    resp
+}
+
+/// A side-menu row's highlight: upstream fills the row; WPS an inset rounded tint, with the
+/// accent bar on the open page.
+fn paint_row(ui: &Ui, look: &Look, r: Rect, fill: egui::Color32, active: bool) {
+    match look.bar {
+        None => {
+            ui.painter().rect_filled(r, 0.0, fill);
+        }
+        Some(bar) => {
+            let r = Rect::from_min_max(pos2(r.min.x + 8.0, r.min.y + 2.0), pos2(r.max.x - 8.0, r.max.y - 2.0));
+            ui.painter().rect_filled(r, 6.0, fill);
+            if active {
+                ui.painter().rect_filled(Rect::from_min_max(pos2(r.min.x, r.min.y + 8.0), pos2(r.min.x + 3.0, r.max.y - 8.0)), 1.5, bar);
+            }
+        }
+    }
+}
+
 /// The Backstage back chevron's centre on macOS (#1873): beside the traffic lights in a
 /// window (the title bar's content edge), at the plain control inset in full screen, where the
 /// lights aren't docked top-left and the reserved offset would leave dead space.
@@ -33,40 +126,39 @@ fn back_chevron_c(band_min_x: f32, center_y: f32, fullscreen: bool, content_left
 /// and Options pages work, and it handles Back, Escape, Save, Save As and Close routing.
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
+    let look = Look::new(&t, app.wps);
     // No document open (#1129): only the pages that open or create one, and Options.
     let has_document = app.has_document();
     if !has_document && !works_without_document(&app.ui.backstage_page) {
         app.ui.backstage_page = "home".into();
     }
-    let mac = app.integrated_titlebar;
+    // Embedded in the NexusOffice window, the WPS layout has no title bar to share.
+    let mac = app.integrated_titlebar && !(app.wps && app.embedded);
     egui::Panel::left("backstage_nav")
         .exact_size(200.0)
         // Fixed width, as in Word: without this egui shows a resize handle that does nothing (#502).
         .resizable(false)
-        .frame(egui::Frame::NONE.fill(t.nav).inner_margin(egui::Margin { left: 0, right: 0, top: if mac { 0 } else { 12 }, bottom: 12 }))
+        .frame(egui::Frame::NONE.fill(look.nav).inner_margin(egui::Margin { left: 0, right: 0, top: if mac { 0 } else { 12 }, bottom: 12 }))
         .show(ui, |ui| {
+            if let Some(line) = look.divider {
+                let full = ui.max_rect();
+                let x = full.max.x - 0.5;
+                ui.painter().vline(x, (full.min.y - 12.0)..=(full.max.y + 12.0), Stroke::new(1.0, line));
+            }
             let back = if mac {
                 // macOS (#222): the Backstage covers the title bar, so its top band is the title
                 // bar: the back button sits beside the traffic lights, centred with them and as far
                 // from them as the title bar's own controls, and the rest of the band drags the window.
                 let (band, drag) = ui.allocate_exact_size(vec2(200.0, app.mac_titlebar.height), Sense::click_and_drag());
-                if drag.drag_started() {
+                if drag.drag_started() && !app.embedded {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
                 }
                 // The chevron's stroke starts at the content edge.
                 let c = back_chevron_c(band.min.x, band.center().y, app.session.view.full_screen, app.mac_titlebar.content_left);
-                let resp = ui.interact(Rect::from_center_size(c, vec2(22.0, band.height())), ui.scope_id().with("backstage_back"), Sense::click());
-                icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", egui::Color32::WHITE, egui::Color32::WHITE);
-                resp
+                back_button(ui, &look, band, c.x)
             } else {
-                // The hit area is scoped to the chevron, not the whole 200px-wide row (#3041):
-                // the row reads as plain sidebar background next to it, so clicking there must
-                // not also close the File page, same as the macOS chevron fix (#2972) below.
-                let (r, _) = ui.allocate_exact_size(vec2(200.0, 40.0), Sense::hover());
-                let c = pos2(r.min.x + 26.0, r.center().y);
-                let resp = ui.interact(Rect::from_center_size(c, vec2(22.0, r.height())), ui.scope_id().with("backstage_back"), Sense::click());
-                icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", egui::Color32::WHITE, egui::Color32::WHITE);
-                resp
+                let (r, _) = ui.allocate_exact_size(vec2(200.0, if look.bar.is_some() { 44.0 } else { 40.0 }), Sense::hover());
+                back_button(ui, &look, r, r.min.x + 26.0)
             };
             // Escape in the built-in file browser closes only the browser.
             if back.clicked() || (!app.file_dialog_open() && ui.input(|i| i.key_pressed(egui::Key::Escape))) {
@@ -81,11 +173,17 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, on, tl!(label)));
                 let active = app.ui.backstage_page == id;
                 if active {
-                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(46));
+                    paint_row(ui, &look, r, look.active, true);
                 } else if on && resp.hovered() {
-                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
+                    paint_row(ui, &look, r, look.hover, false);
                 }
-                let ink = if on { egui::Color32::WHITE } else { egui::Color32::from_white_alpha(110) };
+                let ink = if !on {
+                    look.text_off
+                } else if active {
+                    look.active_text
+                } else {
+                    look.text
+                };
                 icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 31.0, r.center().y), vec2(18.0, 18.0)), icon, ink, ink);
                 ui.painter().text(
                     pos2(r.min.x + 52.0, r.center().y),
@@ -131,9 +229,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     let (r, resp) = ui.allocate_exact_size(vec2(200.0, 32.0), Sense::click());
                     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!(label)));
                     if resp.hovered() {
-                        ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
+                        paint_row(ui, &look, r, look.hover, false);
                     }
-                    ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, tl!(label), regular(13.0), egui::Color32::WHITE);
+                    ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, tl!(label), regular(13.0), look.text);
                     if resp.clicked() {
                         if id == "discord" {
                             let _ = app.run("ui.discord", json!({}));
@@ -144,7 +242,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 }
             });
         });
-    egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(40, 30))).show(ui, |ui| {
+    egui::CentralPanel::default().frame(egui::Frame::NONE.fill(look.page).inner_margin(egui::Margin::symmetric(40, 30))).show(ui, |ui| {
         // The Print page fills the pane and scrolls its settings and its preview itself (#1156).
         if app.ui.backstage_page == "print" {
             export_page(app, ui);
@@ -164,6 +262,20 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     });
 }
 
+/// The recovery copies a window offers to restore: every copy but the one this session keeps
+/// for its own open document (NexusOffice: that one is seconds old and restoring it would only
+/// replace the document with itself).
+pub(crate) fn recovery_list(app: &WordApp) -> Vec<wordcraft_engine::recovery::RecoveryInfo> {
+    let own = app.session.recovery_current();
+    app.session.recovery_documents().into_iter().filter(|d| Some(d.id.as_str()) != own).collect()
+}
+
+/// A recovery copy's name as shown: the engine names a document without a file "Untitled draft"
+/// in the copy itself, so that name is translated where it is shown.
+pub(crate) fn recovery_name(name: &str) -> String {
+    if name == "Untitled draft" { tl!("Untitled draft").to_string() } else { name.to_string() }
+}
+
 /// Recovery is a separate copy. Leaving this page never discards it.
 fn recovery_page(app: &mut WordApp, ui: &mut Ui) {
     heading(ui, "Recover documents");
@@ -178,7 +290,7 @@ fn recovery_page(app: &mut WordApp, ui: &mut Ui) {
     if !app.session.recovery_ready() {
         ui.label(tl!("Local recovery is unavailable or still loading."));
     }
-    let documents = app.session.recovery_documents();
+    let documents = recovery_list(app);
     if documents.is_empty() && app.session.recovery_ready() {
         ui.label(tl!("No recovery copies."));
     }
@@ -190,10 +302,12 @@ fn recovery_page(app: &mut WordApp, ui: &mut Ui) {
             ui.end_row();
         }
         for doc in documents {
-            ui.label(&doc.name);
+            ui.label(recovery_name(&doc.name));
             ui.label(&doc.saved_at);
             ui.add_enabled_ui(!busy, |ui| {
                 ui.horizontal(|ui| {
+                    // Whole labels: a button never shortens its text to fit the column.
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
                     if ui.button(tl!("Restore")).clicked() {
                         let _ = app.run("file.recover", json!({"restore": doc.id}));
                     }
@@ -207,6 +321,7 @@ fn recovery_page(app: &mut WordApp, ui: &mut Ui) {
     });
     ui.add_space(20.0);
     ui.horizontal(|ui| {
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
         if ui.button(tl!("Continue without restoring")).clicked() {
             let _ = app.run("ui.backstage", json!({"value": false}));
             app.canvas.want_focus = true;

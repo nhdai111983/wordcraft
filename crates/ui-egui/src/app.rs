@@ -99,6 +99,10 @@ impl WordApp {
             printing: Default::default(),
             print_feedback_seen: None,
             integrated_titlebar: false,
+            toolbar: false,
+            wps: false,
+            host_menus: Vec::new(),
+            embedded: false,
             mac_titlebar: chrome::MacTitleBar::default(),
             updates_rt: updates_ui::Runtime::default(),
             control_rx: None,
@@ -317,7 +321,7 @@ impl WordApp {
         }
         if !self.recovery_seen && self.session.recovery_ready() {
             self.recovery_seen = true;
-            if !self.session.recovery_documents().is_empty() && !self.session.dirty {
+            if !backstage::recovery_list(self).is_empty() && !self.session.dirty {
                 self.ui.backstage = true;
                 self.ui.backstage_page = "recover".into();
             }
@@ -429,9 +433,12 @@ impl WordApp {
             backstage::forget_open_error(&ctx);
             backstage::forget_save_as_error(&ctx);
         }
+        // NexusOffice: a click that closed the Backstage (its Back button) belongs to it, not to
+        // the chrome under it (see `refocus_after_chrome_click`).
+        let backstage_at_start = self.ui.backstage;
         self.paint_window(ui, &ctx, t);
         if !moved(self) {
-            self.show_overlays(ui, &ctx);
+            self.show_overlays(ui, &ctx, backstage_at_start);
         }
         if !moved(self) {
             self.sync_title_and_frame(&ctx, t0);

@@ -2583,7 +2583,7 @@ fn every_cut_entry_point_publishes_to_the_clipboard() {
     assert!(via_key.iter().any(|t| t.contains("My unsaved novel")), "key event Cut: {via_key:?} body={:?}", body_text(h.state()));
 }
 
-/// NexusOffices: the status bar shows a file name or other user text as it is. Only catalog
+/// NexusOffice: the status bar shows a file name or other user text as it is. Only catalog
 /// strings are looked up (and so branded), never an engine status quoting the user's file.
 #[test]
 fn status_keeps_the_users_file_name() {
@@ -5271,6 +5271,10 @@ fn interface_theme_resolves_against_the_os_appearance() {
     }
     let mut a = app();
     assert!(a.run("ui.theme", json!({"value": "purple"})).is_err());
+    // NexusOffice accent: junk is refused and changes nothing; null keeps the app's colour.
+    assert!(a.run("ui.accent", json!({"value": "purple"})).is_err());
+    assert_eq!(a.run("ui.accent", json!({"value": null})).unwrap()["accent"], Value::Null);
+    assert_eq!(a.run("ui.accent", json!({})).unwrap()["accent"], Value::Null);
     assert_eq!(a.run("ui.theme", json!({"value": "dark"})).unwrap()["theme"], "dark");
     assert_eq!(a.run("ui.dark", json!({})).unwrap()["theme"], "light", "ui.dark toggles the manual choice");
     assert_eq!(a.run("ui.theme", json!({})).unwrap()["theme"], "light");

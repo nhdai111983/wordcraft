@@ -49,7 +49,7 @@ reason = "Whitelist của test audit i18n (#[cfg(test)])"
 [[allow]]
 path = "crates/ui-egui/src/i18n/brand.rs"
 pattern = '.*'
-reason = "Chính bảng thay thế WordCraft→Nexus Docs, ArtCraft→NexusOffices và test của nó"
+reason = "Chính bảng thay thế WordCraft→Nexus Docs, ArtCraft→NexusOffice và test của nó"
 
 [[allow]]
 path = "{ROADMAP.md,AGENTS.md,CLAUDE.md,packaging/web/README.md,packaging/macos/dmg/README.md}"
@@ -64,12 +64,12 @@ reason = "Mô tả crate nội bộ (publish = false), không hiện cho ngườ
 [[allow]]
 path = ".github/workflows/{release.yml,windows-arm64.yml}"
 pattern = '.*'
-reason = "CI phát hành của upstream (craft-common-actions); NexusOffices phát hành bằng nexus-release.yml (Task 12)"
+reason = "CI phát hành của upstream (craft-common-actions); NexusOffice phát hành bằng nexus-release.yml (Task 12)"
 
 [[allow]]
 path = ".github/workflows/{nexus-ci.yml,nexus-sync.yml}"
 pattern = 'github\.com/storytold/\$UPSTREAM_REPO'
-reason = "Workflow NexusOffices (template trong NexusOffices/templates/workflows) phải lấy upstream để đếm patch và đồng bộ; không phát hành, người dùng không thấy"
+reason = "Workflow NexusOffice (template trong NexusOffices/templates/workflows) phải lấy upstream để đếm patch và đồng bộ; không phát hành, người dùng không thấy"
 
 [[allow]]
 path = "assets/spelling/*-extra.txt"
@@ -106,7 +106,7 @@ reason = "Key catalog (vi.tsv và các catalog khác): trạng thái lên giao d
 
 [[allow]]
 path = "crates/ui-egui/src/nexus.rs"
-pattern = '"(NexusOffices is developed from the open-source apps of ArtCraft[^"]*|NexusOffices được phát triển dựa trên các ứng dụng mã nguồn mở của ArtCraft[^"]*|MIT OR Apache-2\.0\. Copyright \(c\) 2026 ArtCraft Team and the WordCraft contributors\.)"'
+pattern = '"(NexusOffice is developed from the open-source apps of ArtCraft[^"]*|NexusOffice được phát triển dựa trên các ứng dụng mã nguồn mở của ArtCraft[^"]*|MIT OR Apache-2\.0\. Copyright \(c\) 2026 ArtCraft Team and the WordCraft contributors\.)"'
 reason = "Câu ghi công + thông báo bản quyền upstream trong About (giấy phép MIT/Apache, LICENSE-brand.txt cho phép ghi chữ)"
 
 [[allow]]

@@ -26,7 +26,7 @@ pub(super) fn custom_groups(app: &mut WordApp, ui: &mut Ui, groups: &[wordcraft_
 }
 
 /// A large button's label on two lines when it is long (broken at the space nearest the middle).
-fn two_lines(label: &str) -> String {
+pub(crate) fn two_lines(label: &str) -> String {
     let n = label.chars().count();
     if n <= 10 {
         return label.to_string();
@@ -66,6 +66,10 @@ pub(super) fn esc_cancelled(ui: &Ui, r: &egui::Response, id: egui::Id) -> bool {
 }
 
 pub(super) fn stack(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    // NexusOffice WPS strip: two rows, the third control starting a new column.
+    if crate::nexus_wps::compact(ui) {
+        return crate::nexus_wps::compact_stack(ui, add);
+    }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
         add(ui);

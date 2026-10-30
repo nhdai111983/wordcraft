@@ -1,7 +1,7 @@
 use super::arrange::{align_menu, group_menu, rotate_menu, wrap_menu};
 use super::common::{mi, size_menu, stack};
 use super::language::mi_check;
-use super::{MeasureExt, Ui, WordApp, big, group, json, menu_button, small, vec2};
+use super::{MeasureExt, Sense, Tokens, Ui, WordApp, big, group, icons, json, menu_button, small, vec2};
 
 // Layout › Margins, Orientation, Size and Columns: the caret section's setting has a check
 // mark, as Text Direction's does (#1206).
@@ -136,32 +136,52 @@ pub(super) fn layout(app: &mut WordApp, ui: &mut Ui) {
                 ui.label(text);
             });
         };
+        // NexusOffice WPS strip: two rows only, so each field is named by an icon (and its
+        // tooltip) instead of a header row and a label.
+        let compact = crate::nexus_wps::compact(ui);
+        let ink = Tokens::get(ui.ctx());
+        let field_label = |ui: &mut Ui, text: &str, icon: &str, tip: &str, gap: f32| {
+            if compact {
+                ui.horizontal(|ui| {
+                    ui.add_space(gap);
+                    let (r, resp) = ui.allocate_exact_size(vec2(18.0, FIELD.y), Sense::hover());
+                    icons::paint(ui.painter(), r.shrink(1.0), icon, ink.icon, ink.accent);
+                    resp.on_hover_text(tl!(tip));
+                });
+            } else if gap > 0.0 {
+                spaced(ui, egui::RichText::new(tl!(text)).small());
+            } else {
+                ui.label(egui::RichText::new(tl!(text)).small());
+            }
+        };
         egui::Grid::new("layout_para").spacing(vec2(4.0, 1.5)).min_row_height(FIELD.y).show(ui, |ui| {
-            ui.label(egui::RichText::new(tl!("Indent")).small().strong());
-            ui.label("");
-            spaced(ui, egui::RichText::new(tl!("Spacing")).small().strong());
-            ui.end_row();
+            if !compact {
+                ui.label(egui::RichText::new(tl!("Indent")).small().strong());
+                ui.label("");
+                spaced(ui, egui::RichText::new(tl!("Spacing")).small().strong());
+                ui.end_row();
+            }
             // Indents in the File › Options unit.
             let u = crate::options::unit();
             let k = u.pt_per_unit();
             let mut l = rp.indent_left / k;
             let mut b = rp.space_before;
-            ui.label(egui::RichText::new(tl!("Left:")).small());
+            field_label(ui, "Left:", "indentLeft", "Indent Left", 0.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut l).speed(3.6 / k).range(-792.0 / k..=1584.0 / k).measure(u).max_decimals(2)).changed() {
                 let _ = app.run("para.indents", json!({"left": l * k}));
             }
-            spaced(ui, egui::RichText::new(tl!("Before:")).small());
+            field_label(ui, "Before:", "spaceBefore", "Spacing Before", 8.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut b).speed(1.0).range(0.0..=1584.0).suffix(format!(" {}", tl!("pt")))).changed() {
                 let _ = app.run("para.spacing", json!({"before": b}));
             }
             ui.end_row();
             let mut r = rp.indent_right / k;
             let mut a = rp.space_after;
-            ui.label(egui::RichText::new(tl!("Right:")).small());
+            field_label(ui, "Right:", "indentRight", "Indent Right", 0.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut r).speed(3.6 / k).range(-792.0 / k..=1584.0 / k).measure(u).max_decimals(2)).changed() {
                 let _ = app.run("para.indents", json!({"right": r * k}));
             }
-            spaced(ui, egui::RichText::new(tl!("After:")).small());
+            field_label(ui, "After:", "spaceAfter", "Spacing After", 8.0);
             if ui.add_sized(FIELD, egui::DragValue::new(&mut a).speed(1.0).range(0.0..=1584.0).suffix(format!(" {}", tl!("pt")))).changed() {
                 let _ = app.run("para.spacing", json!({"after": a}));
             }

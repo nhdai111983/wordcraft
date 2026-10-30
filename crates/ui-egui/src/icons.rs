@@ -1273,6 +1273,12 @@ fn paint_view_and_tables(pen: &Pen, name: &str) -> bool {
         // A triangle filling most of its box: it is drawn at 9–12 pt beside combos and split
         // buttons, where a smaller one shrank to a dot (#535).
         "dropdown" => pen.fill(&[(3.0, 7.0), (17.0, 7.0), (10.0, 14.0)], c),
+        // NexusOffice WPS layout: the File (Tệp) button's three bars.
+        "hamburger" => {
+            for y in [5.5, 10.0, 14.5] {
+                pen.line_c(&[(3.5, y), (16.5, y)], c);
+            }
+        }
         "more" => {
             for x in [5.0, 10.0, 15.0] {
                 pen.fcircle(x, 10.0, 1.3, c);

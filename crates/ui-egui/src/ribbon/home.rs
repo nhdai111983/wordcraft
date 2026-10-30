@@ -331,6 +331,22 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
         crate::previews::style_gallery(app, ui, &st);
     });
     group(ui, "Editing", None, app, |ui, app| {
+        // NexusOffice WPS layout: Find and Replace and Select as large buttons, as in its mockup.
+        if app.wps {
+            let find_label = super::common::two_lines(tl!("Find and Replace"));
+            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("find", Some(&find_label), "Find and Replace", true, "edit.find"), |ui, app| {
+                mi(ui, app, "Find", "edit.find", json!({}));
+                mi(ui, app, "Replace", "ui.dialog", json!({"name": "replace"}));
+                mi(ui, app, "Advanced Find…", "edit.advancedFind", json!({}));
+                mi(ui, app, "Go To…", "ui.dialog", json!({"name": "goto"}));
+            });
+            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("select", Some("Select"), "Select", true, "select.all"), |ui, app| {
+                mi(ui, app, "Select All", "select.all", json!({}));
+                mi(ui, app, "Select Paragraph", "select.paragraph", json!({}));
+                mi(ui, app, "Select Sentence", "select.sentence", json!({}));
+            });
+            return;
+        }
         stack(ui, |ui| {
             menu_button(ui, app, crate::widgets::MenuButtonOptions::new("find", Some("Find"), "Find", false, "edit.find"), |ui, app| {
                 // As in Word: Find searches in the Navigation pane; Advanced Find is the dialog (#712).

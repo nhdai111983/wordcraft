@@ -1,9 +1,9 @@
-//! NexusOffices: the product names the interface shows.
+//! NexusOffice: the product names the interface shows.
 //!
 //! Upstream's English source strings (the catalog keys) and their translations say "WordCraft"
 //! and "ArtCraft". Rather than rewrite thousands of keys in 23 catalogs, every lookup
 //! ([`super::t`], [`super::tc`], which `tl!` uses) passes its result through [`brand`] once, so every language,
-//! English included, shows Nexus Docs / NexusOffices. Keys, command ids, file keys
+//! English included, shows Nexus Docs / NexusOffice. Keys, command ids, file keys
 //! (`wordcraft:*`) and `WORDCRAFT_*` variables are untouched: only `WordCraft` and `ArtCraft`
 //! spelled exactly so are replaced, plus the CLI's command name where an interface string quotes
 //! it as a command (`` `wordcraft-cli `` → `` `nexus-docs-cli ``, the installed binary's name).
@@ -16,10 +16,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-/// Upstream name → the name NexusOffices shows, in the order they are replaced. The command name
+/// Upstream name → the name NexusOffice shows, in the order they are replaced. The command name
 /// is matched only as quoted code (a backtick, then `wordcraft-cli `), as in Options › Agent
 /// control, so identifiers (`wordcraft_engine`, a bare `wordcraft-cli`) are never touched.
-const NAMES: [(&str, &str); 3] = [("WordCraft", "Nexus Docs"), ("ArtCraft", "NexusOffices"), ("`wordcraft-cli ", "`nexus-docs-cli ")];
+const NAMES: [(&str, &str); 3] = [("WordCraft", "Nexus Docs"), ("ArtCraft", "NexusOffice"), ("`wordcraft-cli ", "`nexus-docs-cli ")];
 
 /// At most this many distinct branded strings are kept ([`branded`]). Interface strings number in
 /// the low hundreds; the cap only bounds memory if something unexpected (a document's text) were
@@ -27,7 +27,7 @@ const NAMES: [(&str, &str); 3] = [("WordCraft", "Nexus Docs"), ("ArtCraft", "Nex
 const MAX_INTERNED: usize = 4096;
 
 /// `s` with the upstream product names replaced (`WordCraft` → `Nexus Docs`, `ArtCraft` →
-/// `NexusOffices`). Strings without them come back borrowed, without allocating.
+/// `NexusOffice`). Strings without them come back borrowed, without allocating.
 pub fn brand(s: &str) -> Cow<'_, str> {
     if !NAMES.iter().any(|(from, _)| s.contains(from)) {
         return Cow::Borrowed(s);
@@ -62,7 +62,7 @@ pub(super) fn branded(s: &str) -> &str {
     leaked
 }
 
-/// Text NexusOffices adds to the interface (the About page), written in English and Vietnamese
+/// Text NexusOffice adds to the interface (the About page), written in English and Vietnamese
 /// only: `vi` gets `vi`, every other language `en`. Deliberately not a catalog key, so neither
 /// branded nor asked of the other catalogs (upstream's complete-catalog checks).
 pub fn nexus_text<'a>(en: &'a str, vi: &'a str) -> &'a str {
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn brand_substitutes_product_names() {
         assert_eq!(brand("About WordCraft"), "About Nexus Docs");
-        assert_eq!(brand("Join the ArtCraft community"), "Join the NexusOffices community");
+        assert_eq!(brand("Join the ArtCraft community"), "Join the NexusOffice community");
         assert_eq!(brand("Giới thiệu về WordCraft"), "Giới thiệu về Nexus Docs");
         assert!(matches!(brand("Giới thiệu"), Cow::Borrowed("Giới thiệu")));
         // Identifiers and variables keep upstream's spelling.

@@ -35,6 +35,7 @@
 //! - [`fmt_plain`]: [`fmt`] without bidi isolate marks, for text that goes into the document.
 
 pub mod brand;
+mod nexus_vi;
 
 pub use brand::{brand, nexus_text};
 use std::cell::Cell;
@@ -324,20 +325,25 @@ pub fn current() -> Lang {
 
 /// Does `lang` have a translation for this string? (English never does: it is the source.)
 pub fn has(lang: Lang, s: &str) -> bool {
-    lang.i18n().get(lang.lang, "", s).is_some()
+    nexus_overlay(lang, s).is_some() || lang.i18n().get(lang.lang, "", s).is_some()
 }
 
-/// NexusOffices: is `s` an interface string (a catalog key)? Checked in the current language and
+/// NexusOffice: the Nexus Vietnamese for `s` ([`nexus_vi`]) when `lang` is Vietnamese.
+fn nexus_overlay(lang: Lang, s: &str) -> Option<&'static str> {
+    if lang.code() == "vi" { nexus_vi::get(s) } else { None }
+}
+
+/// NexusOffice: is `s` an interface string (a catalog key)? Checked in the current language and
 /// in Vietnamese, the fork's fullest catalog (English has no entries: it is the source). Text
 /// that isn't, such as an engine status quoting a file name, is shown without [`t`]'s branding.
 pub fn is_catalog_key(s: &str) -> bool {
     has(current(), s) || Lang::from_code("vi").is_some_and(|vi| has(vi, s))
 }
 
-/// `s` in the current language ([`tr`] with [`current`]), with NexusOffices' product names
+/// `s` in the current language ([`tr`] with [`current`]), with NexusOffice' product names
 /// ([`brand`]).
 ///
-/// Invariant (NexusOffices): never pass document or other user text (file names, document text,
+/// Invariant (NexusOffice): never pass document or other user text (file names, document text,
 /// custom style or caption names, comment authors) to `t`, [`tc`] or `tl!`: what they return goes
 /// through [`brand`], which renames the product in interface strings only. Show user text as it
 /// is, or look it up with [`tr`], which is not branded.
@@ -357,6 +363,13 @@ pub fn trc<'a>(lang: Lang, context: &str, s: &'a str) -> &'a str {
     #[cfg(test)]
     if pseudo::on() {
         return I18N.tc(craft_i18n::Lang::PSEUDO, context, s);
+    }
+    // NexusOffice: a context's own row wins; otherwise the Nexus Vietnamese before the plain row.
+    if let Some(v) = lang.i18n().get(lang.lang, context, s) {
+        return v;
+    }
+    if let Some(v) = nexus_overlay(lang, s) {
+        return v;
     }
     lang.i18n().tc(lang.lang, context, s)
 }
@@ -392,13 +405,17 @@ pub fn lowercase(s: &str) -> String {
     out
 }
 
-/// `s` in `lang`; strings without a translation come back unchanged. Not branded (NexusOffices):
+/// `s` in `lang`; strings without a translation come back unchanged. Not branded (NexusOffice):
 /// upstream's catalog tests compare its result with the catalogs, and About's attribution keeps
 /// the upstream names; interface strings are shown through [`t`] / `tl!`.
 pub fn tr(lang: Lang, s: &str) -> &str {
     #[cfg(test)]
     if pseudo::on() {
         return I18N.t(craft_i18n::Lang::PSEUDO, s);
+    }
+    // NexusOffice: the Nexus Vietnamese rows ([`nexus_vi`]) come before craft-i18n's.
+    if let Some(v) = nexus_overlay(lang, s) {
+        return v;
     }
     lang.i18n().t(lang.lang, s)
 }

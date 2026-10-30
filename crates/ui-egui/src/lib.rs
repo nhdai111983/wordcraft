@@ -46,6 +46,8 @@ pub mod keytips;
 mod local_time;
 pub mod mini_toolbar;
 pub mod nexus;
+pub mod nexus_toolbar;
+pub mod nexus_wps;
 pub mod objects;
 pub mod options;
 pub mod panes;
@@ -155,6 +157,9 @@ pub struct UiState {
     pub recent_fonts: Vec<String>,
     /// Interface theme: light, dark, or follow the OS appearance (#115).
     pub theme: theme::Appearance,
+    /// NexusOffice: the accent colour the user picked (`#RRGGBB`); `None` = the app's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
     /// Interface size (#475, #822): Auto (the display scale the system reports) or an absolute
     /// size in percent. Junk saved values read as Auto; out-of-range ones are clamped to 50–300 %.
     #[serde(rename = "uiScale")]
@@ -303,6 +308,7 @@ impl Default for UiState {
             recent_colors: Vec::new(),
             recent_fonts: Vec::new(),
             theme: theme::Appearance::default(),
+            accent: None,
             interface_size: theme::InterfaceSize::default(),
             legacy_interface_size: None,
             animations: theme::Animations::default(),
@@ -482,6 +488,21 @@ pub struct WordApp {
     pub(crate) dialog_pick: Option<String>,
     /// macOS: the window has no title bar; leave room for the traffic lights.
     pub integrated_titlebar: bool,
+    /// NexusOffice layout: a menu bar and one tool row instead of the ribbon
+    /// ([`nexus_toolbar`]). The Nexus apps turn it on; off keeps upstream's ribbon.
+    pub toolbar: bool,
+    /// NexusOffice layout in the style of WPS Office ([`nexus_wps`]): no title bar; one row with
+    /// File, the Quick Access Toolbar, the ribbon tabs, the save state, Search, Comments and Share;
+    /// under it the current tab's groups as one flat strip whose trailing groups fold into a "…"
+    /// menu. Wins over [`toolbar`](Self::toolbar). Off keeps upstream's title bar and ribbon.
+    pub wps: bool,
+    /// Menus a host program adds to the menu bar after the app's own (the NexusOffice window adds
+    /// its "Nexus AI" menu this way): `(title, contents)`. Empty in the stand-alone app.
+    pub host_menus: Vec<(String, Box<dyn FnMut(&mut egui::Ui)>)>,
+    /// Drawn inside another program's window (a tab of the NexusOffice window): the app leaves
+    /// the window alone (no title, no dragging or maximizing it from the title bar); the host
+    /// names its tabs. Off in the stand-alone app.
+    pub embedded: bool,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     /// Focus (#1678): the ribbon is dropped down from the Focus bar, over the page.

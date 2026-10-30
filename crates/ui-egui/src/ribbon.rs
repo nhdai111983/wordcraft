@@ -64,7 +64,8 @@ use shape::shape_format;
 use table::{table_design, table_layout};
 #[cfg(test)]
 use tabs::MIN_TAB_W;
-use tabs::{MORE_TABS_W, reading_toolbar};
+use tabs::MORE_TABS_W;
+pub(crate) use tabs::reading_toolbar;
 pub use tabs::{
     StripPlan, TABS, TabSpec, contextual_tabs, fit_tabs, has_chart_selected, has_picture_selected, has_shape_selected, has_smart_art_selected,
     in_table_public, plan_strip, resolve_tab,
@@ -81,6 +82,18 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         reading_toolbar(app, ui, t);
         return;
     }
+    let (tabs, user_tabs) = sync_tabs(app);
+    tab_strip(app, ui, &t, &tabs);
+    if app.ui.ribbon_collapsed {
+        return;
+    }
+    ribbon_panel(app, ui, &t, &user_tabs);
+}
+
+/// The tabs shown now, after the contextual ones came or went (File first), and the user's tab
+/// list (Customize Ribbon). Switches to the Equation or Outlining tab and back as the selection or
+/// view asks, and away from a tab that is no longer shown.
+pub(crate) fn sync_tabs(app: &mut WordApp) -> (Vec<(String, bool)>, Vec<wordcraft_engine::ribbon::TabEntry>) {
     // Editing an equation brings up the Equation tab; leaving it goes back.
     if app.session.math.is_some() {
         if app.equation_prev_tab.is_none() {
@@ -124,11 +137,16 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             app.ui.tab = next.to_string();
         }
     }
-    // Tab strip.
+    (tabs, user_tabs)
+}
+
+fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]) {
+    let t = *t;
     egui::Panel::top("tabs")
         .exact_size(30.0)
         .frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 }))
         .show(ui, |ui| {
+            let strip = ui.max_rect();
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
                 // Share, Editing mode and Comments keep their room; the tabs get what is left of it
@@ -214,8 +232,22 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     });
                     ui.add_space(8.0);
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        // NexusOffice look: File at the left edge, the other tabs centred in the
+                        // strip as far as the room left of Comments/Editing/Share allows.
+                        let centre_gap = {
+                            let shown: Vec<f32> =
+                                plan.widths.iter().zip(&plan.fits).filter(|(_, f)| **f).map(|(w, _)| *w).collect();
+                            let more = if plan.fits.iter().all(|f| *f) { 0.0 } else { MORE_TABS_W + 2.0 };
+                            let rest = shown.iter().skip(1).sum::<f32>() + more;
+                            let after_file = ui.cursor().min.x + shown.first().copied().unwrap_or(0.0);
+                            let room = ui.available_width() - shown.iter().sum::<f32>() - more;
+                            (strip.center().x - rest / 2.0 - after_file).min(room).max(0.0)
+                        };
                         // The tabs that don't fit go into a » menu at the end of the strip (#897, #2026).
-                        for (i, ((tab, custom), _)) in tabs.iter().zip(&plan.fits).enumerate().filter(|(_, (_, fits))| **fits) {
+                        for (n, (i, ((tab, custom), _))) in tabs.iter().zip(&plan.fits).enumerate().filter(|(_, (_, fits))| **fits).enumerate() {
+                            if n == 1 && crate::nexus::look::CENTRED_TABS {
+                                ui.add_space(centre_gap);
+                            }
                             let (tab, custom) = (tab.as_str(), *custom);
                             let contextual = !custom && wordcraft_engine::ribbon::CONTEXTUAL_TABS.contains(&tab);
                             // A custom tab's name is the user's own text: shown as typed.
@@ -308,9 +340,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 });
             });
         });
-    if app.ui.ribbon_collapsed {
-        return;
-    }
+}
+
+fn ribbon_panel(app: &mut WordApp, ui: &mut Ui, t: &Tokens, user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
+    let t = *t;
     egui::Panel::top("ribbon")
         .exact_size(CONTENT_H + LABEL_H + 10.0)
         .frame(
@@ -325,7 +358,6 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             }
             let bg = ui.interact(ui.max_rect(), ui.scope_id().with("ribbon_background"), Sense::click());
             bg.context_menu(|ui| crate::widgets::customize_menu_items(ui, app));
-            let entry = user_tabs.iter().find(|e| e.name == app.ui.tab);
             crate::ribbon_fit::begin(ui.ctx(), &app.ui.tab, ui.available_width() - 4.0);
             // 0.37 keeps the scroll offset private: an edge-chevron click leaves a one-frame
             // request here and the next scroll area is built at that offset.
@@ -338,38 +370,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             let scroll = area.show(ui, |ui| {
                 ui.horizontal_top(|ui| {
                     ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
-                    match entry {
-                        // Every tab hidden: nothing to show.
-                        Some(e) if e.hidden => return,
-                        Some(e) if e.custom => return custom_groups(app, ui, &e.groups),
-                        _ => {}
-                    }
-                    match app.ui.tab.as_str() {
-                        "Home" => home(app, ui),
-                        "Insert" => insert(app, ui),
-                        "Draw" => draw(app, ui),
-                        "Design" => design(app, ui),
-                        "Layout" => layout(app, ui),
-                        "References" => references(app, ui),
-                        "Mailings" => mailings(app, ui),
-                        "Review" => review(app, ui),
-                        "View" => view(app, ui),
-                        "Developer" => developer(app, ui),
-                        "Zotero" => zotero(app, ui),
-                        "Help" => help(app, ui),
-                        "Table Design" => table_design(app, ui),
-                        "Table Layout" => table_layout(app, ui),
-                        "Equation" if app.session.math.is_some() => crate::equation_tab::show(app, ui),
-                        "Picture Format" => picture_format(app, ui),
-                        "Shape Format" => shape_format(app, ui),
-                        "SmartArt Design" => smart_art_design(app, ui),
-                        "Outlining" => outlining(app, ui),
-                        "Chart Design" => chart_design(app, ui),
-                        _ => home(app, ui),
-                    }
-                    if let Some(e) = entry {
-                        custom_groups(app, ui, &e.groups);
-                    }
+                    tab_groups(app, ui, user_tabs);
                 });
             });
             if pending.is_some() {
@@ -400,6 +401,44 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 ui.ctx().request_repaint();
             }
         });
+}
+
+/// The current tab's groups, left to right (each through [`crate::widgets::group`]), then the
+/// user's custom groups on it.
+pub(crate) fn tab_groups(app: &mut WordApp, ui: &mut Ui, user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
+    let entry = user_tabs.iter().find(|e| e.name == app.ui.tab);
+    match entry {
+        // Every tab hidden: nothing to show.
+        Some(e) if e.hidden => return,
+        Some(e) if e.custom => return custom_groups(app, ui, &e.groups),
+        _ => {}
+    }
+    match app.ui.tab.as_str() {
+        "Home" => home(app, ui),
+        "Insert" => insert(app, ui),
+        "Draw" => draw(app, ui),
+        "Design" => design(app, ui),
+        "Layout" => layout(app, ui),
+        "References" => references(app, ui),
+        "Mailings" => mailings(app, ui),
+        "Review" => review(app, ui),
+        "View" => view(app, ui),
+        "Developer" => developer(app, ui),
+        "Zotero" => zotero(app, ui),
+        "Help" => help(app, ui),
+        "Table Design" => table_design(app, ui),
+        "Table Layout" => table_layout(app, ui),
+        "Equation" if app.session.math.is_some() => crate::equation_tab::show(app, ui),
+        "Picture Format" => picture_format(app, ui),
+        "Shape Format" => shape_format(app, ui),
+        "SmartArt Design" => smart_art_design(app, ui),
+        "Outlining" => outlining(app, ui),
+        "Chart Design" => chart_design(app, ui),
+        _ => home(app, ui),
+    }
+    if let Some(e) = entry {
+        custom_groups(app, ui, &e.groups);
+    }
 }
 
 #[cfg(test)]

@@ -776,7 +776,7 @@ jobs:
           msg=$(tail -n 60 "$RUNNER_TEMP/package.log" | sed 's/\x1b\[[0-9;]*m//g; s/\r//g' | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
           echo "::error title=web (last 60 log lines)::$msg"
 
-  # 1. Identity: the packages say Nexus/Sonnytech where Windows, macOS and the shell look
+  # 1. Identity: the packages say Nexus/SonnyTech where Windows, macOS and the shell look
   #    (needs no secret, runs first). 2. nexus-tools brand-check over the text inside the packages
   #    (binary files are skipped by the tool): each package is unpacked and scanned with its own
   #    root as --repo, so the fork's allowlist paths (README.md, ...) line up.
@@ -823,7 +823,7 @@ jobs:
           prop() { awk -F'\t' -v k="$1" '$1 == k { sub(/\r$/, "", $2); print $2 }' props.tsv; }
           name=$(prop ProductName); maker=$(prop Manufacturer); code=$(prop UpgradeCode)
           [ "$name" = "$TITLE" ] || bad "MSI ProductName is '$name', expected '$TITLE'"
-          [ "$maker" = "Sonnytech" ] || bad "MSI Manufacturer is '$maker', expected 'Sonnytech'"
+          [ "$maker" = "SonnyTech" ] || bad "MSI Manufacturer is '$maker', expected 'SonnyTech'"
           [ "$(printf '%s' "$code" | tr -d '{}' | tr '[:lower:]' '[:upper:]')" = "$UPGRADE_CODE" ] || bad "MSI UpgradeCode is '$code', expected {$UPGRADE_CODE}"
           plist_id=$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb")).get("CFBundleIdentifier",""))' scan/macos/Info.plist) || plist_id=""
           [ "$plist_id" = "$BUNDLE_ID" ] || bad "macOS CFBundleIdentifier is '$plist_id', expected '$BUNDLE_ID'"
@@ -967,7 +967,7 @@ jobs:
           sha256sum -- * | tee "$RUNNER_TEMP/SHA256SUMS.txt"
           mv "$RUNNER_TEMP/SHA256SUMS.txt" SHA256SUMS.txt
           cat > "$RUNNER_TEMP/notes.md" <<EOF
-          $TITLE $VERSION_NEXUS (NexusOffices by Sonnytech).
+          $TITLE $VERSION_NEXUS (NexusOffice by SonnyTech).
 
           Bản chưa ký mã (unsigned).
           - Windows: SmartScreen hiện "Windows protected your PC": bấm "More info" > "Run anyway".

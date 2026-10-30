@@ -75,6 +75,9 @@ pub struct Services {
     /// names), where the platform lists them, so a paste that finds nothing it can use says what
     /// is there instead of "empty" (#833).
     pub clipboard_formats: Option<Box<dyn Fn() -> Vec<String>>>,
+    /// NexusOffice: a host showing documents in tabs makes a new document (File › New, Ctrl+N,
+    /// a template; the `file.new` params) in a tab of its own instead of in place of this one.
+    pub new_document: Option<Box<dyn Fn(serde_json::Value)>>,
     /// Web: keep a font the user added (stored file name, original bytes) for the next visit
     /// (#582). Desktop fonts are stored by the font database itself, in the app's font folder.
     pub store_font: Option<Box<dyn Fn(&str, &[u8])>>,
