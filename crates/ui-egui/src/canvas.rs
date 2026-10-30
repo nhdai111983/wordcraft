@@ -57,10 +57,10 @@ use navigation::top_page;
 pub use navigation::{nearest_page, page_at, page_to_screen};
 use navigation::{scrollbar_page_tip, viewed_page};
 #[cfg(test)]
+use pages::ItemPrint;
+#[cfg(test)]
 use pages::{DRAWING_GRID_MAX_LINES, DRAWING_GRID_MIN_PX};
 pub(crate) use pages::{PageKeys, page_doc, page_screen_scale, preview_sel, screen_render_options};
-#[cfg(test)]
-use pages::ItemPrint;
 use pages::{PagePrints, band_rows, changed_band, page_prints};
 use pages::{
     drawing_grid, drawing_grid_step, gridline_cells, page_image, page_key, page_render_options, shown_layout, texel_aligned_rect, view_key,
@@ -888,6 +888,79 @@ fn draw_page_gridlines(app: &WordApp, painter: &egui::Painter, t: &Tokens, page:
     }
 }
 
+/// One page texture to draw again: page `i` with its cache `key`, view fingerprint and raster
+/// scale, whether a drag forces it, and the render options.
+struct PageRender<'a> {
+    i: usize,
+    page: &'a Page,
+    key: u64,
+    view: u64,
+    scale_px: f32,
+    forced: bool,
+    opts: &'a wordcraft_render::RenderOptions,
+}
+
+/// Draw page `i`'s texture again: only the band an edit changed (NexusOffice), else the page.
+fn render_page_texture(app: &mut WordApp, ui: &Ui, r: PageRender<'_>) {
+    let PageRender { i, page, key, view, scale_px, forced, opts } = r;
+    // NexusOffice: an edit redraws only the band of the page it changed (typing: a line or
+    // a paragraph), not the whole page, when the texture shows the same drawing (view,
+    // scale, size) and every item keeps to a band of its own. Not while a drag hides an
+    // object or Insert › Table previews a table: those draw the page whole.
+    let frame = {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (view, scale_px.to_bits(), page.w.to_bits(), page.h.to_bits(), app.session.view.show_markup).hash(&mut h);
+        h.finish()
+    };
+    let prints = page_prints(page);
+    let plain = !forced && app.canvas.table_preview_layout.is_none() && !app.session.view.show_markup;
+    let band = match (app.canvas.textures.get(&i), app.canvas.prints.get(&i), &prints) {
+        (Some((tex_key, tex)), Some(before), Some(after)) if plain && before.tex_key == *tex_key && before.frame == frame => {
+            let [tw, th] = tex.size();
+            changed_band(&before.items, after)
+                .and_then(|b| band_rows(b, scale_px, th))
+                // A band of more than half the page is drawn as the whole page.
+                .filter(|(_, h)| (*h as usize).saturating_mul(2) < th && (page.w * scale_px).ceil() as usize == tw)
+        }
+        _ => None,
+    };
+    let mut done = false;
+    if let Some((y0_px, h_px)) = band
+        && let Some((k, tex)) = app.canvas.textures.get_mut(&i)
+    {
+        let img = wordcraft_render::render_band(&app.session.doc, page, scale_px, y0_px, h_px, opts);
+        if img.width as usize == tex.size()[0] && img.height == h_px {
+            tex.set_partial([0, y0_px as usize], page_image(&img), egui::TextureOptions::LINEAR);
+            *k = key;
+            app.canvas.band_renders += 1;
+            done = true;
+        }
+    }
+    if !done {
+        let img = wordcraft_render::render_page(page_doc(app), page, scale_px, opts);
+        let ci = page_image(&img);
+        match app.canvas.textures.get_mut(&i) {
+            Some((k, tex)) => {
+                tex.set(ci, egui::TextureOptions::LINEAR);
+                *k = key;
+            }
+            None => {
+                let tex = ui.ctx().load_texture(format!("page{i}"), ci, egui::TextureOptions::LINEAR);
+                app.canvas.textures.insert(i, (key, tex));
+            }
+        }
+        app.canvas.page_renders += 1;
+    }
+    match prints {
+        Some(items) => {
+            app.canvas.prints.insert(i, PagePrints { tex_key: key, frame, items });
+        }
+        None => {
+            app.canvas.prints.remove(&i);
+        }
+    }
+}
+
 fn paint_pages(pass: PagePaint<'_>) -> PagePaintOutput {
     let PagePaint { app, ui, layout, geo, t, painter, dim_body, dark_page, sepia_page, hidden, view, content_origin, ppp, max_tex, grid_story } =
         pass;
@@ -921,62 +994,7 @@ fn paint_pages(pass: PagePaint<'_>) -> PagePaintOutput {
             let mut opts = page_render_options(app, dim_body);
             // Only on the page it is on: the `Pos` can't match an object of another page.
             opts.display.hide_object = hidden.as_ref().filter(|(page, _)| *page == i).map(|(_, p)| p.clone());
-            // NexusOffice: an edit redraws only the band of the page it changed (typing: a line or
-            // a paragraph), not the whole page, when the texture shows the same drawing (view,
-            // scale, size) and every item keeps to a band of its own. Not while a drag hides an
-            // object or Insert › Table previews a table: those draw the page whole.
-            let frame = {
-                let mut h = std::collections::hash_map::DefaultHasher::new();
-                (view, scale_px.to_bits(), page.w.to_bits(), page.h.to_bits(), app.session.view.show_markup).hash(&mut h);
-                h.finish()
-            };
-            let prints = page_prints(page);
-            let plain = !forced && app.canvas.table_preview_layout.is_none() && !app.session.view.show_markup;
-            let band = match (app.canvas.textures.get(&i), app.canvas.prints.get(&i), &prints) {
-                (Some((tex_key, tex)), Some(before), Some(after)) if plain && before.tex_key == *tex_key && before.frame == frame => {
-                    let [tw, th] = tex.size();
-                    changed_band(&before.items, after)
-                        .and_then(|b| band_rows(b, scale_px, th))
-                        // A band of more than half the page is drawn as the whole page.
-                        .filter(|(_, h)| (*h as usize).saturating_mul(2) < th && (page.w * scale_px).ceil() as usize == tw)
-                }
-                _ => None,
-            };
-            let mut done = false;
-            if let Some((y0_px, h_px)) = band
-                && let Some((k, tex)) = app.canvas.textures.get_mut(&i)
-            {
-                let img = wordcraft_render::render_band(&app.session.doc, page, scale_px, y0_px, h_px, &opts);
-                if img.width as usize == tex.size()[0] && img.height == h_px {
-                    tex.set_partial([0, y0_px as usize], page_image(&img), egui::TextureOptions::LINEAR);
-                    *k = key;
-                    app.canvas.band_renders += 1;
-                    done = true;
-                }
-            }
-            if !done {
-                let img = wordcraft_render::render_page(page_doc(app), page, scale_px, &opts);
-                let ci = page_image(&img);
-                match app.canvas.textures.get_mut(&i) {
-                    Some((k, tex)) => {
-                        tex.set(ci, egui::TextureOptions::LINEAR);
-                        *k = key;
-                    }
-                    None => {
-                        let tex = ui.ctx().load_texture(format!("page{i}"), ci, egui::TextureOptions::LINEAR);
-                        app.canvas.textures.insert(i, (key, tex));
-                    }
-                }
-                app.canvas.page_renders += 1;
-            }
-            match prints {
-                Some(items) => {
-                    app.canvas.prints.insert(i, PagePrints { tex_key: key, frame, items });
-                }
-                None => {
-                    app.canvas.prints.remove(&i);
-                }
-            }
+            render_page_texture(app, ui, PageRender { i, page, key, view, scale_px, forced, opts: &opts });
             rendered += 1;
             fresh = true;
         } else if visible && !tiled && !fresh {

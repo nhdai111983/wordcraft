@@ -671,6 +671,6 @@ pub(crate) fn rust_sources(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 }
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod nexus_save_prompt_tests;
+#[cfg(test)]
+mod tests;

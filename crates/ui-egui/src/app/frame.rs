@@ -1,8 +1,8 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::file_browser;
 use super::{
-    WordApp, backstage, canvas, chrome, colors, content_controls, dialogs, documents, keys, nexus_toolbar, nexus_wps, now_ms, panes, read_aloud, ribbon,
-    theme, updates_ui, zotero,
+    WordApp, backstage, canvas, chrome, colors, content_controls, dialogs, documents, keys, now_ms, panes, read_aloud, ribbon, theme, updates_ui,
+    zotero,
 };
 
 impl WordApp {
@@ -41,10 +41,10 @@ impl WordApp {
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
             if self.wps {
-                nexus_wps::show(self, ui, true);
+                crate::nexus_wps::show(self, ui, true);
             } else {
                 chrome::title_bar(self, ui);
-                if self.toolbar { nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
+                if self.toolbar { crate::nexus_toolbar::show(self, ui) } else { ribbon::show(self, ui) }
             }
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
@@ -56,7 +56,7 @@ impl WordApp {
                 chrome::screen_bar(self, ui, screen);
             } else if self.wps {
                 // NexusOffice: the WPS layout's top row holds the tabs and their strip.
-                nexus_wps::show(self, ui, true);
+                crate::nexus_wps::show(self, ui, true);
                 if moved(self) {
                     return;
                 }
@@ -66,7 +66,7 @@ impl WordApp {
                     return;
                 }
                 if self.toolbar {
-                    nexus_toolbar::show(self, ui);
+                    crate::nexus_toolbar::show(self, ui);
                 } else {
                     ribbon::show(self, ui);
                 }

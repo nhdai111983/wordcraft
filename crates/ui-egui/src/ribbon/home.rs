@@ -337,12 +337,17 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
         // NexusOffice WPS layout: Find and Replace and Select as large buttons, as in its mockup.
         if app.wps {
             let find_label = super::common::two_lines(tl!("Find and Replace"));
-            menu_button(ui, app, crate::widgets::MenuButtonOptions::new("find", Some(&find_label), "Find and Replace", true, "edit.find"), |ui, app| {
-                mi(ui, app, "Find", "edit.find", json!({}));
-                mi(ui, app, "Replace", "ui.dialog", json!({"name": "replace"}));
-                mi(ui, app, "Advanced Find…", "edit.advancedFind", json!({}));
-                mi(ui, app, "Go To…", "ui.dialog", json!({"name": "goto"}));
-            });
+            menu_button(
+                ui,
+                app,
+                crate::widgets::MenuButtonOptions::new("find", Some(&find_label), "Find and Replace", true, "edit.find"),
+                |ui, app| {
+                    mi(ui, app, "Find", "edit.find", json!({}));
+                    mi(ui, app, "Replace", "ui.dialog", json!({"name": "replace"}));
+                    mi(ui, app, "Advanced Find…", "edit.advancedFind", json!({}));
+                    mi(ui, app, "Go To…", "ui.dialog", json!({"name": "goto"}));
+                },
+            );
             menu_button(ui, app, crate::widgets::MenuButtonOptions::new("select", Some("Select"), "Select", true, "select.all"), |ui, app| {
                 mi(ui, app, "Select All", "select.all", json!({}));
                 mi(ui, app, "Select Paragraph", "select.paragraph", json!({}));

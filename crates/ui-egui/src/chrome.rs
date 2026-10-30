@@ -110,7 +110,8 @@ pub(crate) fn autosave_switch(ui: &mut Ui, app: &mut WordApp) {
     let color = if block.is_some() { t.text_dim.gamma_multiply(0.6) } else { t.text_dim };
     // The text is part of the switch (#3370): clicking it toggles AutoSave, and chrome
     // text is not document text to select (double-clicking it copied "AutoSave").
-    let text = ui.add(egui::Label::new(egui::RichText::new(tl!("AutoSave")).font(regular(11.5)).color(color)).selectable(false).sense(Sense::click()));
+    let text =
+        ui.add(egui::Label::new(egui::RichText::new(tl!("AutoSave")).font(regular(11.5)).color(color)).selectable(false).sense(Sense::click()));
     let (r, resp) = ui.allocate_exact_size(vec2(30.0, 16.0), Sense::click());
     let (fill, stroke, knob_fill) = match (&block, on) {
         (Some(_), _) => (t.input.gamma_multiply(0.5), t.border.gamma_multiply(0.7), t.text_dim.gamma_multiply(0.45)),

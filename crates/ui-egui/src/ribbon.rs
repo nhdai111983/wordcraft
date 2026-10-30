@@ -235,8 +235,7 @@ fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]
                         // NexusOffice look: File at the left edge, the other tabs centred in the
                         // strip as far as the room left of Comments/Editing/Share allows.
                         let centre_gap = {
-                            let shown: Vec<f32> =
-                                plan.widths.iter().zip(&plan.fits).filter(|(_, f)| **f).map(|(w, _)| *w).collect();
+                            let shown: Vec<f32> = plan.widths.iter().zip(&plan.fits).filter(|(_, f)| **f).map(|(w, _)| *w).collect();
                             let more = if plan.fits.iter().all(|f| *f) { 0.0 } else { MORE_TABS_W + 2.0 };
                             let rest = shown.iter().skip(1).sum::<f32>() + more;
                             let after_file = ui.cursor().min.x + shown.first().copied().unwrap_or(0.0);

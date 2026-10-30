@@ -255,6 +255,8 @@ impl WordApp {
             // running.
             ribbon_collapsed: _,
             quick_access_toolbar: _,
+            // NexusOffice: the accent colour is an app-wide preference.
+            accent: _,
             recent: _,
             recent_symbols: _,
             recent_colors: _,

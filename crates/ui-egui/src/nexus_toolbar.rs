@@ -227,8 +227,15 @@ fn tools(app: &mut WordApp, ui: &mut Ui) {
     let st = app.session.run("format.state", &json!({})).unwrap_or_default();
     let flag = |k: &str| st.get(k).and_then(Value::as_bool).unwrap_or(false);
 
-    small(ui, app, "paste", None, "Paste", "edit.paste", json!({}), false);
-    small(ui, app, "painter", None, "Format Painter", "edit.formatPainter", json!({}), app.session.painter.is_some());
+    small(ui, app, "paste", None, "Paste", crate::widgets::ButtonAction::new("edit.paste", json!({}), false));
+    small(
+        ui,
+        app,
+        "painter",
+        None,
+        "Format Painter",
+        crate::widgets::ButtonAction::new("edit.formatPainter", json!({}), app.session.painter.is_some()),
+    );
     divider(ui);
 
     // Style: the gallery's styles by name.
@@ -267,13 +274,13 @@ fn tools(app: &mut WordApp, ui: &mut Ui) {
     }
     divider(ui);
 
-    small(ui, app, "bold", None, "Bold", "format.bold", json!({}), flag("bold"));
-    small(ui, app, "italic", None, "Italic", "format.italic", json!({}), flag("italic"));
-    small(ui, app, "underline", None, "Underline", "format.underline", json!({}), flag("underline"));
-    small(ui, app, "strike", None, "Strikethrough", "format.strikethrough", json!({}), flag("strike"));
+    small(ui, app, "bold", None, "Bold", crate::widgets::ButtonAction::new("format.bold", json!({}), flag("bold")));
+    small(ui, app, "italic", None, "Italic", crate::widgets::ButtonAction::new("format.italic", json!({}), flag("italic")));
+    small(ui, app, "underline", None, "Underline", crate::widgets::ButtonAction::new("format.underline", json!({}), flag("underline")));
+    small(ui, app, "strike", None, "Strikethrough", crate::widgets::ButtonAction::new("format.strikethrough", json!({}), flag("strike")));
     let fc = app.canvas.last_font_color.clone();
     let sw = wordcraft_doc::Rgb::parse(&fc).map(crate::theme::c32);
-    split(ui, app, "fontcolor", "Font Color", "format.color", json!({"color": fc}), false, sw, |ui, app| {
+    split(ui, app, "fontcolor", "Font Color", crate::widgets::ButtonAction::new("format.color", json!({"color": fc}), false), sw, |ui, app| {
         if ui.button(tl!("Automatic")).clicked() {
             let _ = app.run("format.color", json!({"color": "auto"}));
             ui.close();
@@ -282,53 +289,66 @@ fn tools(app: &mut WordApp, ui: &mut Ui) {
         crate::colors::menu(ui, app, &theme, crate::colors::Target::cmd("format.color").remember(crate::colors::Remember::FontColor));
     });
     let hl = app.canvas.last_highlight.clone();
-    split(ui, app, "highlight", "Text Highlight Color", "format.highlight", json!({"color": hl}), false, None, |ui, app| {
-        for h in wordcraft_doc::props::Highlight::ALL.iter().skip(1) {
-            if ui.button(h.name()).clicked() {
-                app.canvas.last_highlight = h.ooxml().to_string();
-                let _ = app.run("format.highlight", json!({"color": h.ooxml()}));
+    split(
+        ui,
+        app,
+        "highlight",
+        "Text Highlight Color",
+        crate::widgets::ButtonAction::new("format.highlight", json!({"color": hl}), false),
+        None,
+        |ui, app| {
+            for h in wordcraft_doc::props::Highlight::ALL.iter().skip(1) {
+                if ui.button(h.name()).clicked() {
+                    app.canvas.last_highlight = h.ooxml().to_string();
+                    let _ = app.run("format.highlight", json!({"color": h.ooxml()}));
+                    ui.close();
+                }
+            }
+            if ui.button(tl!("No Color")).clicked() {
+                let _ = app.run("format.highlight", json!({"color": "none"}));
                 ui.close();
             }
-        }
-        if ui.button(tl!("No Color")).clicked() {
-            let _ = app.run("format.highlight", json!({"color": "none"}));
-            ui.close();
-        }
-    });
-    small(ui, app, "clear", None, "Clear All Formatting", "format.clear", json!({}), false);
+        },
+    );
+    small(ui, app, "clear", None, "Clear All Formatting", crate::widgets::ButtonAction::new("format.clear", json!({}), false));
     divider(ui);
 
     let rp = app.session.doc.para_at(&app.session.sel.focus).map(|p| app.session.doc.styles.resolve_para(&p.props));
     let align = rp.as_ref().map(|r| r.align.visual(r.bidi)).unwrap_or_default();
     let lists = wordcraft_engine::cmd::para::list_buttons(&app.session.doc, rp.as_ref().and_then(|r| r.numbering));
     use wordcraft_doc::Align as A;
-    small(ui, app, "alignLeft", None, "Align Left", "para.alignLeft", json!({}), align == A::Left);
-    small(ui, app, "alignCenter", None, "Center", "para.alignCenter", json!({}), align == A::Center);
-    small(ui, app, "alignRight", None, "Align Right", "para.alignRight", json!({}), align == A::Right);
-    small(ui, app, "justify", None, "Justify", "para.justify", json!({}), align == A::Justify);
+    small(ui, app, "alignLeft", None, "Align Left", crate::widgets::ButtonAction::new("para.alignLeft", json!({}), align == A::Left));
+    small(ui, app, "alignCenter", None, "Center", crate::widgets::ButtonAction::new("para.alignCenter", json!({}), align == A::Center));
+    small(ui, app, "alignRight", None, "Align Right", crate::widgets::ButtonAction::new("para.alignRight", json!({}), align == A::Right));
+    small(ui, app, "justify", None, "Justify", crate::widgets::ButtonAction::new("para.justify", json!({}), align == A::Justify));
     divider(ui);
-    small(ui, app, "bullets", None, "Bullets", "para.bullets", json!({}), lists.bullets);
-    small(ui, app, "numbering", None, "Numbering", "para.numbering", json!({}), lists.numbering);
-    small(ui, app, "outdent", None, "Decrease Indent", "para.outdent", json!({}), false);
-    small(ui, app, "indent", None, "Increase Indent", "para.indent", json!({}), false);
-    crate::widgets::menu_button(ui, app, "lineSpacing", None, "Line and Paragraph Spacing", false, "para.lineSpacing", |ui, app| {
-        for v in [1.0, 1.15, 1.5, 2.0, 2.5, 3.0] {
-            if ui.button(format!("{v}")).clicked() {
-                let _ = app.run("para.lineSpacing", json!({"value": v}));
-                ui.close();
+    small(ui, app, "bullets", None, "Bullets", crate::widgets::ButtonAction::new("para.bullets", json!({}), lists.bullets));
+    small(ui, app, "numbering", None, "Numbering", crate::widgets::ButtonAction::new("para.numbering", json!({}), lists.numbering));
+    small(ui, app, "outdent", None, "Decrease Indent", crate::widgets::ButtonAction::new("para.outdent", json!({}), false));
+    small(ui, app, "indent", None, "Increase Indent", crate::widgets::ButtonAction::new("para.indent", json!({}), false));
+    crate::widgets::menu_button(
+        ui,
+        app,
+        crate::widgets::MenuButtonOptions::new("lineSpacing", None, "Line and Paragraph Spacing", false, "para.lineSpacing"),
+        |ui, app| {
+            for v in [1.0, 1.15, 1.5, 2.0, 2.5, 3.0] {
+                if ui.button(format!("{v}")).clicked() {
+                    let _ = app.run("para.lineSpacing", json!({"value": v}));
+                    ui.close();
+                }
             }
-        }
-    });
+        },
+    );
     divider(ui);
-    small(ui, app, "link", None, "Link", "ui.dialog", json!({"name": "link"}), false);
-    small(ui, app, "newComment", None, "Comment", "review.newComment", json!({}), false);
-    crate::widgets::menu_button(ui, app, "table", None, "Add a Table", false, "insert.table", |ui, app| {
+    small(ui, app, "link", None, "Link", crate::widgets::ButtonAction::new("ui.dialog", json!({"name": "link"}), false));
+    small(ui, app, "newComment", None, "Comment", crate::widgets::ButtonAction::new("review.newComment", json!({}), false));
+    crate::widgets::menu_button(ui, app, crate::widgets::MenuButtonOptions::new("table", None, "Add a Table", false, "insert.table"), |ui, app| {
         crate::dialogs::table_grid_picker(ui, app);
     });
-    small(ui, app, "picture", None, "Pictures", "insert.picture", json!({}), false);
+    small(ui, app, "picture", None, "Pictures", crate::widgets::ButtonAction::new("insert.picture", json!({}), false));
     divider(ui);
-    small(ui, app, "find", None, "Find", "edit.find", json!({}), false);
-    small(ui, app, "replace", None, "Replace", "edit.replace", json!({}), false);
+    small(ui, app, "find", None, "Find", crate::widgets::ButtonAction::new("edit.find", json!({}), false));
+    small(ui, app, "replace", None, "Replace", crate::widgets::ButtonAction::new("edit.replace", json!({}), false));
 }
 
 #[cfg(test)]

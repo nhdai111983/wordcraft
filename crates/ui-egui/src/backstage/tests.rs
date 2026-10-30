@@ -1277,4 +1277,3 @@ fn file_opens_info_after_the_start_up_recover_page() {
     drop(h);
     let _ = std::fs::remove_dir_all(root);
 }
-

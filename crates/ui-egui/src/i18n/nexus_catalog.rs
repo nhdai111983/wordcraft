@@ -21,16 +21,14 @@ const ROWS: &[(&str, &str)] = &[
     ("Local recovery is unavailable or still loading.", "Bản khôi phục trên máy chưa dùng được hoặc đang tải."),
     ("No recovery copies.", "Không có bản khôi phục nào."),
     ("Recovery copy", "Bản khôi phục"),
-    ("Restore", "Khôi phục"),
     ("Discard…", "Loại bỏ…"),
     ("Continue without restoring", "Tiếp tục, không khôi phục"),
     ("Untitled draft", "Bản nháp chưa đặt tên"),
     ("Back", "Quay lại"),
-    ("Discard", "Loại bỏ"),
     ("Discard recovery copy", "Loại bỏ bản khôi phục"),
     ("Discard the recovery copy of {name}?", "Loại bỏ bản khôi phục của {name}?"),
     ("This cannot be undone. Your original file stays unchanged.", "Không thể hoàn tác thao tác này. Tệp gốc của bạn giữ nguyên."),
-    // The WPS layout (NX-UI.9 – NX-UI.11).
+    // The WPS layout (NX-UI.9 – NX-UI.11). "More tabs": the Nexus apps say "thẻ" for a tab.
     ("Saving…", "Đang lưu…"),
     ("More options", "Tùy chọn khác"),
     ("More commands", "Thêm lệnh"),
@@ -60,15 +58,37 @@ pub(super) fn get(key: &str) -> Option<&'static str> {
     MAP.get(key).copied()
 }
 
-/// Every row, for tests.
-#[cfg(test)]
-pub(super) fn rows() -> &'static [(&'static str, &'static str)] {
-    ROWS
-}
-
 #[cfg(test)]
 mod tests {
     use super::ROWS;
+
+    /// With the Vietnamese catalog embedded, every Nexus row shows in Vietnamese through the
+    /// interface lookups (`tl!`, contexts, the catalog-key check) and English stays English: the
+    /// strings the nx branches added to the deleted `vi.tsv` still show after upstream moved the
+    /// catalogs to craft-i18n.
+    #[test]
+    fn nexus_rows_show_in_a_vietnamese_interface() {
+        use super::super::{Lang, catalogs_embedded, current, has, set_current, t, tc, tr};
+        if !catalogs_embedded() {
+            return;
+        }
+        let Some(vi) = Lang::from_code("vi") else { panic!("the Vietnamese catalog is embedded") };
+        let before = current();
+        set_current(vi);
+        for (en, want) in ROWS {
+            assert_eq!(tr(vi, en), *want, "{en:?}");
+            assert_eq!(t(en), *want, "{en:?} through tl!");
+            assert_eq!(tc("no such context", en), *want, "{en:?} with a context without its own row");
+            assert!(has(vi, en), "{en:?} counts as translated");
+        }
+        set_current(Lang::EN);
+        for (en, _) in ROWS {
+            assert_eq!(t(en), *en, "English keeps {en:?}");
+        }
+        set_current(before);
+        // A row of craft-i18n's own catalog still comes from there.
+        assert_eq!(tr(vi, "Close"), "Đóng");
+    }
 
     /// Each key once, each translation non-empty and with the key's `{placeholders}`.
     #[test]

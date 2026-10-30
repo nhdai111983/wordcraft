@@ -111,7 +111,7 @@ const BAND_MARGIN_PT: f32 = 16.0;
 pub(super) fn band_rows((y0, y1): (f32, f32), scale: f32, height: usize) -> Option<(u32, u32)> {
     let top = ((y0 - BAND_MARGIN_PT) * scale).floor().max(0.0);
     let bottom = ((y1 + BAND_MARGIN_PT) * scale).ceil().min(height as f32);
-    (top.is_finite() && bottom.is_finite() && bottom > top).then(|| (top as u32, (bottom - top) as u32))
+    (top.is_finite() && bottom.is_finite() && bottom > top).then_some((top as u32, (bottom - top) as u32))
 }
 
 /// Fingerprint of a page's laid-out content. A layout never changes once made, so this is
