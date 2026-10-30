@@ -621,3 +621,18 @@ fn embedded_in_a_host_window_the_app_opens_no_window_and_leaves_the_hosts_alone(
         assert_eq!(a.session.documents().len(), docs, "closing the host's window closed a document");
     }
 }
+
+/// A host that replaces the session's document before embedding (NexusOffice starts each tab on
+/// a blank document of its own) keeps a dialog opened afterwards: the first frame doesn't take
+/// the replaced document for a switch and close it (the password prompt of a file it opens).
+#[test]
+fn embedding_after_replacing_the_document_keeps_a_dialog_opened_next() {
+    let ctx = backend();
+    let mut a = app("");
+    let blank = a.session.blank_document();
+    a.session.set_document(blank);
+    a.embed();
+    a.run("ui.dialog", json!({"name": "paragraph"})).unwrap();
+    frames(&ctx, &mut a, 3);
+    assert_eq!(prompt(&a), Some("paragraph"));
+}

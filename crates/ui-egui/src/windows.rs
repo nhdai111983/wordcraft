@@ -297,9 +297,15 @@ impl WordApp {
     /// web app does: documents get no native window of their own (View › New Window does
     /// nothing), and the app never titles, focuses or moves the host's window or takes its close
     /// button for its own. Setting [`WordApp::embedded`] has the same effect from the next frame.
+    ///
+    /// The document the session holds now is the one the window shows: a host that replaced it
+    /// (`session.set_document`) before calling this keeps a dialog opened on it afterwards (the
+    /// password prompt of a file it opens) on the first frame, which would otherwise take it for
+    /// a document switch and close the dialog.
     pub fn embed(&mut self) {
         self.embedded = true;
         self.windows.single();
+        self.sync_document();
     }
 
     /// The viewport new windows start from: the host's size, icon and app id. Their title and
