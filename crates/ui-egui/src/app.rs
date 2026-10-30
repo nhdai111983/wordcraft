@@ -103,6 +103,7 @@ impl WordApp {
             wps: false,
             host_menus: Vec::new(),
             embedded: false,
+            drawn_in: egui::Rect::NOTHING,
             mac_titlebar: chrome::MacTitleBar::default(),
             updates_rt: updates_ui::Runtime::default(),
             control_rx: None,
@@ -395,6 +396,7 @@ impl WordApp {
     /// Lay out the windows: on the desktop each open document's in its own native window
     /// ([`windows`]), on the web the one window.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
+        self.drawn_in = ui.max_rect();
         if self.windows.native() {
             self.windows_ui(ui);
         } else {

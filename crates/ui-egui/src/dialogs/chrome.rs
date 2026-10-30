@@ -35,6 +35,41 @@ pub(crate) fn color_field(ui: &mut Ui, theme: &[wordcraft_doc::Rgb], value: &mut
     });
 }
 
+/// NexusOffice: "Lưu thay đổi?" over the tab (`nexus_save_prompt`), answered through
+/// `ui.saveChanges` like the stand-alone prompt.
+fn embedded_save_prompt(app: &mut WordApp, ctx: &egui::Context, d: Dialog) {
+    let Dialog::SaveChanges { name, message, .. } = &d else {
+        app.dialog = Some(d);
+        return;
+    };
+    use crate::nexus_save_prompt as sp;
+    let t = Tokens::get(ctx);
+    let vi = crate::i18n::current().code() == "vi";
+    let question = sp::question(vi, name);
+    let prompt = sp::Prompt { words: sp::words(vi), question: &question, note: None, error: Some(message.as_str()) };
+    let look = sp::Look {
+        dark: t.dark,
+        accent: t.accent,
+        on_accent: t.on_accent,
+        error: ctx.global_style().visuals.error_fg_color,
+        title_font: crate::theme::semibold(sp::TITLE_SIZE),
+        title_fake_bold: false,
+    };
+    let answer = sp::show(ctx, egui::Id::new("nexus_save_prompt"), app.drawn_in, &prompt, &look);
+    // `ui.saveChanges` reads the prompt from `app.dialog`.
+    app.dialog = Some(d);
+    let Some(answer) = answer else { return };
+    let answer = match answer {
+        sp::Answer::Save => "save",
+        sp::Answer::DontSave => "dontSave",
+        sp::Answer::Cancel => "cancel",
+    };
+    let _ = app.run("ui.saveChanges", serde_json::json!({"answer": answer}));
+    if app.dialog.is_none() {
+        app.canvas.want_focus = true;
+    }
+}
+
 /// The open dialog, as (window id, frames it has been centred for).
 fn dialog_top_key() -> egui::Id {
     egui::Id::unique("dialog_top")
@@ -75,6 +110,11 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         ctx.data_mut(|d| d.remove::<(egui::Id, u8)>(dialog_top_key()));
         return;
     };
+    // NexusOffice: as a tab of the NexusOffice window, the prompt every Nexus app shows.
+    if app.embedded && matches!(d, Dialog::SaveChanges { .. }) {
+        embedded_save_prompt(app, ctx, d);
+        return;
+    }
     let mut close = false;
     let title = match &d {
         Dialog::RenameDocument { .. } => "Rename Document",

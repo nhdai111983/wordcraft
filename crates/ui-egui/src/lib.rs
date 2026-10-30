@@ -46,6 +46,7 @@ pub mod keytips;
 mod local_time;
 pub mod mini_toolbar;
 pub mod nexus;
+pub mod nexus_save_prompt;
 pub mod nexus_toolbar;
 pub mod nexus_wps;
 pub mod objects;
@@ -503,6 +504,9 @@ pub struct WordApp {
     /// the window alone (no title, no dragging or maximizing it from the title bar); the host
     /// names its tabs. Off in the stand-alone app.
     pub embedded: bool,
+    /// NexusOffice: the rectangle the app was last drawn in (its tab, when [`embedded`](Self::embedded)),
+    /// which "Lưu thay đổi?" dims and centres on.
+    pub(crate) drawn_in: egui::Rect,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     /// Focus (#1678): the ribbon is dropped down from the Focus bar, over the page.
@@ -663,3 +667,5 @@ pub(crate) fn rust_sources(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod nexus_save_prompt_tests;
