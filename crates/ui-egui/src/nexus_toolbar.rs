@@ -178,7 +178,7 @@ fn menu_title(ui: &mut Ui, text: &str, contextual: bool) -> egui::Response {
         ui.painter().rect_filled(r, 4.0, t.hover);
     }
     ui.painter().text(r.center(), Align2::CENTER_CENTER, text, medium(12.5), if contextual { t.accent_text } else { t.text });
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, text));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, text));
     resp
 }
 

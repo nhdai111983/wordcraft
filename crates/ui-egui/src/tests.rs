@@ -2623,8 +2623,8 @@ fn check_for_updates_points_to_the_nexusoffices_installer() {
     use egui_kittest::kittest::Queryable;
     let before = crate::i18n::current();
     for (code, text) in [
-        ("en", "New versions of Nexus Docs come with the NexusOffices installer."),
-        ("vi", "Phiên bản mới của Nexus Docs được cập nhật qua bộ cài NexusOffices."),
+        ("en", "New versions of Nexus Docs come with the NexusOffice installer."),
+        ("vi", "Phiên bản mới của Nexus Docs được cập nhật qua bộ cài NexusOffice."),
     ] {
         crate::i18n::set_current(crate::i18n::Lang::from_code(code).unwrap());
         let mut a = app();

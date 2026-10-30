@@ -686,7 +686,7 @@ fn accent_picker(app: &mut WordApp, ui: &mut Ui) {
             if current == Some(c) {
                 ui.painter().circle_stroke(r.center(), 10.0, egui::Stroke::new(2.0, crate::theme::Tokens::get(ui.ctx()).text));
             }
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, current == Some(c), name));
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, true, current == Some(c), name));
             if resp.on_hover_text(name).clicked() {
                 let _ = app.run("ui.accent", json!({"value": format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b())}));
             }

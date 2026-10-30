@@ -39,23 +39,23 @@ const NARROW_W: f32 = 1200.0;
 
 /// The File (Tệp) button.
 pub fn file_button_id() -> Id {
-    Id::new("nexus_wps_file")
+    Id::unique("nexus_wps_file")
 }
 /// The strip's "…" button, shown when groups don't fit.
 pub fn overflow_button_id() -> Id {
-    Id::new("nexus_wps_overflow")
+    Id::unique("nexus_wps_overflow")
 }
 /// The save state ("Saved" / "Not saved" / "Saving…"), which opens AutoSave and Save.
 pub fn save_state_id() -> Id {
-    Id::new("nexus_wps_save_state")
+    Id::unique("nexus_wps_save_state")
 }
 /// The top row's "⋯" menu (account, Editing/Reviewing, Customize).
 pub fn more_button_id() -> Id {
-    Id::new("nexus_wps_more")
+    Id::unique("nexus_wps_more")
 }
 /// The search box.
 pub fn search_id() -> Id {
-    Id::new("nexus_wps_search")
+    Id::unique("nexus_wps_search")
 }
 
 /// Draw the layout's top panels: the top row always, the command strip when `ribbon` (not in
@@ -107,7 +107,7 @@ fn bar(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]) {
         .show(ui, |ui| {
             let full = ui.max_rect();
             if mac {
-                let drag = ui.interact(full, ui.id().with("wps_drag"), Sense::click_and_drag());
+                let drag = ui.interact(full, ui.scope_id().with("wps_drag"), Sense::click_and_drag());
                 if drag.drag_started() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
                 }
@@ -165,7 +165,7 @@ fn file_button(ui: &mut Ui, app: &mut WordApp, t: &Tokens) -> Response {
     ui.painter().rect_filled(r, 6.0, fill);
     icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(16.0, 16.0)), "hamburger", ink, ink);
     ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, label, font, ink);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
     if app.ui.keytips == crate::keytips::Phase::Tabs {
         crate::keytips::record_tab(r, "File", &app.ui.keytip_prefix, &mut app.keytip_rects);
     }
@@ -200,7 +200,7 @@ fn tab_row(ui: &mut Ui, app: &mut WordApp, t: &Tokens, tabs: &[(String, bool)], 
             crate::keytips::record_tab(r, tab, &app.ui.keytip_prefix, &mut app.keytip_rects);
         }
         let active = app.ui.tab == *tab && !app.ui.backstage;
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, active, *shown));
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, active, *shown));
         if resp.hovered() && !active {
             ui.painter().rect_filled(r.shrink2(vec2(2.0, 6.0)), 6.0, t.hover);
         }
@@ -225,7 +225,7 @@ fn tab_row(ui: &mut Ui, app: &mut WordApp, t: &Tokens, tabs: &[(String, bool)], 
             ui.painter().rect_filled(r.shrink2(vec2(0.0, 6.0)), 6.0, t.hover);
         }
         icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(14.0, 14.0)), "chevronDoubleRight", t.icon, t.accent);
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("More tabs")));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("More tabs")));
         egui::Popup::menu(&resp).show(|ui| {
             for (tab, shown) in left_out {
                 if ui.selectable_label(false, shown).clicked() {
@@ -270,7 +270,7 @@ fn save_state(ui: &mut Ui, app: &mut WordApp, t: &Tokens) {
         t.text_dim,
         t.text_dim,
     );
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, text));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, text));
     egui::Popup::menu(&resp).show(|ui| {
         ui.set_min_width(220.0);
         ui.horizontal(|ui| {
@@ -302,7 +302,7 @@ fn search_box(ui: &mut Ui, app: &mut WordApp, t: &Tokens, narrow: bool) {
             t.text_dim,
         );
     }
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, ph));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, ph));
     if app.ui.keytips == crate::keytips::Phase::Tabs {
         app.keytip_rects.push((r, crate::keytips::SEARCH_LETTER.to_string()));
     }
@@ -330,7 +330,7 @@ fn comments_button(ui: &mut Ui, app: &mut WordApp, t: &Tokens, narrow: bool) {
     if !narrow {
         ui.painter().text(pos2(r.min.x + 30.0, r.center().y), Align2::LEFT_CENTER, label, font, tc);
     }
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, label));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, on, label));
     if resp.on_hover_text(label).clicked() {
         let _ = app.run("view.commentsPane", json!({}));
     }
@@ -353,7 +353,7 @@ fn share_button(ui: &mut Ui, app: &mut WordApp, t: &Tokens) {
     ui.painter().rect_filled(r, 8.0, fill);
     icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 19.0, r.center().y), vec2(14.0, 14.0)), "share", t.on_accent, t.on_accent);
     ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, label, font, t.on_accent);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, label));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, on, label));
     if resp.on_hover_text(tl!("Export a copy to share (PDF, Word document)")).clicked() {
         let _ = app.run("ui.backstage", json!({"value": true, "page": "export"}));
     }
@@ -369,7 +369,7 @@ fn more_menu(ui: &mut Ui, app: &mut WordApp, t: &Tokens) {
     }
     icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(18.0, 18.0)), "more", t.icon, t.accent);
     let tip = tl!("More options");
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
     let resp = resp.on_hover_text(tip);
     egui::Popup::menu(&resp).show(|ui| {
         ui.set_min_width(240.0);
@@ -415,9 +415,9 @@ fn strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, user_tabs: &[wordcraft_engi
             }
             // Right-click on the strip (outside a button): Customize Ribbon. Registered first, so
             // the buttons drawn over it keep their own clicks.
-            let bg = ui.interact(ui.max_rect(), ui.id().with("ribbon_background"), Sense::click());
+            let bg = ui.interact(ui.max_rect(), ui.scope_id().with("ribbon_background"), Sense::click());
             bg.context_menu(|ui| crate::widgets::customize_menu_items(ui, app));
-            let key = Id::new("nexus_wps_group_widths").with(app.ui.tab.as_str());
+            let key = Id::unique("nexus_wps_group_widths").with(app.ui.tab.as_str());
             let known: Vec<f32> = ui.data(|d| d.get_temp(key)).unwrap_or_default();
             let full = ui.available_rect_before_wrap();
             let room = (full.width() - OVERFLOW_W).max(0.0);
@@ -450,7 +450,7 @@ fn strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, user_tabs: &[wordcraft_engi
             }
             icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(20.0, 20.0)), "more", t.icon, t.accent);
             let tip = tl!("More commands");
-            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip));
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
             let resp = resp.on_hover_text(tip);
             overflow_panel(app, ui, &resp, shown, user_tabs);
         });
@@ -458,7 +458,7 @@ fn strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, user_tabs: &[wordcraft_engi
 
 /// Where the "…" panel was drawn last frame, while it is open: (its tab, its rect).
 fn overflow_open_id() -> Id {
-    Id::new("nexus_wps_overflow_open")
+    Id::unique("nexus_wps_overflow_open")
 }
 
 /// The "…" panel: the groups from `from` on, under the button. Not an egui popup — only one of
@@ -543,7 +543,7 @@ struct Gate {
 }
 
 fn gate_id() -> Id {
-    Id::new("nexus_wps_gate")
+    Id::unique("nexus_wps_gate")
 }
 
 /// Run `draw` with groups gated by `mode`; returns what the pass met.
@@ -563,7 +563,7 @@ fn with_gate(ctx: &egui::Context, mode: Mode, draw: impl FnOnce()) -> Gate {
 }
 
 fn compact_id() -> Id {
-    Id::new("nexus_wps_compact")
+    Id::unique("nexus_wps_compact")
 }
 
 /// Whether the ribbon being drawn is the WPS strip (shorter: see [`crate::widgets::COMPACT_H`]).
@@ -577,7 +577,7 @@ pub(crate) fn compact(ui: &Ui) -> bool {
 /// — one column, then one row, then from half that width up until the controls take two rows —
 /// and kept per interface language.
 pub(crate) fn compact_stack(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
-    let key = ui.id().with(("wps_stack", ui.next_auto_id(), crate::i18n::current().code()));
+    let key = ui.scope_id().with(("wps_stack", ui.next_auto_id(), crate::i18n::current().code()));
     let state: Option<StackFit> = ui.data(|d| d.get_temp(key));
     let spacing = |ui: &mut Ui| ui.spacing_mut().item_spacing = vec2(6.0, 2.0);
     // Two rows run a point or two past the strip's content height at most; three can't fit.
@@ -692,7 +692,7 @@ pub(crate) fn group_end(ui: &Ui, slot: Slot, width: f32) {
 /// A group's right-click area, as large as the group was last frame. Registered before the
 /// group's controls so they keep their own clicks.
 pub(crate) fn group_menu_area(ui: &mut Ui, id_title: &str) -> Response {
-    let id = ui.id().with(("wps_group", id_title));
+    let id = ui.scope_id().with(("wps_group", id_title));
     let r = ui.data(|d| d.get_temp::<Rect>(id)).unwrap_or(Rect::NOTHING);
     ui.interact(r, id, Sense::click())
 }

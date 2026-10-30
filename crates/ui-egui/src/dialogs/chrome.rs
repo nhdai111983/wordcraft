@@ -55,7 +55,7 @@ fn embedded_save_prompt(app: &mut WordApp, ctx: &egui::Context, d: Dialog) {
         title_font: crate::theme::semibold(sp::TITLE_SIZE),
         title_fake_bold: false,
     };
-    let answer = sp::show(ctx, egui::Id::new("nexus_save_prompt"), app.drawn_in, &prompt, &look);
+    let answer = sp::show(ctx, egui::Id::unique("nexus_save_prompt"), app.drawn_in, &prompt, &look);
     // `ui.saveChanges` reads the prompt from `app.dialog`.
     app.dialog = Some(d);
     let Some(answer) = answer else { return };
