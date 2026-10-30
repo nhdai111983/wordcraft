@@ -38,6 +38,9 @@ pub fn start() {
         {
             log::error!("no unsaved-changes guard: {e}");
         }
+        // Framed in a same-origin page: that page sends and stores files instead of the browser.
+        let bridge = host::Bridge::new();
+        let app_bridge = bridge.clone();
         let mut options = eframe::WebOptions::default();
         if query().contains("webgl")
             && let eframe::egui_wgpu::WgpuSetup::CreateNew(create) = &mut options.wgpu_options.wgpu_setup
@@ -77,6 +80,9 @@ pub fn start() {
                     app.wps = true;
                     // Pasted pictures wait apart from dropped files: the app inserts one only when the page is the edit target (#1349).
                     app.services.pasted = Some(pasted);
+                    if let Some(bridge) = &app_bridge {
+                        bridge.connect(&mut app.services, inbox.clone(), cc.egui_ctx.clone());
+                    }
                     app.autosave = false;
                     // Preferences from an earlier visit (#2132), as the desktop app reads `ui.json`.
                     let stored = stored_prefs();
