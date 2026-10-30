@@ -121,8 +121,7 @@ impl Windows {
         self.native
     }
 
-    /// One window for every document, as in the web app.
-    #[cfg(test)]
+    /// One window for every document, as in the web app (and embedded in a host, [`WordApp::embed`]).
     pub(crate) fn single(&mut self) {
         self.native = false;
     }
@@ -292,6 +291,15 @@ impl WordApp {
         }
         let (info, screen_rect, max_texture_side) = ctx.input_for(viewport, |i| (i.viewport().clone(), i.raw.screen_rect, i.raw.max_texture_side));
         (viewport, crate::control::SurfaceGeometry::from_viewport(&info, screen_rect, max_texture_side, ctx))
+    }
+
+    /// NexusOffice: draw inside a tab of the host's window. The app then has one window, as the
+    /// web app does: documents get no native window of their own (View › New Window does
+    /// nothing), and the app never titles, focuses or moves the host's window or takes its close
+    /// button for its own. Setting [`WordApp::embedded`] has the same effect from the next frame.
+    pub fn embed(&mut self) {
+        self.embedded = true;
+        self.windows.single();
     }
 
     /// The viewport new windows start from: the host's size, icon and app id. Their title and

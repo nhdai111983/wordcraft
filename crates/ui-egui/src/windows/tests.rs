@@ -594,3 +594,30 @@ fn every_open_replaces_an_untouched_blank_document_in_its_window() {
     }
     std::fs::remove_dir_all(second.parent().unwrap()).ok();
 }
+
+/// NexusOffice draws the app in a tab of its own window (`embedded`): View › New Window and New
+/// open no native window, the host's window is never retitled, and its close button is the host's
+/// (the app doesn't cancel it or close a document over it).
+#[test]
+fn embedded_in_a_host_window_the_app_opens_no_window_and_leaves_the_hosts_alone() {
+    for embed in [|a: &mut WordApp| a.embed(), |a: &mut WordApp| a.embedded = true] {
+        let ctx = backend();
+        let mut a = app("Hello");
+        embed(&mut a);
+        frames(&ctx, &mut a, 3);
+        a.run("view.newWindow", json!({})).unwrap();
+        a.run("file.new", json!({})).unwrap();
+        frames(&ctx, &mut a, 3);
+        assert_eq!(a.window_count(), 1);
+        assert_eq!(a.active_viewport(), ViewportId::ROOT);
+        assert_eq!(DRAWN.with(|d| d.borrow().clone()), [ViewportId::ROOT], "no other viewport drew");
+        let root = COMMANDS.with(|c| c.borrow().get(&ViewportId::ROOT).cloned().unwrap_or_default());
+        assert!(!root.iter().any(|c| matches!(c, ViewportCommand::Title(_))), "the host's window was retitled: {root:?}");
+
+        let docs = a.session.documents().len();
+        INFOS.with(|i| i.borrow_mut().entry(ViewportId::ROOT).or_default().events.push(ViewportEvent::Close));
+        frame(&ctx, &mut a);
+        assert!(!sent(ViewportId::ROOT, &ViewportCommand::CancelClose), "the host's close button was taken");
+        assert_eq!(a.session.documents().len(), docs, "closing the host's window closed a document");
+    }
+}
