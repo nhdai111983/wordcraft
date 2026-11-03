@@ -290,6 +290,11 @@ fn insert(s: &mut Session, v: &Value) -> CmdResult {
         };
     }
     let id = s.doc.try_add_part(PartKind::TextBox, vec![para_block(Paragraph::with_text(&text, props))])?;
+    // NexusOffice (Henry, 03/11): an unbent WordArt box resizes to fit its text (`a:spAutoFit`),
+    // as Word's does, so a line added with Enter, or long text that wraps, isn't hidden.
+    if let Some(p) = s.doc.parts.get_mut(&id) {
+        p.body.auto_fit = warp.is_none();
+    }
     if let Some(p) = s.doc.parts.get_mut(&id)
         && let Some(b) = p.blocks.first_mut()
         && let wordcraft_doc::Block::Para(para) = std::sync::Arc::make_mut(b)

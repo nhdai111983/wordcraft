@@ -101,4 +101,50 @@ mod tests {
         let mut e = Session::new(wordcraft_doc::Document::new());
         assert_eq!(story(&mut e, json!({})), "Your text here");
     }
+
+    /// Henry, 03/11: Enter in WordArt "doesn't make a new line". It did, but the box kept the
+    /// height of one line and hid the rest. A new WordArt box resizes to fit its text, as Word's
+    /// does (`a:spAutoFit`), so every line shows; long text that wraps too.
+    #[test]
+    fn wordart_shows_every_line() {
+        use wordcraft_layout::display::Draw;
+        // The text page 1 draws as glyphs, and how many WordArt outlines it draws (a gradient
+        // WordArt's letters are outlines): a line the box hides draws neither.
+        let drawn = |s: &mut Session| -> (String, usize) {
+            let layout = s.layout();
+            let draws = wordcraft_layout::display::page_display(&s.doc, &layout.pages[0], &Default::default());
+            let text = draws
+                .iter()
+                .filter_map(|d| match d {
+                    Draw::Glyphs { text, .. } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            (text, draws.iter().filter(|d| matches!(d, Draw::Art { .. })).count())
+        };
+        for style in ["solid", "gradient"] {
+            let mut s = vi_session();
+            let r = s.run("insert.wordArt", &json!({"style": style, "text": "Dòng một"})).unwrap();
+            let id = r["story"].as_u64().unwrap() as u32;
+            assert!(s.doc.parts.get(&id).is_some_and(|p| p.body.auto_fit), "a new WordArt box resizes to fit its text");
+            // The caret at the end of the WordArt's text, as after typing it (36 pt).
+            let end = s.doc.end_of(StoryRef::Part(id));
+            s.sel = crate::Selection { anchor: end.clone(), focus: end };
+            let (text_one, art_one) = drawn(&mut s);
+            s.run("text.newParagraph", &json!({})).unwrap();
+            s.run("text.insert", &json!({"text": "Dòng hai"})).unwrap();
+            assert_eq!(s.doc.plain_text(StoryRef::Part(id)), "Dòng một\nDòng hai");
+            let (text_two, art_two) = drawn(&mut s);
+            assert!(
+                text_two.contains("Dòng hai") || art_two > art_one,
+                "{style}: the second line is drawn too: {text_one:?}/{art_one} → {text_two:?}/{art_two}"
+            );
+        }
+        // A bent WordArt keeps the height its shape gives it.
+        let mut s = vi_session();
+        let r = s.run("insert.wordArt", &json!({"transform": "textArchUp"})).unwrap();
+        let id = r["story"].as_u64().unwrap() as u32;
+        assert!(s.doc.parts.get(&id).is_some_and(|p| !p.body.auto_fit));
+    }
 }
