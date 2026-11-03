@@ -1,4 +1,4 @@
-//! NexusOffices: what Nexus Docs writes into people's files names Nexus Docs, never the upstream
+//! NexusOffice: what Nexus Docs writes into people's files names Nexus Docs, never the upstream
 //! product (spec §4.4): the PDF creator/producer, DOCX `<Application>`, the HTML/ODT/RTF generator,
 //! and the default author of comments and tracked changes.
 #![cfg(not(target_arch = "wasm32"))]

@@ -43,7 +43,7 @@
   <key>NSRequiresAquaSystemAppearance</key>
   <false/>
   <key>NSHumanReadableCopyright</key>
-  <string>Nexus Docs © 2026 Sonnytech. Based on WordCraft by the ArtCraft team. MIT OR Apache-2.0.</string>
+  <string>Nexus Docs © 2026 SonnyTech. Based on WordCraft by the ArtCraft team. MIT OR Apache-2.0.</string>
 
   <!-- Documents Nexus Docs opens (system type declarations). -->
   <key>CFBundleDocumentTypes</key>

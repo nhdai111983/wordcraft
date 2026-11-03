@@ -1,13 +1,17 @@
 //! Design tab: themes, style sets, colours, fonts, paragraph spacing, watermark, page colour, borders.
 
 use serde_json::{Value, json};
-use wordcraft_doc::props::{Border, BorderStyle, Borders, LineSpacing, Rgb, TextColor};
+use wordcraft_doc::props::{Border, BorderStyle, Borders, CharProps, LineSpacing, Rgb, TextColor};
 use wordcraft_doc::{Watermark, styles};
 
 use super::sel_result;
 use crate::{CmdError, CmdResult, CommandSpec, Session, p};
 
 /// Our own themes: (name, heading font, body font, accent colours).
+///
+/// NexusOffice (QC-DOC-06): the fonts are ones Windows installs, with every Vietnamese letter
+/// (upstream named macOS fonts: Helvetica Neue, Palatino, Futura, Avenir Next, Gill Sans, which a
+/// Windows PC doesn't have). Elsewhere they resolve to open substitutes (`wordcraft_fonts::word`).
 pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
     (
         "Craft",
@@ -23,26 +27,26 @@ pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
     ),
     (
         "Gallery",
-        "Helvetica Neue",
-        "Helvetica Neue",
+        "Arial",
+        "Arial",
         [Rgb(0x22, 0x22, 0x22), Rgb(0xE6, 0x39, 0x46), Rgb(0x45, 0x7B, 0x9D), Rgb(0x1D, 0x35, 0x57), Rgb(0xA8, 0xDA, 0xDC), Rgb(0xF4, 0xA2, 0x61)],
     ),
     (
         "Atelier",
-        "Palatino",
-        "Palatino",
+        "Palatino Linotype",
+        "Palatino Linotype",
         [Rgb(0x6D, 0x59, 0x7A), Rgb(0xB5, 0x65, 0x76), Rgb(0xE5, 0x6B, 0x6F), Rgb(0xEA, 0xAC, 0x8B), Rgb(0x35, 0x50, 0x70), Rgb(0x8E, 0x9A, 0xAF)],
     ),
     (
         "Darkroom",
-        "Futura",
-        "Avenir Next",
+        "Segoe UI Semibold",
+        "Segoe UI",
         [Rgb(0x26, 0x46, 0x53), Rgb(0x2A, 0x9D, 0x8F), Rgb(0xE9, 0xC4, 0x6A), Rgb(0xF4, 0xA2, 0x61), Rgb(0xE7, 0x6F, 0x51), Rgb(0x5E, 0x54, 0x8E)],
     ),
     (
         "Sketchbook",
-        "Gill Sans",
-        "Gill Sans",
+        "Tahoma",
+        "Tahoma",
         [Rgb(0x58, 0x81, 0x57), Rgb(0x3A, 0x5A, 0x40), Rgb(0xA3, 0xB1, 0x8A), Rgb(0xDA, 0xD7, 0xCD), Rgb(0x34, 0x4E, 0x41), Rgb(0xBC, 0x6C, 0x25)],
     ),
 ];
@@ -67,6 +71,8 @@ pub fn specs() -> Vec<CommandSpec> {
             .params(r#"{"name": "default|basic|lines|shaded|casual|centered|minimalist|title"}"#),
         CommandSpec::new("design.paragraphSpacing", "Paragraph Spacing", "Design › Document Formatting", para_spacing)
             .params(r#"{"value": "default|none|compact|tight|open|relaxed|double"}"#),
+        CommandSpec::new("design.scaleFontSizes", "Scale Font Sizes", "Design › Document Formatting", scale_font_sizes)
+            .params(r#"{"delta": pt (-1638..1638, not 0) | "percent": number (-99..1000, not 0; 10 = +10%)} (exactly one)"#),
         CommandSpec::new("design.watermark", "Watermark", "Design › Page Background", watermark)
             .params(r#"{"text"?: string, "remove"?: bool, "diagonal"?: bool, "color"?: "RRGGBB"}"#),
         CommandSpec::new("design.pageColor", "Page Color", "Design › Page Background", |s, v| {
@@ -169,11 +175,19 @@ fn style_set(s: &mut Session, v: &Value) -> CmdResult {
             _ => {}
         }
     }
-    // Keep custom styles and fonts.
-    let customs: Vec<_> = s.doc.styles.styles.iter().filter(|x| !x.builtin).cloned().collect();
-    fresh.styles.extend(customs);
-    fresh.default_chr.font = s.doc.styles.default_chr.font.clone();
-    s.doc.styles = fresh;
+    // Overlay the set onto the document's sheet: every other style, the latent styles and the
+    // document defaults stay as they are (no set defines its own defaults).
+    for mut st in fresh.styles {
+        match s.doc.styles.styles.iter_mut().find(|x| x.id == st.id) {
+            Some(old) => {
+                st.default = old.default;
+                st.locked = old.locked;
+                st.builtin = old.builtin;
+                *old = st;
+            }
+            None => s.doc.styles.styles.push(st),
+        }
+    }
     let (h, b) = (s.doc.settings.major_font.clone(), s.doc.settings.minor_font.clone());
     set_fonts(s, &h, &b);
     set_accent(s, accent);
@@ -193,6 +207,45 @@ fn para_spacing(s: &mut Session, v: &Value) -> CmdResult {
     s.doc.styles.default_para.space_before = Some(before);
     s.doc.styles.default_para.space_after = Some(after);
     s.doc.styles.default_para.line_spacing = Some(LineSpacing::Multiple(line));
+    sel_result(s)
+}
+
+/// Grow or shrink every style's font size at once. Only explicit style sizes change (including
+/// table style parts); styles that inherit one (via `based_on` or the defaults) follow, and runs
+/// keep their own direct formatting.
+fn scale_font_sizes(s: &mut Session, v: &Value) -> CmdResult {
+    let (delta, percent) = (p::f32(v, "delta"), p::f32(v, "percent"));
+    // A field that is present but not a number is an error, not "absent".
+    if (v.get("delta").is_some() && delta.is_none()) || (v.get("percent").is_some() && percent.is_none()) {
+        return Err(CmdError::Params("`delta` and `percent` must be numbers".into()));
+    }
+    if delta.is_some() == percent.is_some() {
+        return Err(CmdError::Params("give exactly one of `delta` (points) or `percent`".into()));
+    }
+    if delta.is_some_and(|d| !(-1638.0..=1638.0).contains(&d) || d == 0.0) || percent.is_some_and(|x| !(-99.0..=1000.0).contains(&x) || x == 0.0) {
+        return Err(CmdError::Params("`delta` must be non-zero within ±1638 pt and `percent` non-zero within -99..1000".into()));
+    }
+    let factor = 1.0 + percent.unwrap_or(0.0) / 100.0;
+    let scale = |size: f32| ((size * factor + delta.unwrap_or(0.0)).clamp(1.0, 1638.0) * 2.0).round() / 2.0;
+    let scale_chr = |c: &mut CharProps| {
+        c.size = c.size.map(scale);
+        c.size_cs = c.size_cs.map(scale);
+    };
+    let st = &mut s.doc.styles;
+    // An unset document default resolves to the fallback size; make it explicit so inheriting styles follow.
+    st.default_chr.size = Some(scale(st.default_chr.size.unwrap_or(wordcraft_doc::props::DEFAULT_FONT_SIZE)));
+    st.default_chr.size_cs = st.default_chr.size_cs.map(scale);
+    for style in &mut st.styles {
+        scale_chr(&mut style.chr);
+        if let Some(t) = style.table.as_mut() {
+            for c in [&mut t.header_chr, &mut t.band_chr, &mut t.first_col_chr, &mut t.last_col_chr, &mut t.total_chr, &mut t.col_band_chr] {
+                scale_chr(c);
+            }
+            for part in t.regions.values_mut() {
+                scale_chr(&mut part.chr);
+            }
+        }
+    }
     sel_result(s)
 }
 

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 /// The app's settings folder (preferences, logs, key files): macOS
 /// `~/Library/Application Support/Nexus Docs`, Windows `%APPDATA%\Nexus Docs`, otherwise
-/// `$XDG_CONFIG_HOME/nexus-docs` or `~/.config/nexus-docs`. NexusOffices: its own folder, so
+/// `$XDG_CONFIG_HOME/nexus-docs` or `~/.config/nexus-docs`. NexusOffice: its own folder, so
 /// Nexus Docs installed next to upstream's app never reads or overwrites the other's settings.
 /// `WORDCRAFT_PROFILE_DIR` overrides the entire folder for isolated runs.
 pub fn settings_dir() -> Option<PathBuf> {

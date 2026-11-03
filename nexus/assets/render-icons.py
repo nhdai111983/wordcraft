@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render every Nexus Docs icon from nexus/assets/nexus-docs.svg (Sonnytech, CC0-1.0).
+"""Render every Nexus Docs icon from nexus/assets/nexus-docs.svg (SonnyTech, CC0-1.0).
 
 Needs: pip install resvg-py pillow. The outputs are committed, so builds never need these tools.
 

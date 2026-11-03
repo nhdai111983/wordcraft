@@ -149,7 +149,11 @@ fn insert_index(s: &mut Session, v: &Value) -> CmdResult {
             }
             para.touch();
         }
-        None => super::citations::generated_list(s, &instr, "Index")?,
+        // NexusOffice (QC-DOC-04): the heading in the text's language ("Chỉ mục").
+        None => {
+            let title = crate::nexus_vi::doc_text(super::insert::caret_lang(s).as_deref(), "Index");
+            super::citations::generated_list(s, &instr, title)?
+        }
     }
     if let Some((i, _)) = index_field(s) {
         rebuild(s, i, p::str(v, "tabLeader").map(leader))?;
