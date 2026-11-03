@@ -38,11 +38,11 @@ impl Ctx {
         b
     }
 
-    /// An empty equation: a grey prompt (screen only).
-    pub(super) fn hint(&mut self, st: St) -> Bx {
+    /// An empty equation: a grey prompt (screen only), `prompt` in the text's language.
+    pub(super) fn hint(&mut self, st: St, prompt: &str) -> Bx {
         let size = self.size(st);
         let rs = wordcraft_fonts::word::resolve(&self.text_font, false, false);
-        let mut g = self.glyphs(rs.face, "Type an equation", size, 0, Rgb(0x80, 0x80, 0x80), (rs.synth_bold, rs.synth_italic));
+        let mut g = self.glyphs(rs.face, prompt, size, 0, Rgb(0x80, 0x80, 0x80), (rs.synth_bold, rs.synth_italic));
         g.items = std::mem::take(&mut g.items).into_iter().map(|i| MItem::ScreenOnly(Box::new(i))).collect();
         g.glyph = None;
         g.cuts.clear();

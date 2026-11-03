@@ -22,6 +22,7 @@ const VI: &[(&str, &str)] = &[
     ("Bibliography", "Thư mục tài liệu"),
     ("Contents", "Mục lục"),
     ("Index", "Chỉ mục"),
+    ("Your text here", "Nhập chữ của bạn"),
 ];
 
 /// `en` as written into text in `lang`: its Vietnamese for Vietnamese text, else `en` itself.
@@ -80,5 +81,24 @@ mod tests {
         let mut s = vi_session();
         s.run("references.bibliography", &json!({"title": "Nguồn"})).unwrap();
         assert!(s.doc.plain_text(StoryRef::Body).starts_with("Nguồn"));
+    }
+
+    /// Test tay 02/11: Insert > WordArt in a Vietnamese document started with "Your text here".
+    #[test]
+    fn wordart_placeholder_in_a_vietnamese_document() {
+        let story = |s: &mut Session, params: serde_json::Value| -> String {
+            let r = s.run("insert.wordArt", &params).unwrap();
+            let id = r["story"].as_u64().unwrap() as u32;
+            s.doc.plain_text(StoryRef::Part(id))
+        };
+        let mut s = vi_session();
+        assert_eq!(story(&mut s, json!({})), "Nhập chữ của bạn");
+        // Blank text falls back to the same placeholder; the caller's text is kept.
+        let mut s = vi_session();
+        assert_eq!(story(&mut s, json!({"text": "   "})), "Nhập chữ của bạn");
+        let mut s = vi_session();
+        assert_eq!(story(&mut s, json!({"text": "Chữ nghệ thuật"})), "Chữ nghệ thuật");
+        let mut e = Session::new(wordcraft_doc::Document::new());
+        assert_eq!(story(&mut e, json!({})), "Your text here");
     }
 }

@@ -193,6 +193,14 @@ fn split_number(row: &[MNode]) -> Option<(Arg, Arg, usize)> {
     None
 }
 
+/// NexusOffice (test tay 02/11): the grey prompt of an empty equation, in Vietnamese for
+/// Vietnamese text (`vi`, `vi-VN`, `vi_VN`), else upstream's English.
+fn empty_equation_prompt(lang: Option<&str>) -> &'static str {
+    let vi =
+        lang.is_some_and(|l| l.get(..2).is_some_and(|p| p.eq_ignore_ascii_case("vi")) && matches!(l.as_bytes().get(2), None | Some(b'-' | b'_')));
+    if vi { "Nhập phương trình" } else { "Type an equation" }
+}
+
 /// Lay out an equation set at the size and colour of `rc`. `display`: an equation on a line of
 /// its own (bigger operators, limits above and below, full-size fractions).
 /// `avail` is the width of the line (numbered display equations fill it, wider display equations
@@ -234,7 +242,7 @@ pub fn layout_equation(
     let st = St { level: 0, display, cramped: false, upright: false };
     let avail = if avail.is_finite() { avail.clamp(0.0, 1e5) } else { 0.0 };
     let b = match nodes.as_slice() {
-        [] => cx.hint(st),
+        [] => cx.hint(st, empty_equation_prompt(rc.lang.as_deref())),
         [MNode::EqArr { rows }] if display && rows.iter().any(|r| split_number(r).is_some()) => cx.numbered(rows, st, avail, counter),
         _ if display => cx.wrapped(nodes, st, avail, props),
         _ => cx.arg(nodes, st, 0),

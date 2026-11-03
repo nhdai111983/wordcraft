@@ -400,3 +400,29 @@ fn a_long_text_run_lays_out_in_linear_time() {
     let lay = |m: &Math| drop(std::hint::black_box(lay_in(m, "", false, 1e6, &MathProps::default())));
     assert_linear_steps("math text run", 400, eq, lay);
 }
+
+/// NexusOffice (test tay 02/11): an empty equation prompts in the text's language.
+#[test]
+fn empty_equation_prompt_follows_the_text_language() {
+    let prompt = |lang: Option<&str>| -> Vec<String> {
+        let mut c = rc();
+        c.lang = lang.map(str::to_string);
+        let m = layout_equation(&Math::default(), "", &c, false, 400.0, &MathProps::default(), &mut 0);
+        m.items
+            .iter()
+            .filter_map(|it| match it {
+                MItem::ScreenOnly(inner) => match inner.as_ref() {
+                    MItem::Glyphs { text, .. } => Some(text.clone()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(prompt(Some("vi-VN")).concat(), "Nhập phương trình");
+    assert_eq!(prompt(Some("vi")).concat(), "Nhập phương trình");
+    assert_eq!(prompt(Some("en-US")).concat(), "Type an equation");
+    assert_eq!(prompt(None).concat(), "Type an equation");
+    // "vie" is not a BCP 47 Vietnamese tag here.
+    assert_eq!(prompt(Some("vie")).concat(), "Type an equation");
+}
