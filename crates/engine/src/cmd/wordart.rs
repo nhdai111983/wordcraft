@@ -266,8 +266,10 @@ fn text_width(s: &Session, text: &str, size: f32, bold: bool) -> f32 {
 /// optionally bent), centred on the column at the caret's paragraph; its text is selected so
 /// typing replaces it.
 fn insert(s: &mut Session, v: &Value) -> CmdResult {
-    let text: String = p::str(v, "text").unwrap_or("Your text here").chars().filter(|c| !c.is_control()).take(1000).collect();
-    let text = if text.trim().is_empty() { "Your text here".to_string() } else { text };
+    // NexusOffice (test tay 02/11): the placeholder in the text's language.
+    let placeholder = crate::nexus_vi::doc_text(super::insert::caret_lang(s).as_deref(), "Your text here");
+    let text: String = p::str(v, "text").unwrap_or(placeholder).chars().filter(|c| !c.is_control()).take(1000).collect();
+    let text = if text.trim().is_empty() { placeholder.to_string() } else { text };
     let style = p::str(v, "style").unwrap_or("solid");
     let fx = art_style(style, &theme(s)).ok_or_else(|| CmdError::Params(format!("unknown WordArt style `{style}`")))?;
     let warp = match p::str(v, "transform") {
