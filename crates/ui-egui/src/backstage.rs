@@ -1,6 +1,6 @@
 //! File tab (Backstage): Home/New, Open, Info, Save As, Print, Export, Close, Options, About.
 
-use egui::{Align2, Rect, Sense, Stroke, Ui, pos2, vec2};
+use egui::{Rect, Sense, Stroke, Ui, pos2, vec2};
 use serde_json::json;
 
 use crate::theme::{Tokens, medium, regular, semibold};
@@ -75,25 +75,30 @@ impl Look {
 
 /// The side menu's back button (it closes the Backstage). Upstream: a white chevron. WPS: a
 /// bordered "‹ Back" button, so the way back to the document is plain to see.
-fn back_button(ui: &mut Ui, look: &Look, band: Rect, x: f32) -> egui::Response {
+fn back_button(ui: &mut Ui, look: &Look, band: Rect, x: f32, rtl: bool) -> egui::Response {
     let id = ui.scope_id().with("backstage_back");
+    // Right to left the chevron points right (upstream's mirrored File page).
+    let chevron = if rtl { "chevronRight" } else { "chevronLeft" };
     if look.bar.is_none() {
         let c = pos2(x, band.center().y);
         let resp = ui.interact(Rect::from_center_size(c, vec2(22.0, band.height())), id, Sense::click());
-        icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", look.text, look.text);
+        icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), chevron, look.text, look.text);
         return resp;
     }
     let t = Tokens::get(ui.ctx());
     let label = tl!("Back");
     let font = medium(13.5);
     let tw = ui.painter().layout_no_wrap(label.to_string(), font.clone(), look.text).size().x;
-    let r = Rect::from_min_size(pos2(x - 12.0, band.center().y - 15.0), vec2(12.0 + 16.0 + 6.0 + tw + 14.0, 30.0));
+    let w = 12.0 + 16.0 + 6.0 + tw + 14.0;
+    let left = if rtl { x + 12.0 - w } else { x - 12.0 };
+    let r = Rect::from_min_size(pos2(left, band.center().y - 15.0), vec2(w, 30.0));
     let resp = ui.interact(r, id, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
     let fill = if resp.hovered() { look.hover } else { t.ribbon };
     ui.painter().rect(r, 6.0, fill, Stroke::new(1.0, t.border_strong), egui::StrokeKind::Inside);
-    icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(16.0, 16.0)), "chevronLeft", look.text, look.text);
-    ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, label, font, look.text);
+    let icon_x = crate::rtl::lead_x(rtl, r, 18.0);
+    icons::paint(ui.painter(), Rect::from_center_size(pos2(icon_x, r.center().y), vec2(16.0, 16.0)), chevron, look.text, look.text);
+    ui.painter().text(pos2(crate::rtl::lead_x(rtl, r, 32.0), r.center().y), crate::rtl::lead_center(rtl), label, font, look.text);
     resp
 }
 
@@ -160,15 +165,18 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     }
     // Embedded in the NexusOffice window, the WPS layout has no title bar to share.
     let mac = app.integrated_titlebar && !(app.wps && app.embedded);
-    egui::Panel::left("backstage_nav")
+    crate::rtl::start_panel("backstage_nav")
         .exact_size(200.0)
         // Fixed width, as in Word: without this egui shows a resize handle that does nothing (#502).
         .resizable(false)
         .frame(egui::Frame::NONE.fill(look.nav).inner_margin(egui::Margin { left: 0, right: 0, top: if mac { 0 } else { 12 }, bottom: 12 }))
         .show(ui, |ui| {
+            // Right to left the navigation is on the right, away from the macOS traffic lights.
+            let rtl = crate::rtl::on();
             if let Some(line) = look.divider {
                 let full = ui.max_rect();
-                let x = full.max.x - 0.5;
+                // The divider sits between the menu and the page: on its left right to left.
+                let x = if rtl { full.min.x + 0.5 } else { full.max.x - 0.5 };
                 ui.painter().vline(x, (full.min.y - 12.0)..=(full.max.y + 12.0), Stroke::new(1.0, line));
             }
             let back = if mac {
@@ -180,11 +188,18 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
                 }
                 // The chevron's stroke starts at the content edge.
-                let c = back_chevron_c(band.min.x, band.center().y, app.session.view.full_screen, app.mac_titlebar.content_left);
-                back_button(ui, &look, band, c.x)
+                let c = if rtl {
+                    pos2(band.max.x - 26.0, band.center().y)
+                } else {
+                    back_chevron_c(band.min.x, band.center().y, app.session.view.full_screen, app.mac_titlebar.content_left)
+                };
+                back_button(ui, &look, band, c.x, rtl)
             } else {
+                // The hit area is scoped to the chevron, not the whole 200px-wide row (#3041):
+                // the row reads as plain sidebar background next to it, so clicking there must
+                // not also close the File page, same as the macOS chevron fix (#2972) below.
                 let (r, _) = ui.allocate_exact_size(vec2(200.0, if look.bar.is_some() { 44.0 } else { 40.0 }), Sense::hover());
-                back_button(ui, &look, r, r.min.x + 26.0)
+                back_button(ui, &look, r, crate::rtl::lead_x(rtl, r, 26.0), rtl)
             };
             // Escape in the built-in file browser closes only the browser.
             if back.clicked() || (!app.file_dialog_open() && ui.input(|i| i.key_pressed(egui::Key::Escape))) {
@@ -210,10 +225,16 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 } else {
                     look.text
                 };
-                icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 31.0, r.center().y), vec2(18.0, 18.0)), icon, ink, ink);
+                icons::paint(
+                    ui.painter(),
+                    Rect::from_center_size(pos2(crate::rtl::lead_x(rtl, r, 31.0), r.center().y), vec2(18.0, 18.0)),
+                    icon,
+                    ink,
+                    ink,
+                );
                 ui.painter().text(
-                    pos2(r.min.x + 52.0, r.center().y),
-                    Align2::LEFT_CENTER,
+                    pos2(crate::rtl::lead_x(rtl, r, 52.0), r.center().y),
+                    crate::rtl::lead_center(rtl),
                     tl!(label),
                     if active { semibold(14.0) } else { medium(14.0) },
                     ink,
@@ -238,7 +259,8 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     if resp.hovered() {
                         paint_row(ui, &look, r, look.hover, false);
                     }
-                    ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, tl!(label), regular(13.0), look.text);
+                    let at = pos2(crate::rtl::lead_x(rtl, r, 22.0), r.center().y);
+                    ui.painter().text(at, crate::rtl::lead_center(rtl), tl!(label), regular(13.0), look.text);
                     if resp.clicked() {
                         if id == "discord" {
                             let _ = app.run("ui.discord", json!({}));
@@ -252,19 +274,21 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(look.page).inner_margin(egui::Margin::symmetric(40, 30))).show(ui, |ui| {
         // The Print page fills the pane and scrolls its settings and its preview itself (#1156).
         if app.ui.backstage_page == "print" {
-            export_page(app, ui);
+            crate::rtl::root(ui, |ui| export_page(app, ui));
             return;
         }
-        egui::ScrollArea::vertical().show(ui, |ui| match app.ui.backstage_page.as_str() {
-            "home" => home_page(app, ui),
-            "new" => new_page(app, ui),
-            "open" => open_page(app, ui),
-            "saveAs" => save_as_page(app, ui),
-            "info" => info_page(app, ui),
-            "recover" => recovery_page(app, ui),
-            "print" | "export" => export_page(app, ui),
-            "options" => crate::options::page(app, ui),
-            _ => home_page(app, ui),
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            crate::rtl::root(ui, |ui| match app.ui.backstage_page.as_str() {
+                "home" => home_page(app, ui),
+                "new" => new_page(app, ui),
+                "open" => open_page(app, ui),
+                "saveAs" => save_as_page(app, ui),
+                "info" => info_page(app, ui),
+                "recover" => recovery_page(app, ui),
+                "print" | "export" => export_page(app, ui),
+                "options" => crate::options::page(app, ui),
+                _ => home_page(app, ui),
+            })
         });
     });
 }
@@ -302,7 +326,7 @@ fn recovery_page(app: &mut WordApp, ui: &mut Ui) {
         ui.label(tl!("No recovery copies."));
     }
     let busy = app.session.recovery_busy();
-    egui::Grid::new("recovery_documents").min_col_width(180.0).spacing(vec2(24.0, 16.0)).show(ui, |ui| {
+    crate::rtl::grid(ui, egui::Grid::new("recovery_documents").min_col_width(180.0).spacing(vec2(24.0, 16.0)), |ui| {
         if !documents.is_empty() {
             ui.strong(tl!("Document"));
             ui.strong(tl!("Recovery copy"));
@@ -387,7 +411,7 @@ fn heading(ui: &mut Ui, s: &str) {
 /// region-aware page preview, and creates a document from the template on click.
 fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
     let t = Tokens::get(ui.ctx());
-    ui.vertical(|ui| {
+    crate::rtl::vertical(ui, |ui| {
         // The thumbnail and its caption are one button named by the caption, so a screen reader
         // announces "Blank document, button" rather than unnamed text (#3176); the caption opens
         // the template too, as in Word.
@@ -457,8 +481,7 @@ fn matching_templates(query: &str) -> Vec<(&'static str, &'static str)> {
 /// Home: a greeting, Blank plus a short row of templates with a link to New, then Recent.
 fn home_page(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    // NexusOffice (QC-DOC-11): the hour on the user's clock, not UTC.
-    let hour = wordcraft_engine::cmd::now_local_iso().get(11..13).and_then(|h| h.parse::<u32>().ok()).unwrap_or(9);
+    let hour = wordcraft_engine::cmd::local_now().3.0;
     heading(
         ui,
         if hour < 12 {
@@ -632,7 +655,7 @@ fn matching_personal(query: &str, list: &[PersonalTemplate]) -> Vec<PersonalTemp
 /// click makes a new document from it.
 fn personal_tile(ui: &mut Ui, app: &mut WordApp, p: &PersonalTemplate) {
     let t = Tokens::get(ui.ctx());
-    ui.vertical(|ui| {
+    crate::rtl::vertical(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
         ui.set_max_width(150.0);
         let (r, resp) = ui.allocate_exact_size(vec2(150.0, 194.0), Sense::click());
@@ -687,15 +710,27 @@ fn open_list(app: &mut WordApp, ui: &mut Ui) {
     let names = shown.iter().map(|p| file_name(p)).collect::<Vec<_>>();
     for (p, name) in shown.iter().zip(&names) {
         let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width().min(700.0), 40.0), Sense::click());
+        // The row shows a name and a path that may not fit: the path in full is its tooltip.
+        let resp = resp.on_hover_text(crate::i18n::isolate_path(p));
         // Two documents with the same file name are told apart by their path, as on screen.
         let spoken = if names.iter().filter(|n| *n == name).count() > 1 { format!("{name}, {p}") } else { name.clone() };
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), &spoken));
         if resp.hovered() {
             ui.painter().rect_filled(r, 4.0, t.hover);
         }
-        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(22.0, 22.0)), "printLayout", t.icon, t.accent);
-        ui.painter().text(pos2(r.min.x + 40.0, r.min.y + 13.0), Align2::LEFT_CENTER, name, medium(13.0), t.text);
-        ui.painter().text(pos2(r.min.x + 40.0, r.min.y + 29.0), Align2::LEFT_CENTER, p, regular(11.0), t.text_dim);
+        // Names and paths are set apart (a right-to-left line would scramble their marks and
+        // folders) and the row starts at the side reading starts from.
+        let rtl = crate::rtl::on();
+        icons::paint(
+            ui.painter(),
+            Rect::from_center_size(pos2(crate::rtl::lead_x(rtl, r, 18.0), r.center().y), vec2(22.0, 22.0)),
+            "printLayout",
+            t.icon,
+            t.accent,
+        );
+        let side = crate::rtl::lead_center(rtl);
+        ui.painter().text(pos2(crate::rtl::lead_x(rtl, r, 40.0), r.min.y + 13.0), side, crate::i18n::isolate(name), medium(13.0), t.text);
+        ui.painter().text(pos2(crate::rtl::lead_x(rtl, r, 40.0), r.min.y + 29.0), side, crate::i18n::isolate_path(p), regular(11.0), t.text_dim);
         if resp.clicked() {
             let failed = open_recent(app, p).err();
             ui.ctx().data_mut(|d| d.insert_temp(open_error_id(), failed.unwrap_or_default()));
@@ -821,94 +856,111 @@ fn elide_middle(s: &str, keep: usize) -> String {
 fn info_page(app: &mut WordApp, ui: &mut Ui) {
     heading(ui, "Info");
     let info = app.session.run("file.info", &json!({})).unwrap_or_default();
+    // Properties at the reading start, so at the right in a mirrored interface, Statistics after.
+    let (first, second) = if crate::rtl::on() { (1, 0) } else { (0, 1) };
     ui.columns(2, |cols| {
-        let ui = &mut cols[0];
-        section(ui, "docPrefs", "Properties");
-        // The fields edit a copy of the document's properties that is read afresh every frame,
-        // so each change goes into the document as it is typed (#260): waiting for the field to
-        // lose focus dropped the keystrokes, and leaving File with Escape never loses it at all.
-        // The keystrokes of one visit to a field are a single undo step.
-        let mut props = app.session.doc.core.clone();
-        let mut edited = None;
-        let mut focused = None;
-        egui::Grid::new("props").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
-            for (l, v) in [("Title", &mut props.title), ("Subject", &mut props.subject), ("Author", &mut props.creator), ("Keywords", &mut props.keywords), ("Category", &mut props.category)] {
-                let label = ui.label(tl!(l));
-                let r = ui.add(egui::TextEdit::singleline(v).id_salt(("info-prop", l))).labelled_by(label.id);
-                if r.changed() {
+        crate::rtl::root(&mut cols[first], |ui| info_properties(app, ui, &info));
+        crate::rtl::root(&mut cols[second], |ui| info_statistics(ui, &info));
+    });
+}
+
+fn info_properties(app: &mut WordApp, ui: &mut Ui, info: &serde_json::Value) {
+    section(ui, "docPrefs", "Properties");
+    // The fields edit a copy of the document's properties that is read afresh every frame,
+    // so each change goes into the document as it is typed (#260): waiting for the field to
+    // lose focus dropped the keystrokes, and leaving File with Escape never loses it at all.
+    // The keystrokes of one visit to a field are a single undo step.
+    let mut props = app.session.doc.core.clone();
+    let mut edited = None;
+    let mut focused = None;
+    crate::rtl::Table::new("props").columns(2).spacing(vec2(12.0, 6.0)).show(ui, |t| {
+        for (l, v) in [
+            ("Title", &mut props.title),
+            ("Subject", &mut props.subject),
+            ("Author", &mut props.creator),
+            ("Keywords", &mut props.keywords),
+            ("Category", &mut props.category),
+        ] {
+            t.row(|r| {
+                let label = r.cell(|ui| ui.label(tl!(l)));
+                let field = r.cell(|ui| ui.add(egui::TextEdit::singleline(v).id_salt(("info-prop", l))).labelled_by(label.id));
+                if field.changed() {
                     edited = Some(l);
                 }
-                if r.has_focus() {
+                if field.has_focus() {
                     focused = Some(l);
                 }
-                ui.end_row();
-            }
-        });
-        if let Some(field) = edited {
-            if app.info_editing == Some((field, app.session.rev())) {
-                app.session.join_next_undo();
-            }
-            let ok = app.run("file.properties", json!({"title": props.title, "subject": props.subject, "author": props.creator, "keywords": props.keywords, "category": props.category})).is_ok();
-            app.info_editing = ok.then(|| (field, app.session.rev()));
-        }
-        if focused != app.info_editing.map(|(f, _)| f) {
-            app.info_editing = None;
-        }
-        // Advanced Properties › Custom (#2982): view and edit the document's custom properties.
-        ui.add_space(6.0);
-        if ui
-            .button(egui::RichText::new(tl!("Advanced Properties…")).font(medium(13.5)))
-            .on_hover_text(tl!("View and edit the document's custom properties."))
-            .clicked()
-        {
-            let _ = app.run("ui.dialog", json!({"name": "customProperties"}));
-        }
-        // Protect Document › Encrypt with Password (#55).
-        ui.add_space(20.0);
-        section(ui, "signature", "Protect Document");
-        let encrypted = info.get("encrypted").and_then(|v| v.as_bool()).unwrap_or(false);
-        ui.label(if encrypted {
-            tl!("A password is required to open this document.")
-        } else {
-            tl!("Anyone can open this document. Encrypt it with a password to keep it private.")
-        });
-        ui.horizontal(|ui| {
-            let label = if encrypted { tl!("Change Password…") } else { tl!("Encrypt with Password…") };
-            if ui.button(egui::RichText::new(label).font(medium(13.5))).clicked() {
-                let _ = app.run("file.encrypt", json!({}));
-            }
-            if encrypted && ui.button(egui::RichText::new(tl!("Remove Password")).font(medium(13.5))).clicked() {
-                let _ = app.run("file.encrypt", json!({"password": null}));
-            }
-        });
-        let ui = &mut cols[1];
-        section(ui, "wordCount", "Statistics");
-        // Two rows of big numbers: the counts are what the page is read for, so they carry the
-        // weight instead of hiding inside sentences.
-        let counts = [("Pages", "pages"), ("Words", "words"), ("Paragraphs", "paragraphs"), ("Sections", "sections"), ("Comments", "comments")];
-        for row in counts.chunks(3) {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 26.0;
-                for (l, k) in row {
-                    stat(ui, l, &info.get(*k).map(|v| v.to_string()).unwrap_or_else(|| "–".into()));
-                }
             });
-            ui.add_space(10.0);
-        }
-        ui.add_space(8.0);
-        section(ui, "folder", "Location");
-        let t = Tokens::get(ui.ctx());
-        match info.get("path").and_then(|v| v.as_str()) {
-            // The full path is in the tooltip: the panel is narrow and a long path would
-            // otherwise stretch the column.
-            Some(path) => {
-                ui.label(egui::RichText::new(elide_middle(path, 46)).font(medium(12.5)).color(t.text_dim)).on_hover_text(path);
-            }
-            None => {
-                ui.label(egui::RichText::new(tl!("Not saved yet")).font(medium(12.5)).color(t.text_dim));
-            }
         }
     });
+    if let Some(field) = edited {
+        if app.info_editing == Some((field, app.session.rev())) {
+            app.session.join_next_undo();
+        }
+        let ok = app.run("file.properties", json!({"title": props.title, "subject": props.subject, "author": props.creator, "keywords": props.keywords, "category": props.category})).is_ok();
+        app.info_editing = ok.then(|| (field, app.session.rev()));
+    }
+    if focused != app.info_editing.map(|(f, _)| f) {
+        app.info_editing = None;
+    }
+    // Advanced Properties › Custom (#2982): view and edit the document's custom properties.
+    ui.add_space(6.0);
+    if ui
+        .button(egui::RichText::new(tl!("Advanced Properties…")).font(medium(13.5)))
+        .on_hover_text(tl!("View and edit the document's custom properties."))
+        .clicked()
+    {
+        let _ = app.run("ui.dialog", json!({"name": "customProperties"}));
+    }
+    // Protect Document › Encrypt with Password (#55).
+    ui.add_space(20.0);
+    section(ui, "signature", "Protect Document");
+    let encrypted = info.get("encrypted").and_then(|v| v.as_bool()).unwrap_or(false);
+    ui.label(if encrypted {
+        tl!("A password is required to open this document.")
+    } else {
+        tl!("Anyone can open this document. Encrypt it with a password to keep it private.")
+    });
+    ui.horizontal(|ui| {
+        let label = if encrypted { tl!("Change Password…") } else { tl!("Encrypt with Password…") };
+        if ui.button(egui::RichText::new(label).font(medium(13.5))).clicked() {
+            let _ = app.run("file.encrypt", json!({}));
+        }
+        if encrypted && ui.button(egui::RichText::new(tl!("Remove Password")).font(medium(13.5))).clicked() {
+            let _ = app.run("file.encrypt", json!({"password": null}));
+        }
+    });
+}
+
+fn info_statistics(ui: &mut Ui, info: &serde_json::Value) {
+    section(ui, "wordCount", "Statistics");
+    // Two rows of big numbers: the counts are what the page is read for, so they carry the
+    // weight instead of hiding inside sentences.
+    let counts = [("Pages", "pages"), ("Words", "words"), ("Paragraphs", "paragraphs"), ("Sections", "sections"), ("Comments", "comments")];
+    for row in counts.chunks(3) {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 26.0;
+            for (l, k) in row {
+                stat(ui, l, &info.get(*k).map(|v| v.to_string()).unwrap_or_else(|| "–".into()));
+            }
+        });
+        ui.add_space(10.0);
+    }
+    ui.add_space(8.0);
+    section(ui, "folder", "Location");
+    let t = Tokens::get(ui.ctx());
+    match info.get("path").and_then(|v| v.as_str()) {
+        // The full path is in the tooltip: the panel is narrow and a long path would otherwise
+        // stretch the column. A path reads left to right whatever its folders are called, so in
+        // a right-to-left interface it is isolated (upstream's `isolate_path`).
+        Some(path) => {
+            let shown = crate::i18n::isolate_path(&elide_middle(path, 46));
+            ui.label(egui::RichText::new(shown).font(medium(12.5)).color(t.text_dim)).on_hover_text(crate::i18n::isolate_path(path));
+        }
+        None => {
+            ui.label(egui::RichText::new(tl!("Not saved yet")).font(medium(12.5)).color(t.text_dim));
+        }
+    }
 }
 
 fn export_page(app: &mut WordApp, ui: &mut Ui) {

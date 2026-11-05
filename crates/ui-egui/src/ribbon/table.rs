@@ -18,7 +18,7 @@ pub(super) fn table_design(app: &mut WordApp, ui: &mut Ui) {
             options.iter().map(|r| r.to_vec()).collect()
         };
         let spacing = if crate::nexus_wps::compact(ui) { vec2(10.0, 4.0) } else { ui.spacing().item_spacing };
-        egui::Grid::new("look").spacing(spacing).show(ui, |ui| {
+        crate::rtl::grid(ui, egui::Grid::new("look").spacing(spacing), |ui| {
             for items in &rows {
                 for (label, key, val) in items {
                     let mut v = *val;
@@ -46,14 +46,16 @@ pub(super) fn table_design(app: &mut WordApp, ui: &mut Ui) {
         if crate::nexus_wps::compact(ui) {
             ui.spacing_mut().scroll = egui::style::ScrollStyle::floating();
         }
-        egui::ScrollArea::horizontal().max_width(420.0).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                for (_, id, name) in styles {
-                    if crate::previews::table_style_tile(ui, app, &id).on_hover_text(name).clicked() {
-                        let _ = app.run("table.style", json!({"style": id}));
+        crate::rtl::island(ui, |ui| {
+            egui::ScrollArea::horizontal().max_width(420.0).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for (_, id, name) in styles {
+                        if crate::previews::table_style_tile(ui, app, &id).on_hover_text(name).clicked() {
+                            let _ = app.run("table.style", json!({"style": id}));
+                        }
                     }
-                }
-            });
+                });
+            })
         });
         stack(ui, |ui| {
             let current = look.and_then(|_| {
@@ -296,7 +298,7 @@ pub(super) fn table_layout(app: &mut WordApp, ui: &mut Ui) {
         });
     });
     group(ui, "Alignment", None, app, |ui, app| {
-        egui::Grid::new("cellalign").spacing(vec2(1.0, 1.0)).show(ui, |ui| {
+        crate::rtl::grid(ui, egui::Grid::new("cellalign").spacing(vec2(1.0, 1.0)), |ui| {
             for row in [
                 [("topLeft", "Align Top Left"), ("topCenter", "Align Top Center"), ("topRight", "Align Top Right")],
                 [("centerLeft", "Align Center Left"), ("center", "Align Center"), ("centerRight", "Align Center Right")],

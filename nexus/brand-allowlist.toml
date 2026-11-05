@@ -52,7 +52,7 @@ pattern = '.*'
 reason = "Chính bảng thay thế WordCraft→Nexus Docs, ArtCraft→NexusOffice và test của nó"
 
 [[allow]]
-path = "{ROADMAP.md,AGENTS.md,CLAUDE.md,packaging/web/README.md,packaging/macos/dmg/README.md}"
+path = "{ROADMAP.md,AGENTS.md,CLAUDE.md,GLOSSARY.md,packaging/web/README.md,packaging/macos/dmg/README.md}"
 pattern = '.*'
 reason = "Tài liệu dev của upstream, không đóng gói, không phải giao diện (README.md đã viết lại cho Nexus Docs và được quét)"
 

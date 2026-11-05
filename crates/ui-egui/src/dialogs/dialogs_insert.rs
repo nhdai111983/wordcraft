@@ -102,7 +102,8 @@ pub(crate) fn buttons(ui: &mut Ui, ok: &str, cancel: &str, ok_enabled: bool) -> 
     // inside `horizontal` takes all the height left, so a dialog in a window with room to grow
     // (SmartArt) stretched to the bottom of the screen with its buttons far below the content.
     let row = egui::vec2(ui.available_width(), ui.spacing().interact_size.y.max(24.0));
-    ui.allocate_ui_with_layout(row, egui::Layout::right_to_left(egui::Align::Center), |ui| {
+    let far = crate::rtl::far_side(ui, egui::Align::Center);
+    ui.allocate_ui_with_layout(row, far, |ui| {
         let (okb, cancelb) =
             crate::dialogs::ok_cancel_responses(ui, |ui| ui.add_enabled(ok_enabled, crate::widgets::primary_button(ui, tl!(ok))), tl!(cancel));
         if cancelb.clicked() || crate::dialogs::cancel_key_pressed(ui) {

@@ -70,7 +70,7 @@ pub(super) fn stack(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
     if crate::nexus_wps::compact(ui) {
         return crate::nexus_wps::compact_stack(ui, add);
     }
-    ui.vertical(|ui| {
+    crate::rtl::vertical(ui, |ui| {
         ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
         add(ui);
     });
@@ -114,7 +114,7 @@ pub(super) fn mi_icon(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, i
 pub(super) fn mi_text(ui: &mut Ui, app: &mut WordApp, text: &str, id: &str, params: Value) {
     let sc = crate::widgets::shortcut_text(app, id);
     let enabled = crate::widgets::enabled(app, id);
-    let resp = ui.add_enabled(enabled, egui::Button::new(text).shortcut_text(sc).min_size(vec2(200.0, 0.0)));
+    let resp = ui.add_enabled(enabled, crate::rtl::menu_item(ui, text, &sc, 200.0));
     if resp.clicked() {
         crate::widgets::run_from_ribbon(app, id, params);
         ui.close();

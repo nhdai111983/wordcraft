@@ -77,10 +77,10 @@ pub fn sample(mut d: Document) -> Document {
     quote.props.space_before = Some(12.0);
     b.push(Block::Para(quote));
     b.push(Block::Para(styled("Những điều chúng ta thống nhất", "Heading2")));
-    let mut num = d.numbering.clone();
+    // The numbering is shared copy-on-write (upstream's `Arc`): changed through `make_mut`.
+    let num = std::sync::Arc::make_mut(&mut d.numbering);
     let bullets = num.add_list(ListKind::Bullet);
     let steps = num.add_list(ListKind::Numbered);
-    d.numbering = num;
     for (lead, rest) in [
         ("Dùng xong dọn ngay. ", "Để lại mặt bàn như cách bạn muốn thấy nó."),
         ("Ghi tên đồ của mình. ", "Vật liệu không ghi tên trên kệ chung là của chung."),

@@ -240,7 +240,7 @@ impl Session {
                 *field = now;
             }
         }
-        let (o, n, c) = (&old.styles.default_chr, &new.styles.default_chr, &mut self.doc.styles.default_chr);
+        let (o, n, c) = (&old.styles.default_chr, &new.styles.default_chr, &mut std::sync::Arc::make_mut(&mut self.doc.styles).default_chr);
         if c.font == o.font {
             c.font = n.font.clone();
         }
@@ -376,7 +376,7 @@ pub fn blank_document(region: &wordcraft_geom::Region) -> Document {
         sp.margin_bottom = r.margin_bottom;
         sp.margin_left = r.margin_left;
         sp.margin_right = r.margin_right;
-        let c = &mut d.styles.default_chr;
+        let c = &mut std::sync::Arc::make_mut(&mut d.styles).default_chr;
         c.font = Some(r.font.into());
         c.size = Some(r.size);
         c.lang = Some(r.lang.into());
