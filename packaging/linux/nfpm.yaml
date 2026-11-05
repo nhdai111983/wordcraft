@@ -71,17 +71,17 @@ contents:
   # Named one by one rather than as a tree of /usr/share: a tree would also own shared directories
   # such as /usr/share/mime, which openSUSE's filesystem package owns with other modes, and RPM
   # refuses to install a package that conflicts with it.
-  - src: ${STAGE}/usr/share/applications/ai.storyteller.wordcraft.desktop
-    dst: /usr/share/applications/ai.storyteller.wordcraft.desktop
-  - src: ${STAGE}/usr/share/mime/packages/ai.storyteller.wordcraft.xml
-    dst: /usr/share/mime/packages/ai.storyteller.wordcraft.xml
-  - src: ${STAGE}/usr/share/metainfo/ai.storyteller.wordcraft.metainfo.xml
-    dst: /usr/share/metainfo/ai.storyteller.wordcraft.metainfo.xml
+  - src: ${STAGE}/usr/share/applications/vn.sonnytech.nexus.docs.desktop
+    dst: /usr/share/applications/vn.sonnytech.nexus.docs.desktop
+  - src: ${STAGE}/usr/share/mime/packages/vn.sonnytech.nexus.docs.xml
+    dst: /usr/share/mime/packages/vn.sonnytech.nexus.docs.xml
+  - src: ${STAGE}/usr/share/metainfo/vn.sonnytech.nexus.docs.metainfo.xml
+    dst: /usr/share/metainfo/vn.sonnytech.nexus.docs.metainfo.xml
   - src: ${STAGE}/usr/share/icons/hicolor/
     dst: /usr/share/icons/hicolor/
     type: tree
-  - src: ${STAGE}/usr/share/doc/wordcraft/
-    dst: /usr/share/doc/wordcraft/
+  - src: ${STAGE}/usr/share/doc/nexus-docs/
+    dst: /usr/share/doc/nexus-docs/
     type: tree
 
 scripts:
