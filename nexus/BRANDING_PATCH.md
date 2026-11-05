@@ -190,6 +190,25 @@ không có telemetry/crash report/cập nhật tự động trong app. Link ArtC
 `ui.discord` (đã chặn: `nexus::COMMUNITY_URL = None`) và link About (đã bỏ). AppImage zsync trỏ
 GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft` — kênh cập nhật, GitHub chuyển hướng sau khi chuyển repo sang `sonnytech-vn`).
 
+**Gói ngôn ngữ tự tải danh sách khi mở app (upstream mới, đồng bộ 2026-11-05):**
+`packs::refresh_if_stale()` (`crates/engine/src/packs.rs:~1008`), gọi mỗi khung hình từ
+`language_packs::tick` (`crates/ui-egui/src/language_packs.rs:~188`), tải nền một lần mỗi phiên
+`index.json` của gói ngôn ngữ, không hỏi lại.
+- Điều kiện kích hoạt: cửa sổ app (yêu cầu chạy trên luồng nền, `runs_in_background()`; CLI/MCP
+  không tự tải), người dùng **đã bật** tải gói ngôn ngữ trước đó (`network_on()`: cài đặt
+  downloading của font store = On, bật ở Tệp › Tùy chọn › Ngôn ngữ), và chưa có danh sách: chưa
+  cache, hoặc cache theo pin cũ (sha256 của `index.json` khác `PACK_INDEX` của bản build); phiên này
+  chưa tải và không có lần tải nào đang chạy. Tải hỏng chỉ ghi lỗi cho Tùy chọn. Downloading tắt
+  thì không có gọi mạng nào.
+- URL: `https://github.com/storytold/craft-i18n/releases/download/language-packs-2/index.json`
+  (`PACK_INDEX` ở `crates/engine/src/packs/store.rs`; cài gói tải
+  `…/language-packs-2/{locale}.tar.zst` cùng chỗ). `CRAFT_LANGUAGE_PACK_INDEX` trỏ được sang index
+  cục bộ/thử nghiệm.
+- Henry đã chốt: giữ nguyên hành vi upstream của Language packs (downloading mặc định tắt, người
+  dùng tự bật); không thêm patch chặn lần tải tự động này.
+- Đổi URL khỏi `storytold/craft-i18n` (sang bản phát hành của SonnyTech): **chưa làm, vẫn chờ Henry
+  quyết** (URL đang nằm trong allowlist, xem dòng `crates/engine/src/packs.rs` ở bảng trên).
+
 ## Đồng bộ upstream 2026-11-05
 
 - 239 commit upstream (`c0ab7e29`, bản 0.15.1). egui/winit giữ rev `6d518fc7`/`a517b384` (`[patch.crates-io]` từ `storytold/egui`, `storytold/winit`); craft-i18n `9d6d54d6`.
