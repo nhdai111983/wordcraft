@@ -11,11 +11,11 @@ use wordcraft_doc::line_dash::{DASH_PERCENT, LineDash, MAX_DASH_STOPS};
 use wordcraft_doc::props::Rgb;
 use wordcraft_doc::wordart::GradStop;
 
-/// The arrowhead WordCraft writes (`draw:marker`, §16.39): a plain triangle pointing along the
+/// The arrowhead Nexus Docs writes (`draw:marker`, §16.39): a plain triangle pointing along the
 /// line, its tip at the line's end.
-pub(super) const ARROW: &str = "WordCraft_20_Arrow";
+pub(super) const ARROW: &str = "Nexus_20_Docs_20_Arrow";
 pub(super) const ARROW_DEF: &str =
-    "<draw:marker draw:name=\"WordCraft_20_Arrow\" draw:display-name=\"WordCraft Arrow\" svg:viewBox=\"0 0 20 20\" svg:d=\"M10 0L20 20H0z\"/>";
+    "<draw:marker draw:name=\"Nexus_20_Docs_20_Arrow\" draw:display-name=\"Nexus Docs Arrow\" svg:viewBox=\"0 0 20 20\" svg:d=\"M10 0L20 20H0z\"/>";
 
 /// A dash or space length: a fraction of the line width, or an absolute length in points.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -320,7 +320,7 @@ impl DrawDefs {
         if let Some(n) = self.names.get(&key) {
             return Some(n.clone());
         }
-        let name = format!("WordCraft_20_{kind}_20_{prefix}{}", self.names.len() + 1);
+        let name = format!("Nexus_20_Docs_20_{kind}_20_{prefix}{}", self.names.len() + 1);
         let def = make(&name)?;
         self.names.insert(key, name.clone());
         self.defs.insert(name.clone(), def);
