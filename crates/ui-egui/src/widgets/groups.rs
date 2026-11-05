@@ -19,7 +19,11 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
     let t = Tokens::get(ui.ctx());
     let h = content_h(ui);
     let titles = crate::nexus::look::GROUP_TITLES;
-    let start = ui.cursor().min;
+    // Groups follow the ribbon's direction: in a right-to-left interface the content starts at
+    // the right, and the launcher and the divider sit on the left.
+    let rtl = crate::rtl::flows(ui);
+    let start_cursor = ui.cursor();
+    let start = start_cursor.min;
     // #662: the window may be too narrow for the tab; the plan says how this group fits.
     let position = crate::ribbon_fit::position(ui.ctx());
     let level = crate::ribbon_fit::level(ui.ctx(), id_title);
@@ -29,12 +33,12 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
         // Not folded: a drop-down left open while it was folded doesn't come back by itself.
         ui.data_mut(|d| d.remove::<bool>(collapsed_open_id(ui, id_title, position)));
         let label_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(title.to_string(), regular(11.0), t.group_label).size().x);
-        let inner = ui.vertical(|ui| {
+        let inner = crate::rtl::vertical(ui, |ui| {
             if titles {
                 ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
             }
             crate::ribbon_fit::set_compact(ui.ctx(), level == crate::ribbon_fit::COMPACT);
-            let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), h), egui::Layout::left_to_right(egui::Align::Min), |ui| {
+            let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), h), crate::rtl::row_layout(ui, egui::Align::Min), |ui| {
                 ui.spacing_mut().item_spacing = vec2(1.0, 1.0);
                 add(ui, app);
             });
@@ -48,33 +52,53 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
         });
         let r = inner.response.rect;
         if titles {
-            title_row(ui, Rect::from_min_max(pos2(start.x, start.y + h), pos2(r.max.x, start.y + h + LABEL_H)), id_title, title, launcher, app);
+            title_row(
+                ui,
+                Rect::from_min_max(pos2(if rtl { r.min.x } else { start.x }, start.y + h), pos2(r.max.x, start.y + h + LABEL_H)),
+                id_title,
+                title,
+                launcher,
+                app,
+            );
         } else if let Some(cmd) = launcher {
-            // NexusOffice look: without titles the launcher gets its own narrow column right of
-            // the controls, level with their bottom row.
+            // NexusOffice look: without titles the launcher gets its own narrow column after the
+            // controls (right of them, left right to left), level with their bottom row.
             let (col, _) = ui.allocate_exact_size(vec2(13.0, h), Sense::hover());
             launcher_button(ui, Rect::from_center_size(pos2(col.center().x, col.max.y - 7.0), vec2(11.0, 11.0)), id_title, title, cmd, app);
         }
     }
     ui.add_space(5.0);
-    let x = ui.cursor().min.x;
+    let x = if rtl { ui.cursor().max.x } else { ui.cursor().min.x };
     ui.painter().line_segment([pos2(x, start.y + 4.0), pos2(x, start.y + h + LABEL_H - 4.0)], Stroke::new(1.0, t.border));
     ui.add_space(6.0);
+    let width = group_width(rtl, start_cursor, ui.cursor());
     if let Some((area, cmd)) = group_menu {
-        let r = Rect::from_min_max(start, pos2(x, start.y + h + LABEL_H));
+        let r = if rtl {
+            Rect::from_min_max(pos2(x, start.y), pos2(start_cursor.max.x, start.y + h + LABEL_H))
+        } else {
+            Rect::from_min_max(start, pos2(x, start.y + h + LABEL_H))
+        };
         crate::nexus_wps::group_menu(ui, area, r, title, cmd, app);
     }
-    crate::ribbon_fit::record(ui.ctx(), id_title, level, ui.cursor().min.x - start.x);
-    crate::nexus_wps::group_end(ui, slot, ui.cursor().min.x - start.x);
+    crate::ribbon_fit::record(ui.ctx(), id_title, level, width);
+    crate::nexus_wps::group_end(ui, slot, width);
+}
+
+/// The width a group took: the cursor's way along the row, from `before` to `after`. A
+/// right-to-left row fills from its right edge, where the cursor's left edge is negative infinity,
+/// so there the width is how far the right edge moved.
+fn group_width(rtl: bool, before: Rect, after: Rect) -> f32 {
+    if rtl { before.max.x - after.max.x } else { after.min.x - before.min.x }
 }
 
 /// A group's title row (`r`): the centred title and, with a `launcher`, its dialog launcher.
 fn title_row(ui: &mut Ui, r: Rect, id_title: &str, title: &str, launcher: Option<&str>, app: &mut WordApp) {
     let t = Tokens::get(ui.ctx());
     let title_y = r.center().y;
+    let rtl = crate::rtl::flows(ui);
     ui.painter().text(pos2(r.center().x, title_y), Align2::CENTER_CENTER, title, regular(11.0), t.group_label);
     if let Some(cmd) = launcher {
-        launcher_button(ui, Rect::from_center_size(pos2(r.max.x - 6.0, title_y), vec2(11.0, 11.0)), id_title, title, cmd, app);
+        launcher_button(ui, Rect::from_center_size(pos2(crate::rtl::trail_x(rtl, r, 6.0), title_y), vec2(11.0, 11.0)), id_title, title, cmd, app);
     }
 }
 
@@ -146,9 +170,9 @@ fn collapsed_group(
         // This popup isn't counted by `Popup::is_any_open`, so keep the same Esc from also leaving
         // full screen.
         app.escape_free = false;
-        egui::Popup::menu(&resp).open_bool(&mut shown).close_behavior(egui::PopupCloseBehavior::IgnoreClicks).show(|ui| {
-            ui.vertical(|ui| {
-                ui.horizontal_top(|ui| {
+        crate::rtl::menu(&resp).open_bool(&mut shown).close_behavior(egui::PopupCloseBehavior::IgnoreClicks).show(|ui| {
+            crate::rtl::vertical(ui, |ui| {
+                crate::rtl::horizontal_top(ui, |ui| {
                     ui.set_min_height(CONTENT_H);
                     ui.spacing_mut().item_spacing = vec2(1.0, 1.0);
                     add(ui, app);
@@ -212,7 +236,7 @@ pub fn command_icon(id: &str) -> &str {
 /// Right-click on a command's button: put it on (or take it off) the Quick Access Toolbar, or
 /// open Customize Ribbon (#379).
 pub fn command_menu(resp: &Response, app: &mut WordApp, id: &str) {
-    resp.context_menu(|ui| {
+    crate::rtl::context_menu(resp, |ui| {
         let known = app.session.registry.get(id).is_some();
         let on_qat = app.session.ribbon.qat().contains(&id);
         if known && !on_qat && ui.button(tl!("Add to Quick Access Toolbar")).clicked() {
@@ -253,4 +277,22 @@ pub fn row(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
         ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
         add(ui);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A right-to-left row's cursor reaches to negative infinity on the left, so the width of a
+    /// group in it comes from the right edge: finite and positive, as the ribbon planner needs.
+    #[test]
+    fn a_group_in_a_right_to_left_row_has_a_finite_width() {
+        let before = Rect::from_min_max(pos2(f32::NEG_INFINITY, 0.0), pos2(900.0, 90.0));
+        let after = Rect::from_min_max(pos2(f32::NEG_INFINITY, 0.0), pos2(740.0, 90.0));
+        assert_eq!(group_width(true, before, after), 160.0);
+        assert!(!(before.min.x - after.min.x).is_finite(), "the left edge cannot measure it");
+        let before = Rect::from_min_max(pos2(20.0, 0.0), pos2(f32::INFINITY, 90.0));
+        let after = Rect::from_min_max(pos2(180.0, 0.0), pos2(f32::INFINITY, 90.0));
+        assert_eq!(group_width(false, before, after), 160.0);
+    }
 }
