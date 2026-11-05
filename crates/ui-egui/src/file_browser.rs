@@ -691,7 +691,9 @@ mod tests {
             a,
         );
         h.run_steps(4);
-        h.get_by_label("Save").click();
+        // NexusOffice: the Quick Access Toolbar's Save has an accessible name too; the dialog's
+        // Save is drawn after it.
+        h.query_all_by_label("Save").last().expect("the dialog's Save").click();
         h.run_steps(4);
         assert!(h.state().dialog.is_none() && h.state().file_browser_open(), "Save As goes on in the browser");
         let before = h.state().file_browser.open.as_ref().map(|b| b.name.clone());

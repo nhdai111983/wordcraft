@@ -671,13 +671,18 @@ fn the_arabic_interface_is_mirrored_and_never_panics() {
     let (file, home, insert, share) = (x_of(&drawn, "File"), x_of(&drawn, "Home"), x_of(&drawn, "Insert"), x_of(&drawn, "Share"));
     assert!(file > home && home > insert && insert > 800.0, "tabs: {file} {home} {insert}");
     assert!(share < 200.0, "Share: {share}");
-    // Ribbon groups too: Clipboard is right of Font, which is right of Styles.
-    assert!(x_of(&drawn, "Clipboard") > x_of(&drawn, "Font") && x_of(&drawn, "Font") > x_of(&drawn, "Styles"));
+    // Ribbon groups too: Clipboard is right of Font, which is right of Styles. NexusOffice: the
+    // Nexus look draws no group titles, so the first group is found by its Paste button.
+    let titles = crate::nexus::look::GROUP_TITLES;
+    if titles {
+        assert!(x_of(&drawn, "Clipboard") > x_of(&drawn, "Font") && x_of(&drawn, "Font") > x_of(&drawn, "Styles"));
+    }
+    let first_group = if titles { "Clipboard" } else { "Paste" };
     // The status bar starts at the right, and a narrow window still shows the ribbon's first group.
     let page = drawn.iter().find(|(t, _)| t.contains(super::tr(ar, "Editing"))).map(|(_, x)| *x);
     assert!(page.is_some());
     let narrow = frame_at(&ctx, &mut app, 700.0);
-    let clipboard = x_of(&narrow, "Clipboard");
+    let clipboard = x_of(&narrow, first_group);
     assert!((350.0..700.0).contains(&clipboard), "the narrow ribbon starts at its right end: {clipboard}");
     // Side panes swap sides: Navigation is on the right.
     let _ = app.run("view.navigationPane", json!({"value": true}));
@@ -690,8 +695,12 @@ fn the_arabic_interface_is_mirrored_and_never_panics() {
         let mut app = fresh_app(&ctx);
         let drawn = frame_at(&ctx, &mut app, 1600.0);
         let x = |label: &str| drawn.iter().find(|(t, _)| t == label).map(|(_, x)| *x).unwrap();
-        assert!(x("File") < x("Home") && x("Home") < x("Insert") && x("Insert") < 400.0 && x("Share") > 1400.0);
-        assert!(x("Clipboard") < x("Font") && x("Font") < x("Styles"));
+        // NexusOffice: the Nexus look centres the tabs after File (`look::CENTRED_TABS`).
+        let insert_before = if crate::nexus::look::CENTRED_TABS { 800.0 } else { 400.0 };
+        assert!(x("File") < x("Home") && x("Home") < x("Insert") && x("Insert") < insert_before && x("Share") > 1400.0);
+        if titles {
+            assert!(x("Clipboard") < x("Font") && x("Font") < x("Styles"));
+        }
         assert!(x("Cut") < 200.0, "ribbon buttons keep their icon on the left and start at the left");
         assert!(!crate::rtl::on());
         super::set_current(ar);
