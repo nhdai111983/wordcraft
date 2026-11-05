@@ -48,6 +48,38 @@ const ROWS: &[(&str, &str)] = &[
     ("Gallery", "Phòng tranh"),
     ("Sketchbook", "Sổ phác thảo"),
     ("Auto orientation", "Hướng tự động"),
+    // Upstream sync 2026-11-05: interface text upstream added whose Vietnamese craft-i18n
+    // (9d6d54d6) doesn't have yet. Drop a row once craft-i18n has it.
+    (
+        "Booklets: duplex on the short edge. Blank pages are added at the end.",
+        "Sách gấp: in hai mặt, lật theo cạnh ngắn. Trang trống được thêm vào cuối.",
+    ),
+    ("Couldn't get the list of languages: {error}", "Không lấy được danh sách ngôn ngữ: {error}"),
+    ("Getting the list of languages…", "Đang lấy danh sách ngôn ngữ…"),
+    ("Install ({size})", "Cài đặt ({size})"),
+    ("Installing turns on downloading of fonts and Language packs from GitHub.", "Cài đặt sẽ bật tải phông chữ và gói ngôn ngữ từ GitHub."),
+    ("Inverse", "Đảo màu"),
+    ("Next sheet", "Tờ tiếp theo"),
+    ("Not installed — shown as", "Chưa cài — hiển thị bằng"),
+    ("Pages per sheet", "Số trang mỗi tờ"),
+    ("Previous sheet", "Tờ trước"),
+    ("Repeated word", "Từ bị lặp"),
+    ("Sepia", "Nâu đỏ"),
+    ("Set the colors in the Text Pane to use custom colors.", "Đặt màu trong Ngăn văn bản để dùng màu tùy chỉnh."),
+    ("Shape color", "Màu hình"),
+    ("Sheet {page} of {pages}", "Tờ {page} trên {pages}"),
+    ("Shown in substitute fonts. Click for details.", "Đang hiển thị bằng phông chữ thay thế. Bấm để xem chi tiết."),
+    ("Style Color", "Màu theo kiểu"),
+    ("{language} proofing isn't installed.", "Chưa cài hiệu đính cho {language}."),
+    ("Emphasis Mark", "Dấu nhấn mạnh"),
+    ("Flat OpenDocument Text (*.fodt)", "Tệp văn bản OpenDocument phẳng (*.fodt)"),
+    ("Item Color", "Màu mục"),
+    ("Missing Fonts", "Phông chữ bị thiếu"),
+    ("OpenDocument Text Template (*.ott)", "Mẫu văn bản OpenDocument (*.ott)"),
+    (
+        "{font} isn't installed on this computer, so its text is shown in {shown}. Line breaks and page count can differ from where the document was made. If you have the font file, add it with Add Font… at the end of this list.",
+        "{font} chưa được cài trên máy này nên chữ dùng phông này được hiển thị bằng {shown}. Ngắt dòng và số trang có thể khác với máy đã tạo tài liệu. Nếu có tệp phông chữ, hãy thêm bằng Thêm phông chữ… ở cuối danh sách này.",
+    ),
     // @@NEXUS_VI_MORE@@
 ];
 
