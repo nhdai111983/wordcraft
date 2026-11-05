@@ -41,3 +41,43 @@ fn the_default_author_is_a_nexus_docs_user() {
     let s = Session::new(sample::sample_document());
     assert_eq!(s.author, "Nexus Docs User");
 }
+
+/// A font store whose downloading is off: every call that would download says so.
+struct OfflineStore;
+
+impl wordcraft_engine::packs::Backend for OfflineStore {
+    fn index(&self) -> Result<Vec<wordcraft_engine::packs::Pack>, String> {
+        Ok(Vec::new())
+    }
+    fn fetch_index(&self, _: &wordcraft_engine::packs::Cancel) -> Result<Vec<wordcraft_engine::packs::Pack>, String> {
+        Err("no request while downloading is off".into())
+    }
+    fn network_on(&self) -> bool {
+        false
+    }
+    fn enable_network(&self) -> Result<(), String> {
+        Err("refused".into())
+    }
+    fn install(&self, _: &wordcraft_engine::packs::Pack, _: &wordcraft_engine::packs::Cancel, _: &mut dyn FnMut(u64, u64)) -> Result<(), String> {
+        Err("no request while downloading is off".into())
+    }
+    fn remove(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+    fn packs_dir(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+}
+
+/// The "downloading is off" error reaches the person unbranded (Options › Language shows engine
+/// errors as they are, and the CLI/MCP print them), so it names Nexus Docs at the source.
+#[test]
+fn the_downloading_is_off_error_names_nexus_docs() {
+    use wordcraft_engine::packs;
+    packs::set_backend(Some(std::sync::Arc::new(OfflineStore)));
+    let e = packs::refresh(&packs::Cancel::new()).unwrap_err();
+    packs::set_backend(None);
+    assert!(e.contains("downloading is turned off"), "{e}");
+    assert!(e.contains("Nexus Docs"), "{e}");
+    assert!(!e.contains("WordCraft"), "{e}");
+}

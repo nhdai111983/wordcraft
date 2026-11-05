@@ -86,7 +86,7 @@ pattern = 'tl!\(\s*"[^"/]*"'
 reason = "Chuỗi đi qua tl! → i18n::brand() thay tên lúc chạy"
 
 [[allow]]
-path = "{crates/ui-egui/src/options.rs,crates/ui-egui/src/dialogs.rs,crates/ui-egui/src/file_browser.rs,crates/ui-egui/src/chrome.rs,crates/ui-egui/src/dialogs/dispatch.rs}"
+path = "{crates/ui-egui/src/options.rs,crates/ui-egui/src/dialogs.rs,crates/ui-egui/src/file_browser.rs,crates/ui-egui/src/chrome.rs,crates/ui-egui/src/dialogs/dispatch.rs,crates/ui-egui/src/language_packs.rs}"
 pattern = '^\s*"[^"/]*WordCraft[^"/]*"$'
 reason = "Đối số dòng tiếp theo của tl!( … ) nhiều dòng → i18n::brand()"
 
@@ -202,7 +202,7 @@ pattern = '^#.*'
 reason = "Chú thích đầu file danh sách biến thể chính tả tiếng Anh, không phải chuỗi giao diện"
 
 [[allow]]
-path = "{crates/docbin/src/lib.rs,crates/docx/src/write/embed.rs,crates/zotero/src/fields.rs}"
+path = "{crates/docbin/src/lib.rs,crates/docx/src/write/embed.rs,crates/zotero/src/fields.rs,crates/docx/src/read/chunk.rs}"
 pattern = '"[^"]*WordCraft[^"]*"'
 reason = "Thông điệp log (log::warn), không hiện trên giao diện"
 
@@ -225,3 +225,12 @@ reason = "Đóng gói upstream không dùng: Nexus Docs không phát hành FreeB
 path = ".github/workflows/{nexus-ci.yml,nexus-release.yml}"
 pattern = 'github\.com/storytold/craft-i18n'
 reason = "Bản dịch giao diện (cả tiếng Việt) upstream chuyển ra storytold/craft-i18n (đầu vào build CRAFT_I18N_DIR, ghim ở craft-i18n.rev); workflow lấy về lúc build, không phát hành URL"
+
+# ---------------------------------------------------------------------------------------------
+# 7. Đồng bộ upstream 2026-11-03 (Language packs)
+# ---------------------------------------------------------------------------------------------
+
+[[allow]]
+path = "{crates/engine/src/packs/store.rs,crates/engine/src/packs.rs}"
+pattern = 'https://github\.com/storytold/craft-i18n/releases/download/language-packs-2/(index\.json|\{locale\}\.tar\.zst)'
+reason = "Language packs (đồng bộ 03/11): chỉ mục gói ngôn ngữ ghim sha256 và URL gói mẫu của FixedBackend; app chỉ tải khi người dùng bấm (mặc định tắt). Giữ nguyên hành vi upstream cho tới khi Henry quyết nguồn tải (mirror nhdai111983/sonnytech-vn hay tắt hẳn); URL không hiện trên giao diện"
