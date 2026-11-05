@@ -104,6 +104,7 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/engine/src/io/safe_save.rs` | Lỗi lưu an toàn "This folder doesn't let Nexus Docs create…", "Nexus Docs can't create files in this folder.", gợi ý macOS "allow Nexus Docs to use this folder…", "macOS may be blocking Nexus Docs…" (file mới của upstream, đồng bộ 2026-10-29) | Có — tên app qua biến build |
 | `crates/zotero/src/lib.rs` | Lỗi Zotero "Nexus Docs won't let this program edit the document" | Có — tên app qua biến build |
 | `crates/zotero/src/peer.rs` | Lỗi Zotero "…Nexus Docs only talks to Zotero on 127.0.0.1" | Có — tên app qua biến build |
+| `crates/engine/src/packs.rs` | Đồng bộ 2026-11-03 (Language packs, file mới của upstream): lỗi "downloading is turned off: turn it on in Nexus Docs (File › Options › Language…)" đổi tại nguồn — Tùy chọn › Ngôn ngữ hiện lỗi engine nguyên văn (không qua `tl!`), CLI/MCP cũng in nó. Test `the_downloading_is_off_error_names_nexus_docs` (`crates/engine/tests/nexus_brand.rs`). URL gói ngôn ngữ `storytold/craft-i18n` giữ nguyên (allowlist, chờ Henry quyết) | Có — tên app qua biến build |
 | `apps/wordcraft/build.rs` | Resource Windows: ProductName, CompanyName SonnyTech, icon, LegalCopyright (ghi công), OriginalFilename `nexus-docs.exe` | Có |
 | `apps/wordcraft/src/default_apps.rs` | Desktop id `vn.sonnytech.nexus.docs.desktop`, `registeredAppMachine=NexusDocs`, thông báo Flatpak (+ test) | Có |
 | `apps/wordcraft-web/index.html` | `<title>Nexus Docs</title>`, favicon, chữ "Loading" | Có |
@@ -124,6 +125,7 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/formats/src/html/export.rs` | `<meta name="generator" content="Nexus Docs">` | Có — tên app qua biến build |
 | `crates/formats/src/odt/package.rs` | `<meta:generator>Nexus Docs</meta:generator>` | Có — tên app qua biến build |
 | `crates/formats/src/rtf/export.rs` | `{\*\generator Nexus Docs;}` | Có — tên app qua biến build |
+| `SECURITY.md` | Đồng bộ 2026-11-03 (file mới của upstream): chính sách bảo mật của Nexus Docs (tiếng Việt trước, có phần English), báo lỗ hổng riêng tư qua `sonnytech-vn/wordcraft` › Security › Advisories, bản sửa vào `nexus` | Không (tài liệu của fork) |
 | `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffice/SonnyTech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE/NOTICE/ATTRIBUTION.md, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
 | `Cargo.toml` | `[workspace.package] repository` → `https://github.com/sonnytech-vn/wordcraft` (brand-check `brand-url`; metadata, không code nào đọc `CARGO_PKG_REPOSITORY`) | Có — metadata của fork |
 | `ATTRIBUTION.md` | 14 dòng cho icon Nexus (`nexus/assets/**`, SonnyTech, CC0-1.0) | Không (bắt buộc theo luật asset) |
