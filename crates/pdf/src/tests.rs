@@ -2949,8 +2949,10 @@ fn undecodable_pictures_keep_their_grey_box_bytes() {
     let text = String::from_utf8_lossy(&a);
     assert!(text.contains("0.8157 0.8157 0.8157") || text.contains(".81"), "the grey box is drawn: {}", text.len());
     // FNV-1a of the file, recorded from the export before the shared decode check existed.
+    // NexusOffice: the file's Creator and Producer say Nexus Docs (`metadata.rs`), so its bytes
+    // hash differently from upstream's (0x1edbbffab353d744); nothing else differs.
     let h = a.iter().fold(0xcbf29ce484222325u64, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x100000001b3));
-    assert_eq!(h, 0x1edbbffab353d744, "{h:#x}");
+    assert_eq!(h, 0x5ad9eaed20043528, "{h:#x}");
 }
 
 /// A page with a chart label and an equation, exported without compression. Chart and equation
