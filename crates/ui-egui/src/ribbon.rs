@@ -70,11 +70,11 @@ use shape::shape_format;
 use table::{table_design, table_layout};
 #[cfg(test)]
 use tabs::MIN_TAB_W;
+pub(crate) use tabs::reading_toolbar;
 use tabs::{
     CONTENT_SWITCH_SLIDE, MORE_TABS_W, TAB_ENTRY_SECS, TAB_ENTRY_SLIDE, ease_out_cubic, note_contextual_tabs, slide_underline, tab_content_entry,
     tab_entry,
 };
-pub(crate) use tabs::reading_toolbar;
 pub use tabs::{
     StripPlan, TABS, TabSpec, contextual_tabs, fit_tabs, has_chart_selected, has_picture_selected, has_shape_selected, has_smart_art_selected,
     in_table_public, plan_strip, resolve_tab,

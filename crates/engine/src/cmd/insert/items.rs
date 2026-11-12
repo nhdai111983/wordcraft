@@ -288,9 +288,7 @@ const PORTUGUESE: DateNames = DateNames {
 /// field without a picture is `dd/MM/yyyy`. [`format_date_parts_in`] writes `MMM` "thg 10",
 /// `ddd` "T2" and AM/PM "SA"/"CH" itself (they are not the first three letters).
 const VIETNAMESE: DateNames = DateNames {
-    months: [
-        "tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6", "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12",
-    ],
+    months: ["tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6", "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12"],
     days: ["Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư"],
     default: "dd/MM/yyyy",
 };
