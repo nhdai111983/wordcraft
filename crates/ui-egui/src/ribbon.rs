@@ -70,8 +70,11 @@ use shape::shape_format;
 use table::{table_design, table_layout};
 #[cfg(test)]
 use tabs::MIN_TAB_W;
-use tabs::MORE_TABS_W;
 pub(crate) use tabs::reading_toolbar;
+use tabs::{
+    CONTENT_SWITCH_SLIDE, MORE_TABS_W, TAB_ENTRY_SECS, TAB_ENTRY_SLIDE, ease_out_cubic, note_contextual_tabs, slide_underline, tab_content_entry,
+    tab_entry,
+};
 pub use tabs::{
     StripPlan, TABS, TabSpec, contextual_tabs, fit_tabs, has_chart_selected, has_picture_selected, has_shape_selected, has_smart_art_selected,
     in_table_public, plan_strip, resolve_tab,
@@ -89,11 +92,11 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         return;
     }
     let (tabs, user_tabs) = sync_tabs(app);
-    tab_strip(app, ui, &t, &tabs);
+    tab_strip(app, ui, &t, &tabs, &user_tabs);
     if app.ui.ribbon_collapsed {
         return;
     }
-    ribbon_panel(app, ui, &t, &user_tabs);
+    ribbon_panel(app, ui, &t, &tabs, &user_tabs);
 }
 
 /// The tabs shown now, after the contextual ones came or went (File first), and the user's tab
@@ -146,8 +149,29 @@ pub(crate) fn sync_tabs(app: &mut WordApp) -> (Vec<(String, bool)>, Vec<wordcraf
     (tabs, user_tabs)
 }
 
-fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]) {
+fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)], user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
     let t = *t;
+    let mut tabs = tabs.to_vec();
+    let (now, animate) = (ui.input(|i| i.time), app.animations_on());
+    let leaving = {
+        let user_names: Vec<&str> = user_tabs.iter().filter(|e| e.custom).map(|e| e.name.as_str()).collect();
+        let contextual: Vec<(&str, usize)> = tabs
+            .iter()
+            .enumerate()
+            .map(|(i, (n, _))| (n.as_str(), i))
+            .filter(|(n, _)| wordcraft_engine::ribbon::CONTEXTUAL_TABS.contains(n) && !user_names.contains(n))
+            .collect();
+        note_contextual_tabs(ui.ctx(), &contextual, now, animate)
+    };
+    // A tab that just left stays in its former slot while it slides and fades away.
+    let ghosts: Vec<(String, usize, f64)> = leaving.iter().filter(|(n, ..)| !tabs.iter().any(|(t, _)| t == n)).cloned().collect();
+    if !ghosts.is_empty() {
+        ui.ctx().request_repaint();
+    }
+    for (name, at, _) in &ghosts {
+        tabs.insert((*at).min(tabs.len()), (name.clone(), false));
+    }
+    // Tab strip.
     egui::Panel::top("tabs")
         .exact_size(30.0)
         .frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 }))
@@ -266,7 +290,13 @@ fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]
                             };
                             let centred = crate::nexus::look::CENTRED_TABS && !crate::rtl::on();
                             // The tabs that don't fit go into a » menu at the end of the strip (#897, #2026).
-                            for (n, (i, ((tab, custom), _))) in tabs.iter().zip(&plan.fits).enumerate().filter(|(_, (_, fits))| **fits).enumerate() {
+                            for (n, (i, ((tab, custom), _))) in tabs
+                                .iter()
+                                .zip(&plan.fits)
+                                .enumerate()
+                                .filter(|(_, ((tab, _), fits))| **fits || ghosts.iter().any(|(g, ..)| g == tab))
+                                .enumerate()
+                            {
                                 if n == 1 && centred {
                                     ui.add_space(centre_gap);
                                 }
@@ -276,19 +306,35 @@ fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]
                                 let shown = if custom { tab } else { tl!(tab) };
                                 let w = plan.widths.get(i).copied().unwrap_or(0.0) - 2.0;
                                 let cut = specs.get(i).is_some_and(|sp| sp.text_w + plan.pad > w + 0.5);
-                                let (r, resp) = ui.allocate_exact_size(vec2(w, 30.0), Sense::click());
-                                if app.ui.keytips == crate::keytips::Phase::Tabs {
+                                let ghost = ghosts.iter().find(|(n, ..)| n == tab);
+                                let (r, resp) = ui.allocate_exact_size(vec2(w, 30.0), if ghost.is_some() { Sense::hover() } else { Sense::click() });
+                                if app.ui.keytips == crate::keytips::Phase::Tabs && ghost.is_none() {
                                     crate::keytips::record_tab(r, tab, &app.ui.keytip_prefix, &mut app.keytip_rects);
-                                } else if app.ui.keytips == crate::keytips::Phase::Legacy {
+                                } else if app.ui.keytips == crate::keytips::Phase::Legacy && ghost.is_none() {
                                     // Every tab: they only place the legacy keys' hint (#1697).
                                     crate::keytips::record_tab(r, tab, "", &mut app.keytip_rects);
                                 }
                                 let active = app.ui.tab == tab && !app.ui.backstage;
                                 resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, active, shown));
-                                if resp.hovered() && !active {
-                                    ui.painter().rect_filled(r.shrink2(vec2(0.0, 4.0)), 4.0, t.hover);
+                                let hover = ui.ctx().animate_bool_responsive(resp.id.with("hover"), resp.hovered() && !active && ghost.is_none());
+                                if hover > 0.0 {
+                                    ui.painter().rect_filled(
+                                        r.shrink2(vec2(0.0, 4.0)),
+                                        4.0,
+                                        egui::Color32::TRANSPARENT.lerp_to_gamma(t.hover, hover),
+                                    );
                                 }
-                                let color = if contextual || active { t.accent_text } else { t.text };
+                                // Entering and departing contextual tabs move and fade without changing layout.
+                                let entry = match ghost {
+                                    Some((_, _, left)) => {
+                                        ui.ctx().request_repaint();
+                                        1.0 - ease_out_cubic(((now - left) / TAB_ENTRY_SECS) as f32)
+                                    }
+                                    None if contextual => tab_entry(ui.ctx(), tab, now, animate),
+                                    None => 1.0,
+                                };
+                                let shift = vec2(-(1.0 - entry) * TAB_ENTRY_SLIDE, 0.0);
+                                let color = (if contextual || active { t.accent_text } else { t.text }).gamma_multiply(entry);
                                 if cut {
                                     let mut job = egui::text::LayoutJob::single_section(
                                         shown.to_string(),
@@ -301,20 +347,20 @@ fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]
                                         overflow_character: Some('…'),
                                     };
                                     let galley = ui.painter().layout_job(job);
-                                    ui.painter().galley(r.center() - galley.size() / 2.0, galley, color);
+                                    ui.painter().galley(r.center() + shift - galley.size() / 2.0, galley, color);
                                 } else {
                                     ui.painter().text(
-                                        r.center(),
+                                        r.center() + shift,
                                         Align2::CENTER_CENTER,
                                         shown,
                                         if active { semibold(12.5) } else { medium(12.5) },
                                         color,
                                     );
                                 }
-                                let resp = if cut { resp.on_hover_text(shown) } else { resp };
+                                let resp = if cut && ghost.is_none() { resp.on_hover_text(shown) } else { resp };
                                 if active {
-                                    let u = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(w - 16.0, 3.0));
-                                    ui.painter().rect_filled(u, 2.0, t.accent);
+                                    let u = Rect::from_center_size(pos2(r.center().x + shift.x, r.max.y - 2.0), vec2(w - 16.0, 3.0));
+                                    slide_underline(ui, tab, u, t.accent.gamma_multiply(entry), now, animate);
                                 }
                                 if resp.clicked() {
                                     let _ = app.run("ui.tab", json!({"tab": tab}));
@@ -322,19 +368,26 @@ fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]
                                 if resp.double_clicked() && tab != "File" {
                                     let _ = app.run("ui.collapseRibbon", json!({}));
                                 }
-                                resp.context_menu(|ui| crate::widgets::customize_menu_items(ui, app));
+                                if ghost.is_none() {
+                                    resp.context_menu(|ui| crate::widgets::customize_menu_items(ui, app));
+                                }
                             }
                             let left_out: Vec<(&str, &str)> = tabs
                                 .iter()
                                 .zip(&labels)
                                 .zip(&plan.fits)
-                                .filter(|(_, fits)| !**fits)
+                                .filter(|(((tab, _), _), fits)| !**fits && !ghosts.iter().any(|(n, ..)| n == tab))
                                 .map(|(((tab, _), shown), _)| (tab.as_str(), *shown))
                                 .collect();
                             if !left_out.is_empty() {
                                 let (r, resp) = ui.allocate_exact_size(vec2(MORE_TABS_W, 30.0), Sense::click());
-                                if resp.hovered() {
-                                    ui.painter().rect_filled(r.shrink2(vec2(0.0, 4.0)), 4.0, t.hover);
+                                let hover = ui.ctx().animate_bool_responsive(resp.id.with("hover"), resp.hovered());
+                                if hover > 0.0 {
+                                    ui.painter().rect_filled(
+                                        r.shrink2(vec2(0.0, 4.0)),
+                                        4.0,
+                                        egui::Color32::TRANSPARENT.lerp_to_gamma(t.hover, hover),
+                                    );
                                 }
                                 // The active tab is in the menu: the button says so.
                                 let holds_active = left_out.iter().any(|(tab, _)| *tab == app.ui.tab);
@@ -365,14 +418,22 @@ fn tab_strip(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)]
         });
 }
 
-fn ribbon_panel(app: &mut WordApp, ui: &mut Ui, t: &Tokens, user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
+fn ribbon_panel(app: &mut WordApp, ui: &mut Ui, t: &Tokens, tabs: &[(String, bool)], user_tabs: &[wordcraft_engine::ribbon::TabEntry]) {
     let t = *t;
+    let (now, animate) = (ui.input(|i| i.time), app.animations_on());
     egui::Panel::top("ribbon")
         .exact_size(CONTENT_H + LABEL_H + 10.0)
         .frame(
             egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 }).stroke(Stroke::new(1.0, t.border)),
         )
         .show(ui, |ui| {
+            // Bring newly selected ribbon content in from the side of its tab.
+            let index = tabs.iter().position(|(name, _)| name == &app.ui.tab).unwrap_or(0);
+            let (settled, direction) = tab_content_entry(ui.ctx(), &app.ui.tab, index, now, animate);
+            let shift = vec2(direction * (1.0 - settled) * CONTENT_SWITCH_SLIDE, 0.0);
+            let mut shifted = ui.new_child(egui::UiBuilder::new().max_rect(ui.max_rect().translate(shift)).layout(*ui.layout()));
+            shifted.set_opacity(0.2 + 0.8 * settled);
+            let ui = &mut shifted;
             // Right-click on the ribbon (outside a button): Customize Ribbon. Registered first, so
             // the buttons drawn over it keep their own clicks.
             // No document open (#1129): every command is greyed out but Help's.

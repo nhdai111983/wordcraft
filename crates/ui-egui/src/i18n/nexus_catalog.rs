@@ -80,6 +80,85 @@ const ROWS: &[(&str, &str)] = &[
         "{font} isn't installed on this computer, so its text is shown in {shown}. Line breaks and page count can differ from where the document was made. If you have the font file, add it with Add Font… at the end of this list.",
         "{font} chưa được cài trên máy này nên chữ dùng phông này được hiển thị bằng {shown}. Ngắt dòng và số trang có thể khác với máy đã tạo tài liệu. Nếu có tệp phông chữ, hãy thêm bằng Thêm phông chữ… ở cuối danh sách này.",
     ),
+    // Upstream sync 2026-11-12: interface text upstream added whose Vietnamese craft-i18n
+    // (1e515422) doesn't have yet. Drop a row once craft-i18n has it.
+    ("Applies the next time WordCraft starts.", "Có hiệu lực từ lần khởi động Nexus Docs tiếp theo."),
+    ("Cancel printing", "Hủy in"),
+    (
+        "Cancellation could not be confirmed here. The printer driver may still be processing the job. If it appears in the system's print queue, cancel it there.",
+        "Không xác nhận được việc hủy tại đây. Trình điều khiển máy in có thể vẫn đang xử lý lệnh in. Nếu lệnh in còn trong hàng đợi in của hệ thống, hãy hủy ở đó.",
+    ),
+    ("Column Edge", "Mép cột"),
+    ("Could not save the preferences: {error}", "Không lưu được tùy chọn: {error}"),
+    ("Default format saved.", "Đã lưu định dạng mặc định."),
+    ("Display server:", "Máy chủ hiển thị:"),
+    ("Hidden text is not shown unless you display it.", "Chữ ẩn không hiện ra trừ khi bạn bật hiển thị."),
+    ("Language data", "Dữ liệu ngôn ngữ"),
+    ("No other WordCraft windows are open.", "Không có cửa sổ Nexus Docs nào khác đang mở."),
+    ("no other Nexus Docs window is open", "không có cửa sổ Nexus Docs nào khác đang mở"),
+    ("only the desktop app has several windows", "chỉ ứng dụng trên máy tính mới có nhiều cửa sổ"),
+    ("turn on View Side by Side first", "hãy bật Xem song song trước"),
+    ("Paragraph Tools", "Công cụ đoạn văn"),
+    ("Paragraph\nTools", "Công cụ\nđoạn văn"),
+    ("Printing cancelled. Nothing was sent to the printer.", "Đã hủy in. Chưa có gì được gửi tới máy in."),
+    ("Remove from list", "Xóa khỏi danh sách"),
+    ("Removed {count} documents from the recent list", "Đã xóa {count} tài liệu khỏi danh sách gần đây"),
+    ("Removed {name} from the recent list", "Đã xóa {name} khỏi danh sách gần đây"),
+    ("Screen paper color:", "Màu giấy trên màn hình:"),
+    ("Status bar count:", "Số đếm trên thanh trạng thái:"),
+    ("You can also right-click the count in the status bar to change it.", "Bạn cũng có thể bấm chuột phải vào số đếm trên thanh trạng thái để đổi."),
+    ("{chars} characters", "Ký tự: {chars}"),
+    ("{selected} of {chars} characters", "Ký tự: {selected} trên {chars}"),
+    ("{chars} characters (no spaces)", "Ký tự (không tính khoảng trắng): {chars}"),
+    ("{selected} of {chars} characters (no spaces)", "Ký tự (không tính khoảng trắng): {selected} trên {chars}"),
+    ("Synchronous Scrolling", "Cuộn đồng bộ"),
+    ("View Side by Side", "Xem song song"),
+    ("Type a size in any unit, such as 3 cm or 300 px.", "Nhập kích thước theo đơn vị bất kỳ, ví dụ 3 cm hoặc 300 px."),
+    ("Update automatically", "Tự động cập nhật"),
+    (
+        "Updates are off in this window: WordCraft was started with another program's AppImage settings. Start WordCraft from its own menu entry to update it.",
+        "Cập nhật bị tắt trong cửa sổ này: Nexus Docs được khởi động với thiết lập AppImage của chương trình khác. Hãy mở Nexus Docs từ mục menu riêng để cập nhật.",
+    ),
+    ("Warm cream", "Kem ấm"),
+    // Home › Paragraph Tools (#5043) and the rest the i18n audit finds untranslated.
+    ("Add Blank Paragraphs Between", "Chèn đoạn trống giữa các đoạn"),
+    ("Insert Blank Paragraphs Between", "Chèn đoạn trống giữa các đoạn"),
+    ("Convert Indents to Spaces", "Đổi thụt lề thành khoảng trắng"),
+    ("Convert Line Breaks to Paragraphs", "Đổi ngắt dòng thành đoạn"),
+    ("Convert Spaces to Indentation", "Đổi khoảng trắng thành thụt lề"),
+    ("Delete Blank Paragraphs", "Xóa đoạn trống"),
+    ("Delete Blank Paragraphs in the Whole Document", "Xóa đoạn trống trong toàn tài liệu"),
+    ("Indent Leading Spaces", "Đổi khoảng trắng đầu dòng thành thụt lề"),
+    ("Indents to Leading Spaces", "Đổi thụt lề thành khoảng trắng đầu dòng"),
+    ("Join Lines", "Nối dòng"),
+    ("Remove Extra Spaces", "Xóa khoảng trắng thừa"),
+    ("Remove Extra Spaces in the Whole Document", "Xóa khoảng trắng thừa trong toàn tài liệu"),
+    ("Remove Leading Spaces", "Xóa khoảng trắng đầu dòng"),
+    ("Remove Leading Spaces in the Whole Document", "Xóa khoảng trắng đầu dòng trong toàn tài liệu"),
+    ("Remove Line Breaks", "Xóa ngắt dòng"),
+    ("Separate Paragraphs", "Tách đoạn"),
+    ("Split Lines into Paragraphs", "Tách dòng thành đoạn"),
+    ("Delete Previous Sentence", "Xóa câu trước"),
+    ("Document background", "Nền tài liệu"),
+    ("Linux display server", "Máy chủ hiển thị Linux"),
+    ("Screen Paper Color", "Màu giấy trên màn hình"),
+    (
+        "Screen only. Document backgrounds, printing and exports keep their colours. Dark page and explicit Read Mode colours take precedence.",
+        "Chỉ trên màn hình. Nền tài liệu, bản in và tệp xuất giữ màu của chúng. Trang tối và màu Chế độ đọc đặt riêng được ưu tiên.",
+    ),
+    ("Select Canvas Member", "Chọn thành phần trong khung vẽ"),
+    ("Status bar", "Thanh trạng thái"),
+    ("Strict Export Report", "Báo cáo xuất nghiêm ngặt"),
+    ("a shape inside a drawing canvas is placed by the canvas", "hình nằm trong khung vẽ do khung vẽ đặt vị trí"),
+    // Engine reasons Nexus names at the source (so craft-i18n's key no longer matches).
+    (
+        "this SmartArt was made in another program: Nexus Docs shows it but can't edit it",
+        "SmartArt này được tạo bằng chương trình khác: Nexus Docs hiển thị được nhưng không sửa được",
+    ),
+    (
+        "this chart was made in another program: Nexus Docs shows it but can't edit it",
+        "biểu đồ này được tạo bằng chương trình khác: Nexus Docs hiển thị được nhưng không sửa được",
+    ),
     // @@NEXUS_VI_MORE@@
 ];
 
@@ -114,8 +193,9 @@ mod tests {
             assert!(has(vi, en), "{en:?} counts as translated");
         }
         set_current(Lang::EN);
+        // English keeps the key, with the product's name as installed (`brand`).
         for (en, _) in ROWS {
-            assert_eq!(t(en), *en, "English keeps {en:?}");
+            assert_eq!(t(en), super::super::brand(en), "English keeps {en:?}");
         }
         set_current(before);
         // A row of craft-i18n's own catalog still comes from there.

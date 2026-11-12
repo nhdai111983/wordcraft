@@ -430,6 +430,34 @@ fn date_time_follows_the_text_language() {
     assert!(day.starts_with("Thứ ") || day == "Chủ Nhật", "{day}");
 }
 
+/// NexusOffice (sync 2026-11-12): upstream's `language` param (en-US, pt-BR) takes vi-VN too:
+/// the text is tagged Vietnamese and written with Vietnamese names and picture, also as a field.
+#[test]
+fn date_time_language_takes_vietnamese() {
+    let mut s = Session::new(wordcraft_doc::Document::new());
+    s.run("insert.dateTime", &json!({"format": "dddd", "language": "vi-VN"})).unwrap();
+    let day = s.doc.plain_text(StoryRef::Body);
+    assert!(day.starts_with("Thứ ") || day == "Chủ Nhật", "{day}");
+    let para = s.doc.para_at(&s.doc.start_of(StoryRef::Body)).unwrap();
+    assert_eq!(para.props_of_char(0).lang.as_deref(), Some("vi-VN"));
+
+    let mut f = Session::new(wordcraft_doc::Document::new());
+    f.run("insert.dateTime", &json!({"language": "vi-VN", "update": true})).unwrap();
+    let para = f.doc.para_at(&f.doc.start_of(StoryRef::Body)).unwrap();
+    let field = para.objects.iter().find_map(|o| match o {
+        InlineObject::Field { instr, result, .. } => Some((instr.clone(), result.clone())),
+        _ => None,
+    });
+    let (instr, result) = field.expect("a DATE field");
+    assert_eq!(instr, r#"DATE \@ "dd/MM/yyyy""#);
+    assert_eq!(result.split('/').map(str::len).collect::<Vec<_>>(), [2, 2, 4], "{result}");
+
+    // Other languages are still refused, and refusing changes nothing.
+    let mut e = Session::new(wordcraft_doc::Document::new());
+    assert!(e.run("insert.dateTime", &json!({"language": "fr-FR"})).is_err());
+    assert_eq!(e.doc.plain_text(StoryRef::Body), "");
+}
+
 /// #1707: Insert ▸ Date & Time and DATE/TIME fields use the local civil date, time and
 /// weekday, not UTC's.
 #[test]

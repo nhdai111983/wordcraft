@@ -11,12 +11,19 @@ use super::{
 /// between texts that differ only in case, lowercase first. Equal rows keep their order, also
 /// when descending.
 pub(super) fn sort_table(s: &mut Session, v: &Value) -> CmdResult {
-    let col = p::u64(v, "column").unwrap_or(0) as usize;
+    let column = match v.get("column") {
+        None => 0,
+        Some(value) => value.as_u64().ok_or_else(|| CmdError::Params("`column` must be a non-negative JSON integer".into()))?,
+    };
     let desc = p::bool(v, "descending").unwrap_or(false);
     let case_sensitive = p::bool(v, "caseSensitive").unwrap_or(false);
     let header = p::bool(v, "header");
     let (tp, _, _) = cell(s)?;
     let t = s.doc.table(s.sel.focus.story, &tp).ok_or_else(|| CmdError::Failed("no table".into()))?;
+    let col = usize::try_from(column)
+        .ok()
+        .filter(|&col| t.rows.iter().any(|row| col < row.cells.len()))
+        .ok_or_else(|| CmdError::Params("`column` is outside the table".into()))?;
     let skip = usize::from(header.unwrap_or(t.rows.first().is_some_and(|r| r.props.header))).min(t.rows.len());
     let column = || t.rows.iter().skip(skip).map(|r| r.cells.get(col));
     let lang = column().flatten().find_map(|c| cell_lang(&s.doc, c)).or_else(|| crate::cmd::default_lang(s));

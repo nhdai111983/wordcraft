@@ -5,7 +5,7 @@ use wordcraft_doc::para::{Float, InlineObject, ShapeKind, Wrap};
 use wordcraft_doc::props::{Align, Border, Borders, CharProps, Rgb, TabAlign, TabStop, TextColor};
 use wordcraft_doc::{Block, Paragraph, PartKind, Path, Pos, StoryRef, Table, para_block};
 
-use super::{delete_selection, sel_result, split_para, type_text};
+use super::{delete_selection, sel_result, split_para, type_text, type_text_with_lang};
 use crate::{CmdError, CmdResult, CommandSpec, Selection, Session, p};
 
 mod header_footer;
@@ -26,6 +26,7 @@ pub use objects::{base64_decode, base64_encode};
 use objects::{icon, shape, table, text_box};
 pub(crate) use objects::{image_ext, picture};
 
+/// Command specifications for the Insert ribbon tab and menu.
 pub fn specs() -> Vec<CommandSpec> {
     vec![
         CommandSpec::new("insert.pageBreak", "Page Break", "Insert › Pages", |s, _| {
@@ -116,7 +117,8 @@ pub fn specs() -> Vec<CommandSpec> {
             s.doc.last_section.footers = Default::default();
             sel_result(s)
         }),
-        CommandSpec::new("insert.dateTime", "Date & Time", "Insert › Text", date_time).params(r#"{"format"?: "M/d/yyyy", "update"?: bool, "lang"?: "vi-VN"}"#),
+        CommandSpec::new("insert.dateTime", "Date & Time", "Insert › Text", date_time)
+            .params(r#"{"format"?: "M/d/yyyy", "update"?: bool, "language"?: "en-US|pt-BR|vi-VN", "lang"?: "vi-VN"}"#),
         CommandSpec::new("insert.symbol", "Symbol", "Insert › Symbols", symbol).params(r#"{"char": string, "font"?: family (the symbol's own font)}"#),
         CommandSpec::new("insert.field", "Field", "Insert › Text › Quick Parts", field).key("Mod+F9").params(r#"{"instr": string, "result"?: string}"#),
         // Word's Alt+Shift+D / T / P (Control+Shift+… in Word for Mac): DATE, TIME and PAGE fields.
