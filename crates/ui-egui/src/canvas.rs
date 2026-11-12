@@ -229,6 +229,10 @@ pub struct CanvasState {
     pub(crate) ink_ui: crate::ink::InkUi,
     /// Wheel/touchpad scrolling (smooth notches, touchpad momentum).
     pub(crate) wheel: crate::scroll::CanvasScroll,
+    /// NexusOffice: the document point a pointer zoom keeps under the pointer (pointer, page, x,
+    /// y in points), held while the zoom goes on with the pointer where it was. Read again each
+    /// frame from the drawn (pixel-snapped) page rects, it drifted a little every frame.
+    pub(crate) zoom_hold: Option<(Pos2, (usize, f32, f32))>,
     /// Middle-click scrolling (#1065).
     pub(crate) auto_scroll: crate::autoscroll::AutoScroll,
     /// The scroll offset and its maximum at the end of last frame.
@@ -461,6 +465,7 @@ impl Default for CanvasState {
             alt_code_echo: None,
             field_alt_code: Default::default(),
             wheel: Default::default(),
+            zoom_hold: None,
             auto_scroll: Default::default(),
             scroll_offset: egui::Vec2::ZERO,
             scroll_max: egui::Vec2::ZERO,
@@ -593,7 +598,9 @@ fn prepare_view(app: &mut WordApp, ui: &Ui, full: Rect, layout: &DocLayout) -> C
     let mut zoom_anchor = None;
     if (zoom_delta - 1.0).abs() > 1e-3 && ui.rect_contains_pointer(area) {
         if !read_mode && let Some(p) = ui.input(|i| i.pointer.latest_pos()) {
-            zoom_anchor = page_at(&app.canvas.page_rects, layout, app.canvas.scale, p).map(|at| (p, at));
+            // NexusOffice: the same point as last frame's zoom while the pointer stays put.
+            let held = app.canvas.zoom_hold.filter(|(at, _)| (*at - p).length() < 0.5).map(|(_, a)| a);
+            zoom_anchor = held.or_else(|| page_at(&app.canvas.page_rects, layout, app.canvas.scale, p)).map(|at| (p, at));
         }
         let pct =
             (app.canvas.scale / PX_PER_PT * zoom_delta * 100.0).clamp(if read_mode { 75.0 } else { 10.0 }, if read_mode { 150.0 } else { 500.0 });
@@ -620,6 +627,7 @@ fn prepare_view(app: &mut WordApp, ui: &Ui, full: Rect, layout: &DocLayout) -> C
     let rescaled = (geo.scale - app.canvas.scale).abs() > 1e-4;
     app.canvas.scale = geo.scale;
     sync_fit_zoom(app, geo.scale);
+    app.canvas.zoom_hold = zoom_anchor;
     let anchored = if let Some((p, (page, x, y))) = zoom_anchor
         && let (Some(pr), Some(lp), Some(vp)) = (geo.rects.get(page), layout.pages.get(page), app.canvas.viewport)
     {
