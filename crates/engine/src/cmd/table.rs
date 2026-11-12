@@ -195,7 +195,7 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .params(r#"{"text"?: string, "title"?: string} (empty clears)"#)),
         t(CommandSpec::new("table.sort", "Sort", "Table Layout › Data", sort_table)
-            .params(r#"{"column"?: n, "descending"?: bool, "header"?: bool, "caseSensitive"?: bool (lowercase first; default: case-only differences keep their order), "lang"?: string (BCP 47 sorting language for the whole column; default: the first tagged cell's, else the document's)}"#)),
+            .params(r#"{"column"?: non-negative JSON integer (0-based, default 0; must name a column in the table), "descending"?: bool, "header"?: bool, "caseSensitive"?: bool (lowercase first; default: case-only differences keep their order), "lang"?: string (BCP 47 sorting language for the whole column; default: the first tagged cell's, else the document's)}"#)),
         t(CommandSpec::new("table.toText", "Convert to Text", "Table Layout › Data", to_text)
             .params(r#"{"separator"?: "tab|comma|paragraph|other", "char"?: string (with other)} (the selected rows, or the whole table)"#)),
         t(CommandSpec::new("table.formula", "Formula", "Table Layout › Data", formula).params(r#"{"formula"?: "=SUM(ABOVE)"}"#)),
