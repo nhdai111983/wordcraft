@@ -4,6 +4,10 @@
 //!
 //! `cargo run --release -p wordcraft-ui-egui --example perf_probe -- doc.docx [block]`
 //!
+//! `PPP` sets the scale (default 2.0) and `MAX_TEXTURE_SIDE` the texture limit (default 16384, what a
+//! desktop GPU reports; egui's own default of 2048 would draw every page in tiles, a path real
+//! windows never take). `typing_*` reports how many page textures were drawn whole or by band.
+//!
 //! A frame's time is the CPU time of `WordApp::logic` + `ui` for that frame (layout, page
 //! rasterisation, widgets). What the user sees adds the wait for the next frame and the
 //! presentation on screen (up to one display refresh).
@@ -20,6 +24,7 @@ static READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new
 /// duration in milliseconds.
 fn step(h: &mut egui_kittest::Harness<'_, WordApp>) -> f64 {
     let mut raw = std::mem::take(h.input_mut());
+    raw.max_texture_side = Some(std::env::var("MAX_TEXTURE_SIDE").ok().and_then(|v| v.parse().ok()).unwrap_or(16384));
     let ctx = h.ctx.clone();
     h.state_mut().raw_input_hook(&ctx, &mut raw);
     *h.input_mut() = raw;
@@ -45,8 +50,11 @@ fn main() {
     session.run("file.open", &json!({"path": path})).expect("open");
     let open_ms = t_open.elapsed().as_secs_f64() * 1000.0;
     let app = WordApp::new(session, Services::default());
-    let mut h =
-        egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_pixels_per_point(2.0).with_max_steps(1_000_000).build_ui_state(
+    let mut h = egui_kittest::Harness::builder()
+        .with_size(egui::vec2(1440.0, 900.0))
+        .with_pixels_per_point(std::env::var("PPP").ok().and_then(|v| v.parse().ok()).unwrap_or(2.0))
+        .with_max_steps(1_000_000)
+        .build_ui_state(
             |ui, app: &mut WordApp| {
                 if !READY.load(std::sync::atomic::Ordering::Relaxed) {
                     return;
@@ -73,6 +81,7 @@ fn main() {
         for _ in 0..3 {
             step(h);
         }
+        let (pages0, bands0) = (h.state().canvas.page_renders, h.state().canvas.band_renders);
         let mut frames = Vec::new();
         let (mut lay, mut ren) = (Vec::new(), Vec::new());
         for _ in 0..40 {
@@ -84,7 +93,8 @@ fn main() {
             ren.push(h.state().canvas.render_ms);
         }
         let typed = frames.chunks(2).map(|c| c[0] + c[1]).collect::<Vec<_>>();
-        json!({"frame_with_key_ms": stats(&frames.iter().step_by(2).copied().collect::<Vec<_>>()), "two_frames_ms": stats(&typed), "layout_ms": stats(&lay), "render_ms": stats(&ren)})
+        let (pages, bands) = (h.state().canvas.page_renders.saturating_sub(pages0), h.state().canvas.band_renders.saturating_sub(bands0));
+        json!({"frame_with_key_ms": stats(&frames.iter().step_by(2).copied().collect::<Vec<_>>()), "two_frames_ms": stats(&typed), "layout_ms": stats(&lay), "render_ms": stats(&ren), "page_renders": pages, "band_renders": bands})
     };
     let mid = h.state().session.doc.body.get(doc_block).and_then(|b| b.as_para()).map(|p| p.len() / 2).unwrap_or(0);
     // a char boundary at or before the middle
