@@ -52,6 +52,11 @@ pattern = '.*'
 reason = "Chính bảng thay thế WordCraft→Nexus Docs, ArtCraft→NexusOffice và test của nó"
 
 [[allow]]
+path = "sonar-project.properties"
+pattern = '^\s*#.*'
+reason = "Chú thích trong cấu hình SonarCloud của upstream (công cụ dev, không đóng gói, không hiện cho người dùng)"
+
+[[allow]]
 path = "{ROADMAP.md,AGENTS.md,CLAUDE.md,GLOSSARY.md,packaging/web/README.md,packaging/macos/dmg/README.md}"
 pattern = '.*'
 reason = "Tài liệu dev của upstream, không đóng gói, không phải giao diện (README.md đã viết lại cho Nexus Docs và được quét)"
@@ -89,6 +94,11 @@ reason = "Chuỗi đi qua tl! → i18n::brand() thay tên lúc chạy"
 path = "{crates/ui-egui/src/options.rs,crates/ui-egui/src/dialogs.rs,crates/ui-egui/src/file_browser.rs,crates/ui-egui/src/chrome.rs,crates/ui-egui/src/dialogs/dispatch.rs,crates/ui-egui/src/language_packs.rs}"
 pattern = '^\s*"[^"/]*WordCraft[^"/]*"$'
 reason = "Đối số dòng tiếp theo của tl!( … ) nhiều dòng → i18n::brand()"
+
+[[allow]]
+path = "crates/ui-egui/src/options.rs"
+pattern = 'note\(ui, "Applies the next time WordCraft starts\."\)'
+reason = "note() vẽ chuỗi qua tl!(text) → i18n::brand() thay tên lúc chạy (đồng bộ 2026-11-12)"
 
 [[allow]]
 path = "crates/ui-egui/src/dialogs/chrome.rs"

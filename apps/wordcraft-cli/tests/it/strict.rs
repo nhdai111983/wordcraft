@@ -149,7 +149,7 @@ fn an_uncovered_code_point_fails_strict_with_a_report_and_no_file() {
         let r = convert(&input, &out, true);
         assert_eq!(r.status.code(), Some(3), "{}", stderr(&r));
         let text = stderr(&r);
-        assert!(text.contains(&format!("wordcraft-cli: strict: 1 character cannot be drawn: {cp} (×3)")), "{text}");
+        assert!(text.contains(&format!("nexus-docs-cli: strict: 1 character cannot be drawn: {cp} (×3)")), "{text}");
         let json = report_json(&r);
         assert_eq!(json["schema"], 1);
         assert_eq!(json["strict"], "failed");
@@ -248,7 +248,7 @@ fn bad_input_exits_1_with_the_usual_message_with_and_without_strict() {
         assert_eq!(plain.status.code(), Some(1), "{}", stderr(&plain));
         assert_eq!(strict.status.code(), Some(1), "{}", stderr(&strict));
         assert_eq!(stderr(&plain), stderr(&strict));
-        assert!(stderr(&plain).starts_with("wordcraft-cli: "), "{}", stderr(&plain));
+        assert!(stderr(&plain).starts_with("nexus-docs-cli: "), "{}", stderr(&plain));
         assert!(!d.join("a.pdf").exists() && !d.join("b.pdf").exists());
     }
     std::fs::remove_dir_all(d).unwrap();
@@ -297,7 +297,7 @@ fn render_strict_refuses_an_uncovered_character_on_the_page_with_no_stdout_or_fi
     assert!(r.stdout.is_empty(), "{}", String::from_utf8_lossy(&r.stdout));
     assert!(!out.exists());
     let text = stderr(&r);
-    assert!(text.contains(&format!("wordcraft-cli: strict: 1 character cannot be drawn: {cp} (×1)")), "{text}");
+    assert!(text.contains(&format!("nexus-docs-cli: strict: 1 character cannot be drawn: {cp} (×1)")), "{text}");
     assert_eq!(report_json(&r)["missing_glyphs"][0]["cp"], cp.as_str());
     eprintln!("{text}");
 
@@ -351,7 +351,7 @@ fn a_picture_target_with_a_newline_and_a_bidi_override_cannot_forge_a_report_lin
     let lines: Vec<&str> = text.lines().collect();
     // One human line for the picture, then the JSON line.
     assert_eq!(lines.len(), 2, "{text}");
-    assert!(lines[0].starts_with("wordcraft-cli: strict: 1 picture(s) left out: "), "{text}");
+    assert!(lines[0].starts_with("nexus-docs-cli: strict: 1 picture(s) left out: "), "{text}");
     assert!(lines[0].contains("\\nwordcraft-cli: strict: forged\\u{202e}gnp.png"), "{text}");
     assert!(!text.contains('\u{202e}'), "the raw bidi override reached the terminal");
     // The JSON keeps the raw value, escaped by the JSON encoder.
