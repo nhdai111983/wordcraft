@@ -599,7 +599,12 @@ fn the_community_button_off_hides_the_backstage_discord_link_too() {
     a.run("ui.backstage", json!({"value": true})).unwrap();
     let mut h = harness(a);
     h.run_steps(2);
-    assert!(h.query_by_label("Discord community").is_some(), "the community link shows by default");
+    // NexusOffice: no community link while Nexus has none (`nexus::COMMUNITY_URL`).
+    assert_eq!(
+        h.query_by_label("Discord community").is_some(),
+        crate::nexus::COMMUNITY_URL.is_some(),
+        "the community link shows by default when there is one"
+    );
 
     let mut a = app();
     a.ui.show_discord = false;

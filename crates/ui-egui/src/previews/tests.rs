@@ -471,7 +471,8 @@ fn styles_group_rects() -> (Vec<(String, Rect)>, Vec<Rect>, Option<Rect>) {
     let mut arrows: Vec<Rect> = h
         .query_all(by().predicate(|n| n.bounding_box().is_some()))
         .map(|n| n.rect())
-        .filter(|r| r.width() <= 16.0 && (row.min.y..=row.max.y).contains(&r.center().y))
+        // NexusOffice: the 11-point launcher sits in its own column beside the row (no titles).
+        .filter(|r| (12.0..=16.0).contains(&r.width()) && (row.min.y..=row.max.y).contains(&r.center().y))
         .collect();
     arrows.sort_by(|a, b| a.min.y.total_cmp(&b.min.y));
     let more = h.query_by_label(crate::i18n::t("Styles Pane")).map(|n| n.rect());

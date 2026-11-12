@@ -240,6 +240,11 @@ mod tests {
     /// start reads the record, the result window opens, and Esc closes it and clears the status.
     #[test]
     fn the_last_update_opens_the_result_window_until_it_is_closed() {
+        // NexusOffices: upstream's updater is off (`nexus::UPDATES`), so no update of its own
+        // ever installs and `show` draws only the NexusOffices message.
+        if !crate::nexus::UPDATES {
+            return;
+        }
         let version = env!("CARGO_PKG_VERSION");
         // The files craft-update writes for an installed update and for a failed one.
         let cases: [(&str, &str, fn(&Status) -> bool); 2] = [
