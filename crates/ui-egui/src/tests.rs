@@ -661,7 +661,8 @@ fn reading_page_color_restores_for_new_documents_and_windows() {
 #[test]
 fn caret_animation_is_a_ui_command_and_survives_a_restart() {
     let mut a = app();
-    assert_eq!(a.run("ui.caretAnimation", json!({})).unwrap(), json!({"caretAnimation": true}), "on by default; no value reads it");
+    let default = crate::nexus::CARET_ANIMATION;
+    assert_eq!(a.run("ui.caretAnimation", json!({})).unwrap(), json!({"caretAnimation": default}), "the default; no value reads it");
     assert_eq!(a.run("ui.caretAnimation", json!({"value": false})).unwrap(), json!({"caretAnimation": false}));
     for junk in [json!({"value": "yes"}), json!({"value": 1}), json!({"value": null}), json!({"value": [true]})] {
         assert!(a.run("ui.caretAnimation", junk).is_err());
@@ -672,9 +673,9 @@ fn caret_animation_is_a_ui_command_and_survives_a_restart() {
     let mut b = app();
     b.apply_prefs(serde_json::from_str(&saved).unwrap());
     assert!(!b.ui.caret_animation);
-    // Settings saved before the option existed leave it on.
+    // Settings saved before the option existed take the default.
     let old: UiState = serde_json::from_str(r#"{"tab":"Insert"}"#).unwrap();
-    assert!(old.caret_animation && old.tab == "Insert");
+    assert!(old.caret_animation == default && old.tab == "Insert");
     assert_eq!(a.run("ui.caretAnimation", json!({"value": true})).unwrap()["caretAnimation"], true);
 }
 

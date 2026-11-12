@@ -409,6 +409,8 @@ fn key(key: egui::Key) -> egui::Event {
 fn the_canvas_caret_glides_after_a_key() {
     let mut a = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Default::default());
     a.run("text.insert", json!({"text": "Some text here"})).unwrap();
+    // NexusOffice: the caret animation is off for a new user (`nexus::CARET_ANIMATION`).
+    a.run("ui.caretAnimation", json!({"value": true})).unwrap();
     // Animation effects off: the caret follows that switch.
     a.run("ui.animations", json!({"value": "off"})).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(vec2(1440.0, 900.0)).with_step_dt(DT as f32).build_ui_state(
