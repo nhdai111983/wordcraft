@@ -101,6 +101,11 @@ pattern = 'note\(ui, "Applies the next time WordCraft starts\."\)'
 reason = "note() vẽ chuỗi qua tl!(text) → i18n::brand() thay tên lúc chạy (đồng bộ 2026-11-12)"
 
 [[allow]]
+path = "crates/ui-egui/src/i18n/nexus_catalog.rs"
+pattern = '^\s*\(?"[^"]*WordCraft[^"]*",'
+reason = "Key tiếng Anh của overlay tiếng Việt (đúng chữ upstream truyền cho tl!); tiếng Anh hiện qua i18n::brand(), bản tiếng Việt viết Nexus Docs (đồng bộ 2026-11-12)"
+
+[[allow]]
 path = "crates/ui-egui/src/dialogs/chrome.rs"
 pattern = '=> "(About WordCraft|WordCraft)",'
 reason = "Tiêu đề hộp thoại, hiển thị qua tl!(title) → i18n::brand()"
