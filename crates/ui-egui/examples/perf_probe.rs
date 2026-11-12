@@ -92,9 +92,31 @@ fn main() {
             lay.push(h.state_mut().session.layout().ms);
             ren.push(h.state().canvas.render_ms);
         }
+        // Frames until a typed character is in the document and until its page texture is drawn.
+        let (mut to_doc, mut to_tex) = (Vec::new(), Vec::new());
+        for _ in 0..20 {
+            for _ in 0..4 {
+                step(h);
+            }
+            let len0 = h.state().session.doc.plain_text(wordcraft_doc::StoryRef::Body).len();
+            let r0 = h.state().canvas.page_renders + h.state().canvas.band_renders;
+            h.input_mut().events.push(egui::Event::Text("a".into()));
+            let (mut d, mut t) = (0.0, 0.0);
+            for f in 1..=8 {
+                step(h);
+                if d == 0.0 && h.state().session.doc.plain_text(wordcraft_doc::StoryRef::Body).len() != len0 {
+                    d = f as f64;
+                }
+                if t == 0.0 && h.state().canvas.page_renders + h.state().canvas.band_renders != r0 {
+                    t = f as f64;
+                }
+            }
+            to_doc.push(d);
+            to_tex.push(t);
+        }
         let typed = frames.chunks(2).map(|c| c[0] + c[1]).collect::<Vec<_>>();
         let (pages, bands) = (h.state().canvas.page_renders.saturating_sub(pages0), h.state().canvas.band_renders.saturating_sub(bands0));
-        json!({"frame_with_key_ms": stats(&frames.iter().step_by(2).copied().collect::<Vec<_>>()), "two_frames_ms": stats(&typed), "layout_ms": stats(&lay), "render_ms": stats(&ren), "page_renders": pages, "band_renders": bands})
+        json!({"frame_with_key_ms": stats(&frames.iter().step_by(2).copied().collect::<Vec<_>>()), "two_frames_ms": stats(&typed), "layout_ms": stats(&lay), "render_ms": stats(&ren), "page_renders": pages, "band_renders": bands, "frame_char_in_doc": stats(&to_doc), "frame_texture_drawn": stats(&to_tex)})
     };
     let mid = h.state().session.doc.body.get(doc_block).and_then(|b| b.as_para()).map(|p| p.len() / 2).unwrap_or(0);
     // a char boundary at or before the middle
