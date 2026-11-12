@@ -32,7 +32,45 @@ pub(crate) fn date_time_preview_matches(value: &str) -> bool {
     PT_DATE_FORMATS.iter().chain(DATE_FORMATS.iter()).any(|picture| {
         wordcraft_engine::cmd::insert::format_date_in(picture, Some("pt-BR")) == value
             || wordcraft_engine::cmd::insert::format_date_in(picture, Some("en-US")) == value
-    })
+    }) || VI_DATE_FORMATS.iter().any(|picture| wordcraft_engine::cmd::insert::format_date_in(picture, Some("vi-VN")) == value)
+}
+
+/// NexusOffice (QC-DOC-03): Vietnamese text gets the Vietnamese pictures of Insert › Date & Time's
+/// menu (26/10/2026, "Thứ Hai, 26 tháng 10 năm 2026"…).
+const VI_DATE_FORMATS: &[&str] = wordcraft_engine::cmd::insert::DATE_FORMATS_VI;
+
+/// NexusOffice (QC-DOC-03): the dialog's language. A saved choice (`pt…` is Portuguese (Brazil),
+/// `vi…` Vietnamese, anything else English (United States)); without one, Vietnamese text at the
+/// caret ([`caret_lang`](wordcraft_engine::cmd::insert::caret_lang), the Date & Time menu's
+/// choice) or, for text in no language, a Vietnamese interface opens it in Vietnamese.
+pub(super) fn dialog_language(saved: &str, caret: Option<&str>, interface: &str) -> &'static str {
+    let vi = |l: &str| wordcraft_engine::nexus_vi::is_vi(Some(l));
+    let pt = |l: &str| l.to_ascii_lowercase().starts_with("pt");
+    if !saved.is_empty() {
+        return if pt(saved) {
+            "pt-BR"
+        } else if vi(saved) {
+            "vi-VN"
+        } else {
+            "en-US"
+        };
+    }
+    if caret.map_or(vi(interface), vi) {
+        "vi-VN"
+    } else if pt(interface) {
+        "pt-BR"
+    } else {
+        "en-US"
+    }
+}
+
+/// The pictures the dialog offers for `language`.
+fn formats_for(language: &str) -> &'static [&'static str] {
+    match language {
+        "pt-BR" => PT_DATE_FORMATS,
+        "vi-VN" => VI_DATE_FORMATS,
+        _ => DATE_FORMATS,
+    }
 }
 
 /// State of the Word-like Insert > Date & Time dialog, including an optional validation error.
@@ -55,20 +93,15 @@ pub struct DateTimeForm {
 impl DateTimeForm {
     /// Restore a saved format/language or choose a sensible default for the UI language.
     pub fn new(app: &WordApp) -> Self {
-        let language = if app.ui.date_time_language.is_empty() {
-            if crate::i18n::current().code().to_ascii_lowercase().starts_with("pt") { "pt-BR" } else { "en-US" }.to_string()
-        } else if app.ui.date_time_language.to_ascii_lowercase().starts_with("pt") {
-            "pt-BR".to_string()
-        } else {
-            "en-US".to_string()
-        };
-        let list = if language == "pt-BR" { PT_DATE_FORMATS } else { DATE_FORMATS };
+        let caret = wordcraft_engine::cmd::insert::caret_lang(&app.session);
+        let language = dialog_language(&app.ui.date_time_language, caret.as_deref(), crate::i18n::current().code()).to_string();
+        let list = formats_for(&language);
         let format = if list.contains(&app.ui.date_time_format.as_str()) { app.ui.date_time_format.clone() } else { list[0].to_string() };
         Self { format, language, update: app.ui.date_time_update, error: None, status: None }
     }
     /// Pictures available in the chosen language.
-    fn formats(&self) -> &'static [&'static str] {
-        if self.language == "pt-BR" { PT_DATE_FORMATS } else { DATE_FORMATS }
+    pub(super) fn formats(&self) -> &'static [&'static str] {
+        formats_for(&self.language)
     }
     /// Engine command parameters corresponding to the current controls.
     pub fn params(&self) -> Value {
@@ -99,8 +132,16 @@ pub(super) fn date_time_ui(app: &mut WordApp, ui: &mut Ui, f: &mut DateTimeForm)
         ui.vertical(|ui| {
             ui.label(tl!("Language"));
             craft_ui::ComboBox::from_id_salt("date_time_lang")
-                .selected_text(if f.language == "pt-BR" { tl!("Portuguese (Brazil)") } else { tl!("English (United States)") })
+                .selected_text(match f.language.as_str() {
+                    "pt-BR" => tl!("Portuguese (Brazil)"),
+                    "vi-VN" => tl!("Vietnamese"),
+                    _ => tl!("English (United States)"),
+                })
                 .show_ui(ui, |ui| {
+                    if ui.selectable_label(f.language == "vi-VN", tl!("Vietnamese")).clicked() {
+                        f.language = "vi-VN".into();
+                        f.format = VI_DATE_FORMATS.first().copied().unwrap_or("dd/MM/yyyy").into();
+                    }
                     if ui.selectable_label(f.language == "pt-BR", tl!("Portuguese (Brazil)")).clicked() {
                         f.language = "pt-BR".into();
                         f.format = PT_DATE_FORMATS[0].into();

@@ -180,6 +180,54 @@ fn date_time_dialog_uses_saved_pt_br_language() {
     assert_eq!(f.params()["update"], false);
 }
 
+/// NexusOffice (QC-DOC-03): Insert › Date & Time's dialog (the ribbon keytip opens it) writes
+/// Vietnamese text as the Date & Time menu does: with no saved choice, a caret in Vietnamese text
+/// opens it in Vietnamese with 26/10/2026 first, and OK writes that date in Vietnamese, tagged
+/// vi-VN. Before, it offered English and Portuguese only and wrote 10/26/2026 tagged en-US.
+#[test]
+fn date_time_dialog_writes_vietnamese_text_in_vietnamese() {
+    let mut a = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Default::default());
+    // A Vietnamese document (as Nexus Docs' templates and region vi-VN make it); a plain new
+    // document is en-US and keeps English, as the menu does.
+    let InsertDialog::DateTime(f) = open("dateTime", &a).expect("dialog") else { panic!("not DateTime") };
+    assert_eq!(f.language, "en-US");
+    a.session.run("review.language", &json!({"lang": "vi-VN", "default": true})).unwrap();
+    let InsertDialog::DateTime(f) = open("dateTime", &a).expect("dialog") else { panic!("not DateTime") };
+    assert_eq!(f.language, "vi-VN");
+    assert_eq!(f.format, "dd/MM/yyyy");
+    assert!(f.formats().contains(&"dddd, d 'tháng' M 'năm' yyyy"), "{:?}", f.formats());
+    a.run("insert.dateTime", f.params()).unwrap();
+    let doc = &a.session.doc;
+    assert_eq!(doc.plain_text(wordcraft_doc::StoryRef::Body), wordcraft_engine::cmd::insert::format_date_in("dd/MM/yyyy", Some("vi-VN")));
+    let para = doc.para_at(&doc.start_of(wordcraft_doc::StoryRef::Body)).expect("inserted paragraph");
+    assert_eq!(para.props_of_char(0).lang.as_deref(), Some("vi-VN"));
+    // A saved choice still wins, and a saved Vietnamese one is kept.
+    a.ui.date_time_language = "en-US".into();
+    let InsertDialog::DateTime(f) = open("dateTime", &a).expect("dialog") else { panic!("not DateTime") };
+    assert_eq!((f.language.as_str(), f.format.as_str()), ("en-US", "M/d/yyyy"));
+    let mut b = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Default::default());
+    b.ui.date_time_language = "vi_VN".into();
+    let InsertDialog::DateTime(f) = open("dateTime", &b).expect("dialog") else { panic!("not DateTime") };
+    assert_eq!(f.language, "vi-VN", "a saved Vietnamese choice holds in English text too");
+}
+
+/// NexusOffice: the dialog's language without a saved choice follows the caret's text, and for
+/// text in no language a Vietnamese interface; else upstream's choice (Portuguese interface: pt-BR).
+#[test]
+fn date_time_dialog_language_follows_vietnamese_text_or_interface() {
+    use super::date_time::dialog_language as l;
+    assert_eq!(l("", Some("vi-VN"), "en"), "vi-VN");
+    assert_eq!(l("", Some("vi"), "pt-BR"), "vi-VN");
+    assert_eq!(l("", None, "vi"), "vi-VN");
+    assert_eq!(l("", Some("en-US"), "vi"), "en-US", "English text keeps English, as the menu does");
+    assert_eq!(l("", Some("en-US"), "en"), "en-US");
+    assert_eq!(l("", None, "pt-BR"), "pt-BR");
+    assert_eq!(l("", Some("vie"), "en"), "en-US");
+    assert_eq!(l("pt-PT", Some("vi-VN"), "vi"), "pt-BR");
+    assert_eq!(l("en-US", Some("vi-VN"), "vi"), "en-US");
+    assert_eq!(l("VI-vn", None, "en"), "vi-VN");
+}
+
 /// Language tags with primary subtag `pt` (such as `pt_BR` or `pt-PT`) are normalized to `pt-BR`.
 #[test]
 fn date_time_dialog_normalizes_portuguese_language_tags() {
