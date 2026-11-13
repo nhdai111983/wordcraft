@@ -409,12 +409,13 @@ fn advanced_animation_turns_the_caret_animation_off_and_on() {
     );
     h.run_steps(4);
     assert!(h.query_by_label("Animation").is_some(), "the section is there");
+    let default = h.state().ui.caret_animation;
     h.get_by_label("Animate the caret (it glides and fades)").click();
     h.run_steps(4);
-    assert!(!h.state().ui.caret_animation, "the checkbox turns it off");
+    assert_eq!(h.state().ui.caret_animation, !default, "the checkbox turns it over");
     h.get_by_label("Animate the caret (it glides and fades)").click();
     h.run_steps(4);
-    assert!(h.state().ui.caret_animation, "and on again");
+    assert_eq!(h.state().ui.caret_animation, default, "and back");
     if !crate::i18n::catalogs_embedded() {
         return;
     }

@@ -26,6 +26,14 @@ pub const COMMUNITY_URL: Option<&str> = None;
 /// NexusOffices installer.
 pub const UPDATES: bool = false;
 
+/// File › Options › Advanced › Animation, for a new user: off. Upstream's caret glides to its
+/// new place and fades in after every key ([`crate::caret_glide`]); measured on a Windows 11 PC
+/// (2026-11-12, keystroke to screen, the same sentence typed into each app), the typed character
+/// shows after ~25 ms but the caret only after ~90 ms, and typing "isn't as smooth" as Word
+/// (29 ms) or WPS Writer (31 ms). Off, Nexus Docs shows both after 25 ms (median; p90 34 ms).
+/// Anyone can turn it back on; a saved choice is kept.
+pub const CARET_ANIMATION: bool = false;
+
 /// What Help › Check for Updates says while [`UPDATES`] is off.
 pub fn updates_message() -> &'static str {
     crate::i18n::nexus_text(
@@ -95,6 +103,16 @@ mod tests {
         assert_eq!(SOURCE_URL, "https://github.com/sonnytech-vn/wordcraft");
         assert!(ABOUT_LINE.0.ends_with("Part of the NexusOffice suite by SonnyTech."));
         assert!(ABOUT_LINE.1.ends_with("Thuộc bộ ứng dụng văn phòng NexusOffice của SonnyTech."));
+    }
+
+    /// A new Nexus Docs window starts with the caret animation off, and a settings file saved
+    /// before the option existed reads as off too.
+    #[test]
+    fn the_caret_does_not_glide_for_a_new_user() {
+        let app = crate::WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services::default());
+        assert!(!app.ui.caret_animation);
+        let old: crate::UiState = serde_json::from_str(r#"{"tab":"Insert"}"#).unwrap();
+        assert!(!old.caret_animation);
     }
 
     /// About keeps upstream's names in the attribution and the copyright notice (not branded)

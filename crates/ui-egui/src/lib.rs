@@ -395,8 +395,8 @@ pub struct UiState {
     /// File › Options › Proofing › Check spelling as you type, kept between runs (#1792).
     pub check_spelling: bool,
     /// File › Options › Advanced › Animation: the caret glides to its new place and its blink
-    /// fades, as Word's does on Windows (on, the default), or it jumps and blinks on and off
-    /// (off).
+    /// fades, as Word's does on Windows (on), or it jumps and blinks on and off (off). The
+    /// default is [`crate::nexus::CARET_ANIMATION`].
     pub caret_animation: bool,
     /// Custom keyboard shortcuts (Customize Keyboard, #368); the session owns them while running.
     pub keyboard: wordcraft_engine::KeyMap,
@@ -505,7 +505,7 @@ impl Default for UiState {
             alt_modifier_seen: false,
             dark_page: false,
             check_spelling: true,
-            caret_animation: true,
+            caret_animation: crate::nexus::CARET_ANIMATION,
             keyboard: wordcraft_engine::KeyMap::default(),
             ribbon: wordcraft_engine::RibbonLayout::default(),
             caption_labels: Vec::new(),
