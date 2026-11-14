@@ -268,10 +268,10 @@ const ROWS: &[(&str, &str)] = &[
     ),
     (
         "This document has content Markdown can't hold. Changing the text here removes it; one Undo afterwards brings it back.",
-        "Tài liệu này có nội dung Markdown không giữ được. Sửa chữ ở đây sẽ bỏ nội dung đó; Hoàn tác một lần ngay sau đó sẽ lấy lại.",
+        "Tài liệu này có nội dung Markdown không giữ được. Sửa văn bản ở đây sẽ bỏ nội dung đó; Hoàn tác một lần ngay sau đó sẽ lấy lại.",
     ),
     ("Markdown Source", "Mã nguồn Markdown"),
-    ("Markdown Source takes up to 2 MB of text", "Mã nguồn Markdown nhận tối đa 2 MB chữ"),
+    ("Markdown Source takes up to 2 MB of text", "Mã nguồn Markdown nhận tối đa 2 MB văn bản"),
     ("Nothing to undo", "Không có gì để hoàn tác"),
     ("Nothing to redo", "Không có gì để làm lại"),
     ("Mouse wheel scroll speed:", "Tốc độ cuộn bằng con lăn chuột:"),
