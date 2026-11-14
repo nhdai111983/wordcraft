@@ -28,6 +28,10 @@ impl WordApp {
     /// Close, Envelopes, Labels and Finish & Merge on a document with unsaved changes first ask
     /// Save / Don't Save / Cancel, and the command runs once that is answered (`ui.saveChanges`).
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
+        // While Markdown Source is open, Undo and Redo work on its typing, as Ctrl+Z does there.
+        if matches!(id, "edit.undo" | "edit.redo") && self.session.md_source.is_some() {
+            return crate::md_source::undo(self, id == "edit.redo");
+        }
         // Comment text still being typed is written first, so a save or export has it and a
         // close, New or Open counts it as a change (#1348). A draft the document refuses is not
         // part of it: saving and exporting go on without it (the refusal stays on the status
@@ -263,6 +267,13 @@ impl WordApp {
             && v.get("path").and_then(Value::as_str).map(std::path::Path::new) == self.session.path.as_deref()
         {
             self.autosave_path = self.session.path.clone();
+        }
+        // A Markdown file edited in the formatted view was written out again, not kept as it was.
+        if let Ok(v) = &r
+            && matches!(id, "file.save" | "file.saveAs")
+            && v.get("rewritten").and_then(Value::as_bool) == Some(true)
+        {
+            self.status_long(tl!("Saved. Edits in the formatted view meant writing the Markdown out again, so its own layout wasn't kept."));
         }
         // A renamed file is the same file: AutoSave keeps covering it, and Recent drops the old name.
         if r.is_ok()
@@ -517,6 +528,28 @@ impl WordApp {
         log::warn!("dropped a request for document {document}, which no window shows: {req}");
     }
 
+    /// NexusOffice: `ui.accent`. `#RRGGBB` sets the accent colour, `null` or "" goes back to
+    /// the app's own; no value reads it. (Its own function keeps `ui_command` under clippy's
+    /// cognitive-complexity limit.)
+    fn ui_accent(&mut self, p: &Value) -> Result<Value, String> {
+        if let Some(v) = p.get("value") {
+            let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
+            match hex.map(theme::parse_hex) {
+                Some(None) => return Err(format!("unknown colour {v}; use #RRGGBB")),
+                Some(Some(c)) => {
+                    self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
+                    theme::set_accent(Some(c));
+                }
+                None => {
+                    self.ui.accent = None;
+                    theme::set_accent(None);
+                }
+            }
+            self.applied_theme = None;
+        }
+        Ok(json!({"accent": self.ui.accent}))
+    }
+
     /// Commands that live in the UI layer.
     pub(crate) fn ui_command(&mut self, id: &str, p: &Value) -> Option<Result<Value, String>> {
         let s = |k: &str| p.get(k).and_then(Value::as_str);
@@ -654,26 +687,7 @@ impl WordApp {
                 }
                 json!({"theme": self.ui.theme.code(), "dark": self.ui_is_dark()})
             }
-            "ui.accent" => {
-                // NexusOffice: `#RRGGBB` sets the accent colour, `null` or "" goes back to the
-                // app's own; no value reads it.
-                if let Some(v) = p.get("value") {
-                    let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
-                    match hex.map(theme::parse_hex) {
-                        Some(None) => return Some(Err(format!("unknown colour {v}; use #RRGGBB"))),
-                        Some(Some(c)) => {
-                            self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
-                            theme::set_accent(Some(c));
-                        }
-                        None => {
-                            self.ui.accent = None;
-                            theme::set_accent(None);
-                        }
-                    }
-                    self.applied_theme = None;
-                }
-                json!({"accent": self.ui.accent})
-            }
+            "ui.accent" => return Some(self.ui_accent(p)),
             "ui.interfaceSize" => {
                 // `auto` (the display scale the system reports) or an absolute size in percent,
                 // 50–300 (clamped); no value reads it. `percent` in the result is the size the
@@ -723,6 +737,28 @@ impl WordApp {
                     }
                 }
                 json!({"statusCount": self.ui.status_count.code()})
+            }
+            "ui.scrollSpeed" => {
+                // `slow`, `normal` (the default) or `fast`: mouse-wheel scroll speed (#6146);
+                // no value reads it.
+                if let Some(v) = s("value") {
+                    match crate::scroll::ScrollSpeed::from_code(v) {
+                        Some(s) => self.ui.scroll_speed = s,
+                        None => return Some(Err(format!("unknown scroll speed {v:?}; use slow, normal or fast"))),
+                    }
+                }
+                json!({"scrollSpeed": self.ui.scroll_speed.code(), "factor": self.ui.scroll_speed.wheel_factor()})
+            }
+            "ui.touchpadScrollSpeed" => {
+                // `slow`, `normal` (the default) or `fast`: touchpad scroll speed on Wayland (#6146);
+                // no value reads it.
+                if let Some(v) = s("value") {
+                    match crate::scroll::ScrollSpeed::from_code(v) {
+                        Some(s) => self.ui.touchpad_scroll_speed = s,
+                        None => return Some(Err(format!("unknown touchpad scroll speed {v:?}; use slow, normal or fast"))),
+                    }
+                }
+                json!({"touchpadScrollSpeed": self.ui.touchpad_scroll_speed.code(), "factor": self.ui.touchpad_scroll_speed.touchpad_factor()})
             }
             "ui.language" => {
                 // `auto` (follow the system) or a language code; anything else is an error.
@@ -1169,6 +1205,8 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.recentClear"
             | "ui.displayServer"
             | "ui.statusCount"
+            | "ui.scrollSpeed"
+            | "ui.touchpadScrollSpeed"
             | "ui.checkForUpdates"
     ) || id.starts_with("help.")
 }
