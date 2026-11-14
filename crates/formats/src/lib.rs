@@ -77,7 +77,7 @@ pub fn export(ext: &str, doc: &Document) -> Option<Result<Vec<u8>, String>> {
         "txt" | "text" => Ok(txt::export(doc)),
         "md" | "markdown" => Ok(markdown::export(doc).into_bytes()),
         "html" | "htm" | "xhtml" => Ok(html::export(doc).into_bytes()),
-        "rtf" => Ok(rtf::export(doc).into_bytes()),
+        "rtf" => rtf::try_export(doc).map(String::into_bytes),
         "odt" => odt::export(doc),
         "ott" => odt::export_template(doc),
         "fodt" => odt::export_flat(doc),
