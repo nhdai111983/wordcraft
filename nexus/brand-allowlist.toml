@@ -249,3 +249,12 @@ reason = "Bản dịch giao diện (cả tiếng Việt) upstream chuyển ra st
 path = "{crates/engine/src/packs/store.rs,crates/engine/src/packs.rs}"
 pattern = 'https://github\.com/storytold/craft-i18n/releases/download/language-packs-2/(index\.json|\{locale\}\.tar\.zst)'
 reason = "Language packs (đồng bộ 03/11): chỉ mục gói ngôn ngữ ghim sha256 và URL gói mẫu của FixedBackend; app chỉ tải khi người dùng bấm (mặc định tắt). Giữ nguyên hành vi upstream cho tới khi Henry quyết nguồn tải (mirror nhdai111983/sonnytech-vn hay tắt hẳn); URL không hiện trên giao diện"
+
+# ---------------------------------------------------------------------------------------------
+# 8. Đồng bộ upstream 2026-11-14 (DOCX và RTF chuyển sang craft-libs)
+# ---------------------------------------------------------------------------------------------
+
+[[allow]]
+path = "{crates/docx/src/nexus.rs,crates/formats/src/rtf.rs}"
+pattern = 'WordCraft'
+reason = "craft-docx/craft-rtf (craft-libs) ghi cứng tên WordCraft vào docProps/app.xml, dòng generator RTF và lỗi mã hoá; hai chỗ này tìm đúng chuỗi đó để đổi thành Nexus Docs (kiểm bởi crates/engine/tests/nexus_brand.rs)"
