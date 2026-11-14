@@ -528,6 +528,28 @@ impl WordApp {
         log::warn!("dropped a request for document {document}, which no window shows: {req}");
     }
 
+    /// NexusOffice: `ui.accent`. `#RRGGBB` sets the accent colour, `null` or "" goes back to
+    /// the app's own; no value reads it. (Its own function keeps `ui_command` under clippy's
+    /// cognitive-complexity limit.)
+    fn ui_accent(&mut self, p: &Value) -> Result<Value, String> {
+        if let Some(v) = p.get("value") {
+            let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
+            match hex.map(theme::parse_hex) {
+                Some(None) => return Err(format!("unknown colour {v}; use #RRGGBB")),
+                Some(Some(c)) => {
+                    self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
+                    theme::set_accent(Some(c));
+                }
+                None => {
+                    self.ui.accent = None;
+                    theme::set_accent(None);
+                }
+            }
+            self.applied_theme = None;
+        }
+        Ok(json!({"accent": self.ui.accent}))
+    }
+
     /// Commands that live in the UI layer.
     pub(crate) fn ui_command(&mut self, id: &str, p: &Value) -> Option<Result<Value, String>> {
         let s = |k: &str| p.get(k).and_then(Value::as_str);
@@ -665,26 +687,7 @@ impl WordApp {
                 }
                 json!({"theme": self.ui.theme.code(), "dark": self.ui_is_dark()})
             }
-            "ui.accent" => {
-                // NexusOffice: `#RRGGBB` sets the accent colour, `null` or "" goes back to the
-                // app's own; no value reads it.
-                if let Some(v) = p.get("value") {
-                    let hex = v.as_str().map(str::trim).filter(|h| !h.is_empty());
-                    match hex.map(theme::parse_hex) {
-                        Some(None) => return Some(Err(format!("unknown colour {v}; use #RRGGBB"))),
-                        Some(Some(c)) => {
-                            self.ui.accent = Some(format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()));
-                            theme::set_accent(Some(c));
-                        }
-                        None => {
-                            self.ui.accent = None;
-                            theme::set_accent(None);
-                        }
-                    }
-                    self.applied_theme = None;
-                }
-                json!({"accent": self.ui.accent})
-            }
+            "ui.accent" => return Some(self.ui_accent(p)),
             "ui.interfaceSize" => {
                 // `auto` (the display scale the system reports) or an absolute size in percent,
                 // 50–300 (clamped); no value reads it. `percent` in the result is the size the
