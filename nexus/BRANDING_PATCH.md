@@ -216,6 +216,12 @@ GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft` �
 - Đổi URL khỏi `storytold/craft-i18n` (sang bản phát hành của SonnyTech): **chưa làm, vẫn chờ Henry
   quyết** (URL đang nằm trong allowlist, xem dòng `crates/engine/src/packs.rs` ở bảng trên).
 
+## Đồng bộ upstream 2026-11-14
+
+- 75 commit upstream, **dừng trước** lần chuyển DOCX/RTF/DOC sang craft-libs (#6603 `514085ca`, #6565 `a4b898f8`): đầu `upstream/main` lúc đó tự đỏ — 12 test `wordcraft-docx` (glossary, tracked style change, chart dựng một lần, đánh số dòng…) và `clippy` (`expect()` trong `crates/docx/src/lib.rs`, `rtf.rs`; `if` lồng trong `model_bridge.rs`). Đồng bộ tới `eae8363e` (#6541) là đủ lấy bản sửa lint Rust 1.100 (`crates/formats/src/latex/tests.rs` #6225, `crates/engine/src/cmd/table_draw.rs`) đang làm `gate` trên `nexus` đỏ từ 13/11.
+- 2 xung đột: `apps/wordcraft/src/main.rs` (giữ `nexus::UPDATES`, nhận `cancel_file_dialog` mới), `crates/ui-egui/src/app.rs` (giữ `drawn_in`/`embedded`, nhận `clear_raw_scroll_replay`). File upstream mới bị sửa: `apps/wordcraft/src/clipboard.rs` (tên định dạng clipboard Windows "Nexus Docs Copy Owner", để không lẫn với WordCraft cài cùng máy).
+- Lần đồng bộ sau (qua lần chuyển craft-libs) đã chuẩn bị ở nhánh `nexus-sync/2026-11-14`: `crates/docx/src/nexus.rs` đổi `<Application>` và lỗi mã hoá trên đầu ra của craft-docx, `crates/formats/src/rtf.rs` đổi dòng generator RTF, bỏ `expect()` của upstream. Chờ upstream sửa 12 test kia rồi mới gộp.
+
 ## Đồng bộ upstream 2026-11-12
 
 - 422 commit upstream (`07f97737`, bản 0.18.1). egui/winit giữ rev `6d518fc7`/`a517b384`; craft-i18n `9d6d54d6` → `1e515422`; craft-libs: craft-pdf/craft-update/krilla `c5a1cbfb` → `6e03f65b` (đúng rev Suite đang patch krilla), craft-print `92d392cf` → `a3e0b5a9`; mới ở web: craft-web-api/craft-web-host `fd5e2fef` (`window.wordcraft`).

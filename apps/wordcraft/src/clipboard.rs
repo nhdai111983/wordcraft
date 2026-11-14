@@ -581,7 +581,7 @@ mod platform {
         Ok(out)
     }
 
-    const OWNER_FORMAT: &str = "WordCraft Copy Owner";
+    const OWNER_FORMAT: &str = "Nexus Docs Copy Owner";
 
     /// Process-unique ownership token placed into Windows clipboard marker.
     fn owner_token() -> [u8; 16] {
