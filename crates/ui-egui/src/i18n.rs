@@ -390,6 +390,11 @@ pub fn tn(n: u64, one: &str, other: &str) -> String {
         return I18N.trn(craft_i18n::Lang::PSEUDO, n, one, other);
     }
     let lang = current();
+    // NexusOffice: a Nexus Vietnamese row keyed `one|other` (as craft-i18n's `@plural` rows are)
+    // is the one form Vietnamese has; `{n}` is still written the catalog's way.
+    if let Some(v) = nexus_overlay(lang, &format!("{one}|{other}")) {
+        return lang.i18n().trn(lang.lang, n, v, v);
+    }
     lang.i18n().trn(lang.lang, n, one, other)
 }
 
