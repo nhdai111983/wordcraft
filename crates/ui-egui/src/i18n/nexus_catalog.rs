@@ -260,6 +260,24 @@ const ROWS: &[(&str, &str)] = &[
     // Counts (`tn`): keyed `one|other` like craft-i18n's `@plural` rows; Vietnamese has one form.
     ("{n} font not installed|{n} fonts not installed", "{n} phông chữ chưa cài"),
     ("…and {n} more|…and {n} more", "…và {n} phông chữ khác"),
+    // Upstream sync 2026-11-14: Markdown Source view, scroll speeds, Fit One Page — interface
+    // text craft-i18n's Vietnamese (1e51542) doesn't have yet.
+    (
+        "Saved. Edits in the formatted view meant writing the Markdown out again, so its own layout wasn't kept.",
+        "Đã lưu. Vì có sửa trong chế độ xem định dạng nên Markdown được ghi lại từ đầu; bố cục riêng của tệp không được giữ.",
+    ),
+    (
+        "This document has content Markdown can't hold. Changing the text here removes it; one Undo afterwards brings it back.",
+        "Tài liệu này có nội dung Markdown không giữ được. Sửa chữ ở đây sẽ bỏ nội dung đó; Hoàn tác một lần ngay sau đó sẽ lấy lại.",
+    ),
+    ("Markdown Source", "Mã nguồn Markdown"),
+    ("Markdown Source takes up to 2 MB of text", "Mã nguồn Markdown nhận tối đa 2 MB chữ"),
+    ("Nothing to undo", "Không có gì để hoàn tác"),
+    ("Nothing to redo", "Không có gì để làm lại"),
+    ("Mouse wheel scroll speed:", "Tốc độ cuộn bằng con lăn chuột:"),
+    ("Touchpad scroll speed:", "Tốc độ cuộn bằng bàn di chuột:"),
+    ("On X11, the touchpad follows the mouse wheel speed.", "Trên X11, bàn di chuột theo tốc độ của con lăn chuột."),
+    ("Fit\nOne Page", "Vừa\nmột trang"),
     // @@NEXUS_VI_MORE@@
 ];
 
