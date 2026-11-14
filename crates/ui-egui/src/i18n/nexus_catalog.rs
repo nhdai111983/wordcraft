@@ -257,6 +257,9 @@ const ROWS: &[(&str, &str)] = &[
     ("{n} KB", "{n} KB"),
     ("{n} MB", "{n} MB"),
     ("{paper}   {width} × {height}", "{paper}   {width} × {height}"),
+    // Counts (`tn`): keyed `one|other` like craft-i18n's `@plural` rows; Vietnamese has one form.
+    ("{n} font not installed|{n} fonts not installed", "{n} phông chữ chưa cài"),
+    ("…and {n} more|…and {n} more", "…và {n} phông chữ khác"),
     // @@NEXUS_VI_MORE@@
 ];
 
@@ -300,6 +303,26 @@ mod tests {
         assert_eq!(tr(vi, "Close"), "Đóng");
     }
 
+    /// Counts in the status bar's missing-fonts item are Vietnamese, with the number in.
+    #[test]
+    fn counts_show_in_a_vietnamese_interface() {
+        use super::super::{Lang, catalogs_embedded, current, set_current, tn};
+        if !catalogs_embedded() {
+            return;
+        }
+        let Some(vi) = Lang::from_code("vi") else { panic!("the Vietnamese catalog is embedded") };
+        let before = current();
+        set_current(vi);
+        // The number comes isolated (LRI…PDI) so a right-to-left sentence can't reorder it.
+        let count = |n: u64, one: &str, other: &str| craft_i18n::strip_isolates(&tn(n, one, other));
+        assert_eq!(count(1, "{n} font not installed", "{n} fonts not installed"), "1 phông chữ chưa cài");
+        assert_eq!(count(3, "{n} font not installed", "{n} fonts not installed"), "3 phông chữ chưa cài");
+        assert_eq!(count(5, "…and {n} more", "…and {n} more"), "…và 5 phông chữ khác");
+        set_current(Lang::EN);
+        assert_eq!(count(3, "{n} font not installed", "{n} fonts not installed"), "3 fonts not installed");
+        set_current(before);
+    }
+
     /// Each key once, each translation non-empty and with the key's `{placeholders}`.
     #[test]
     fn rows_are_unique_and_keep_their_placeholders() {
@@ -307,9 +330,11 @@ mod tests {
         for (en, vi) in ROWS {
             assert!(seen.insert(*en), "{en:?} is listed twice");
             assert!(!vi.trim().is_empty(), "{en:?} has no Vietnamese");
+            // Each placeholder at least once (a count row's key has `{n}` in both its forms).
             let holes = |s: &str| {
                 let mut v: Vec<String> = s.split('{').skip(1).filter_map(|p| p.split_once('}').map(|(h, _)| h.to_string())).collect();
                 v.sort();
+                v.dedup();
                 v
             };
             assert_eq!(holes(en), holes(vi), "{en:?}: placeholders differ");
