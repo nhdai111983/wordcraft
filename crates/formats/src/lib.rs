@@ -17,6 +17,8 @@ pub mod markdown;
 pub mod mathml;
 pub mod mht;
 pub mod model;
+// NexusOffice: the craft-libs writers name WordCraft; this renames it on the way out.
+mod nexus;
 pub mod odt;
 pub mod rtf;
 pub mod sheet;
