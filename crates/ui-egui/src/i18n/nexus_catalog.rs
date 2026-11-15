@@ -152,8 +152,8 @@ const ROWS: &[(&str, &str)] = &[
     ("a shape inside a drawing canvas is placed by the canvas", "hình nằm trong khung vẽ do khung vẽ đặt vị trí"),
     // Engine reasons Nexus names at the source (so craft-i18n's key no longer matches).
     (
-        "this SmartArt was made in another program: Nexus Docs shows it but can't edit it",
-        "SmartArt này được tạo bằng chương trình khác: Nexus Docs hiển thị được nhưng không sửa được",
+        "this diagram was made in another program: Nexus Docs shows it but can't edit it",
+        "Sơ đồ này được tạo bằng chương trình khác: Nexus Docs hiển thị được nhưng không sửa được",
     ),
     (
         "this chart was made in another program: Nexus Docs shows it but can't edit it",

@@ -76,7 +76,6 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/ui-egui/src/theme.rs` | Màu NexusOffice (DESIGN_SYSTEM.md): ink indigo `#4F46E5`, gradient `#6366F1`→`#06B6D4`→`#10B981`, nền `#F8FAFC`/`#F1F5F9`, viền `#E2E8F0`; màu chủ đạo người dùng chọn (`set_accent`, `with_accent` giữ tương phản 4.5:1) | Có — bảng màu qua biến build |
 | `crates/mcp/src/server.rs` | `serverInfo.title = "Nexus Docs"`, websiteUrl fork; bỏ link Discord/getartcraft khỏi instructions. **`serverInfo.name` giữ `"wordcraft"`** có chủ đích: là định danh máy (test MCP và cấu hình client dựa vào), không phải tên hiển thị | Có |
 | `crates/engine/src/sample.rs` | Tài liệu mẫu: creator `Nexus Docs`, link `getartcraft.com` → `example.org` | Có |
-| `crates/formats/src/latex/export.rs` | Dòng đầu LaTeX: bỏ URL getartcraft, "Written by Nexus Docs" | Có — tên app qua biến build |
 | `crates/formats/src/tests.rs` | Test khẳng định dòng đầu LaTeX mới | Đi cùng `latex.rs` |
 | `crates/control-key/src/lib.rs` | Thư mục cấu hình `Nexus Docs` (macOS/Windows) / `nexus-docs` (XDG) — không đụng cấu hình WordCraft gốc (+ test) | Có — tên thư mục qua biến build |
 | `apps/wordcraft/src/main.rs` | Không bật kiểm tra cập nhật khi khởi động (`nexus::UPDATES`). Bật `app.wps` (bố cục NexusOffice kiểu WPS; thanh menu `app.toolbar` vẫn giữ sau cờ); Tiêu đề cửa sổ, app id `vn.sonnytech.nexus.docs`, tên eframe, icon cửa sổ từ `nexus/assets/`, USAGE/log; tên lệnh `nexus-docs` trong USAGE, `--version` và tiền tố stderr | Có |
@@ -97,9 +96,6 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/engine/src/io.rs` | Lỗi mở tệp "not a document (or text file) Nexus Docs can open" — CLI/MCP/giao diện đều thấy | Có — tên app qua biến build |
 | `crates/engine/src/cmd/chart.rs` | "this chart was made in another program: Nexus Docs shows it but can't edit it" | Có — tên app qua biến build |
 | `crates/engine/src/cmd/smart_art.rs` | Như trên cho SmartArt | Có — tên app qua biến build |
-| `crates/docx/src/crypt.rs` | Lỗi mã hoá "…which Nexus Docs can't open" (3 chỗ). Thông báo "Standard encryption (Office 2007)…can't open yet": **đã có ở upstream** (upstream đọc được Standard encryption), bỏ patch | Có — tên app qua biến build |
-| `crates/formats/src/odt/crypt.rs` | Đồng bộ 2026-11-05 (ODF mã hoá, mới ở upstream): lỗi "this file is encrypted with …, which Nexus Docs can't open" — giao diện, CLI, MCP đều thấy | Có — tên app qua biến build |
-| `crates/formats/src/odt/strokes.rs` | Đồng bộ 2026-11-05 (mới ở upstream): tên kiểu mũi tên/nét đứt/gradient ghi vào .odt là "Nexus Docs Arrow", "Nexus_20_Docs_20_Dash_20_…" (LibreOffice hiện các tên này trong danh sách kiểu đường) | Có — tên app qua biến build |
 | `apps/wordcraft/src/clipboard.rs` | "Nexus Docs can't decode its format" (ảnh trong clipboard) | Có — tên app qua biến build |
 | `crates/zotero/src/bridge.rs` | Trả lời plugin Zotero "Nexus Docs doesn't support …" | Có — tên app qua biến build |
 | `crates/ui-egui/src/zotero.rs` | Trả lời Zotero "Nexus Docs closed/replaced the document…", "Zotero works with the Nexus Docs desktop app" (wasm) | Có — tên app qua biến build |
@@ -125,11 +121,11 @@ Link nguồn hiển thị (About, README, metainfo, nfpm, `sign.ps1`, `Cargo.tom
 | `crates/engine/src/session/lifecycle.rs` | Tác giả mặc định `"Nexus Docs User"` (ghi vào nhận xét/theo dõi thay đổi; avatar "ND") | Có — tên app qua biến build |
 | `crates/engine/src/tests.rs` | Assert tác giả mặc định mới | Đi cùng `session/lifecycle.rs` |
 | `crates/pdf/src/metadata.rs` | PDF creator/producer `Nexus Docs` | Có — tên app qua biến build |
-| `crates/docx/src/write/settings.rs` | DOCX `docProps/app.xml` `<Application>Nexus Docs</Application>` | Có — tên app qua biến build |
-| `crates/docx/tests/it/passthrough.rs` | Assert `<Application>` mới | Đi cùng `write/settings.rs` |
-| `crates/formats/src/html/export.rs` | `<meta name="generator" content="Nexus Docs">` | Có — tên app qua biến build |
-| `crates/formats/src/odt/package.rs` | `<meta:generator>Nexus Docs</meta:generator>` | Có — tên app qua biến build |
-| `crates/formats/src/rtf/export.rs` | `{\*\generator Nexus Docs;}` | Có — tên app qua biến build |
+| `crates/docx/src/nexus.rs` | Từ 15/11 (DOCX/ODT/RTF/HTML/LaTeX chuyển sang craft-libs, ghi cứng "WordCraft"): đổi tên trên đầu ra — DOCX `docProps/app.xml` `<Application>Nexus Docs</Application>` (gói zip và Flat OPC); hàm chung `rewrite_parts` chép lại gói zip, chỉ thay phần XML cần đổi, giữ thứ tự và kiểu lưu (`mimetype` vẫn stored, đứng đầu); gói hỏng thì để nguyên | Có — craft-docx nhận tên app |
+| `crates/docx/src/lib.rs`, `crates/docx/Cargo.toml` | `write`/`write_as`/`write_flat` đi qua `nexus.rs`; `craft-zip` thành phụ thuộc thường | Đi cùng `nexus.rs` |
+| `crates/formats/src/nexus.rs` | HTML `<meta name="generator" content="Nexus Docs">`, dòng đầu LaTeX "Written by Nexus Docs (NexusOffice)", RTF `{\*\generator Nexus Docs;}`, ODT/FODT `<meta:generator>Nexus Docs</meta:generator>` và tên kiểu mũi tên/nét đứt/gradient "Nexus Docs Arrow", "Nexus_20_Docs_20_…" (LibreOffice hiện các tên này) | Có — craft-html/latex/rtf/odf nhận tên app |
+| `crates/formats/src/{html,latex,rtf,odt,lib}.rs` | Đầu ra của craft-libs đi qua `formats/src/nexus.rs` | Đi cùng `nexus.rs` |
+| `crates/docx/tests/it/passthrough.rs` | Assert `<Application>` mới | Đi cùng `crates/docx/src/nexus.rs` |
 | `SECURITY.md` | Đồng bộ 2026-11-03 (file mới của upstream): chính sách bảo mật của Nexus Docs (tiếng Việt trước, có phần English), báo lỗ hổng riêng tư qua `sonnytech-vn/wordcraft` › Security › Advisories, bản sửa vào `nexus` | Không (tài liệu của fork) |
 | `README.md` | README Nexus Docs ngắn (tiếng Việt trước, có phần English): sản phẩm, NexusOffice/SonnyTech, câu ghi công "Nexus Docs được phát triển dựa trên WordCraft của ArtCraft (MIT/Apache-2.0)" chỉ bằng chữ, trỏ LICENSE-MIT/LICENSE-APACHE/NOTICE/ATTRIBUTION.md, link fork; được `copy_docs` và zip portable đóng gói | Không (README của fork) |
 | `Cargo.toml` | `[workspace.package] repository` → `https://github.com/sonnytech-vn/wordcraft` (brand-check `brand-url`; metadata, không code nào đọc `CARGO_PKG_REPOSITORY`) | Có — metadata của fork |
@@ -215,6 +211,12 @@ GitHub Releases của fork (`GITHUB_REPOSITORY` hoặc `nhdai111983/wordcraft` �
   dùng tự bật); không thêm patch chặn lần tải tự động này.
 - Đổi URL khỏi `storytold/craft-i18n` (sang bản phát hành của SonnyTech): **chưa làm, vẫn chờ Henry
   quyết** (URL đang nằm trong allowlist, xem dòng `crates/engine/src/packs.rs` ở bảng trên).
+
+## Đồng bộ upstream 2026-11-15
+
+- 33 commit upstream, gồm lần chuyển DOCX/RTF/DOC (#778, #6603, #6565) rồi ODT/HTML/LaTeX, codec ảnh và zip (#6661) sang craft-libs. Lần 14/11 đã dừng trước lần chuyển vì `upstream/main` khi đó đỏ 12 test `wordcraft-docx`; 15/11 upstream đã sửa (chạy trên worktree sạch: 450/450 xanh) nên gộp.
+- Patch tên trong các file bị xoá (`crates/docx/src/crypt.rs`, `write/settings.rs`, `crates/formats/src/{html,latex,rtf}/export.rs`, `odt/{crypt,package,strokes}.rs`) chuyển thành lớp đổi tên trên đầu ra: `crates/docx/src/nexus.rs`, `crates/formats/src/nexus.rs`. Lỗi mã hoá ODT/DOCX của craft-libs không còn nêu tên app nên bỏ patch đó. Đọc file không cần đổi: bộ đọc của craft-libs không dựa vào các tên này.
+- Xung đột: `README.md` (giữ Nexus), `crates/engine/src/cmd/smart_art.rs` (câu mới "this diagram…" + Nexus Docs; khoá catalog Nexus đổi theo), `crates/ui-egui/src/i18n.rs` (`has` dùng `display_source` của upstream + lớp tiếng Việt Nexus), `crates/ui-egui/src/tests.rs`, `crates/ui-egui/src/widgets/combo.rs` (giữ cả hai bên).
 
 ## Đồng bộ upstream 2026-11-14
 
