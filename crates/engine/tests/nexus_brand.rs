@@ -3,15 +3,12 @@
 //! and the default author of comments and tracked changes.
 #![cfg(not(target_arch = "wasm32"))]
 
-use std::io::Read;
-
 use wordcraft_engine::{Session, io, sample};
 
 fn zip_entry(bytes: &[u8], name: &str) -> String {
-    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
-    let mut s = String::new();
-    zip.by_name(name).unwrap().read_to_string(&mut s).unwrap();
-    s
+    let limits = craft_zip::Limits { max_entries: 10_000, max_total_bytes: 1 << 30 };
+    let mut zip = craft_zip::Archive::open(bytes, limits).unwrap();
+    String::from_utf8(zip.read(name, 1 << 30).unwrap().unwrap()).unwrap()
 }
 
 fn latin1(bytes: &[u8]) -> String {
