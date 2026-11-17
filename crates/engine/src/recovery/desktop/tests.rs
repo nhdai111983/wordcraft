@@ -647,3 +647,37 @@ fn a_handed_over_document_is_written_soon_and_discarded_now() {
     assert!(!off.recovery_written());
     assert!(off.recovery_discard_current().is_ok());
 }
+
+/// Removing a record's emptied folder waits out a file Windows hasn't finished deleting (another
+/// process, such as an antivirus scanner, still has it open, so the folder isn't empty yet: os
+/// error 145), which made saving with a password, and discarding a closed document's copy, fail
+/// now and then. It doesn't wait on other errors, nor forever.
+#[test]
+fn removing_a_record_folder_waits_for_files_still_being_deleted() {
+    let not_empty = || io::Error::from(io::ErrorKind::DirectoryNotEmpty);
+    let mut pending = 3;
+    let removed = remove_record_dir(Path::new("record"), |_| {
+        if pending > 0 {
+            pending -= 1;
+            Err(not_empty())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(removed.is_ok(), "{removed:?}");
+    assert_eq!(pending, 0);
+    let mut calls = 0;
+    let stuck = remove_record_dir(Path::new("record"), |_| {
+        calls += 1;
+        Err(not_empty())
+    });
+    assert_eq!(stuck.map_err(|e| e.kind()), Err(io::ErrorKind::DirectoryNotEmpty));
+    assert_eq!(calls, REMOVE_RETRIES + 1);
+    let mut calls = 0;
+    let denied = remove_record_dir(Path::new("record"), |_| {
+        calls += 1;
+        Err(io::Error::from(io::ErrorKind::PermissionDenied))
+    });
+    assert_eq!(denied.map_err(|e| e.kind()), Err(io::ErrorKind::PermissionDenied));
+    assert_eq!(calls, 1);
+}
