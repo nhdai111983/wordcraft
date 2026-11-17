@@ -1176,7 +1176,8 @@ fn save_as_saves_in_wordcraft_when_the_system_dialog_never_shows() {
     h.get_by_label("Browse…").click();
     h.run_steps(4);
     assert!(h.state().file_dialog.is_some(), "the system dialog was asked for and never answered");
-    h.get_by_label("Browse in WordCraft…").click();
+    // NexusOffice: the label is branded at runtime (crate::i18n::brand), so it names Nexus Docs.
+    h.get_by_label(crate::i18n::brand("Browse in WordCraft…").as_ref()).click();
     h.run_steps(4);
     let a = h.state_mut();
     assert!(a.file_dialog.is_none(), "the silent system dialog is given up");
@@ -1207,7 +1208,8 @@ fn export_page_offers_wordcrafts_own_browser() {
         a,
     );
     h.run_steps(4);
-    h.get_by_label("Browse in WordCraft…").click();
+    // NexusOffice: the label is branded at runtime (crate::i18n::brand), so it names Nexus Docs.
+    h.get_by_label(crate::i18n::brand("Browse in WordCraft…").as_ref()).click();
     h.run_steps(4);
     let b = h.state().file_browser.open.as_ref().expect("WordCraft's own browser is open");
     assert!(matches!(&b.after, crate::file_dialogs::AfterPick::Export { ext } if ext == "pdf"));
