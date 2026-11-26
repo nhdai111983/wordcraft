@@ -338,6 +338,9 @@ impl<'a> MenuButtonOptions<'a> {
 
 pub fn menu_button(ui: &mut Ui, app: &mut WordApp, options: MenuButtonOptions<'_>, menu: impl FnOnce(&mut Ui, &mut WordApp)) {
     let MenuButtonOptions { icon, label, tip, big_btn, id } = options;
+    // The keytips table holds the tips in English, so the badge looks this one up, not the
+    // translated tip, which no other language's "Paste" equals.
+    let keytip_name = tip;
     let (label, tip) = (label.map(|l| tl!(l)), tl!(tip));
     let label = label.filter(|_| big_btn || !crate::ribbon_fit::compact(ui.ctx()));
     let t = Tokens::get(ui.ctx());
@@ -352,7 +355,7 @@ pub fn menu_button(ui: &mut Ui, app: &mut WordApp, options: MenuButtonOptions<'_
             lines.iter().map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
         let w = (galley_w + 22.0).max(44.0);
         let (r, resp) = ui.allocate_exact_size(vec2(w, content_h(ui)), Sense::click());
-        keytip_badge(ui, r, "menu", tip);
+        keytip_badge(ui, r, "menu", keytip_name);
         bg_if(ui, r, &resp, false, &t, on);
         icons::paint(ui.painter(), Rect::from_center_size(pos2(r.center().x, r.min.y + g.icon_y), vec2(g.icon, g.icon)), icon, c, a);
         let mut y = r.min.y + g.label_y;
@@ -364,7 +367,7 @@ pub fn menu_button(ui: &mut Ui, app: &mut WordApp, options: MenuButtonOptions<'_
     } else {
         let text_w = label.map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x) + 6.0).unwrap_or(0.0);
         let (r, resp) = ui.allocate_exact_size(vec2(24.0 + text_w + 10.0, 22.0), Sense::click());
-        keytip_badge(ui, r, "menu", tip);
+        keytip_badge(ui, r, "menu", keytip_name);
         bg_if(ui, r, &resp, false, &t, on);
         let rtl = crate::rtl::flows(ui);
         let lead = |inset: f32| crate::rtl::lead_x(rtl, r, inset);

@@ -47,8 +47,7 @@ pub(super) fn home(app: &mut WordApp, ui: &mut Ui) {
     let st = app.session.run("format.state", &json!({})).unwrap_or_default();
     let flag = |k: &str| st.get(k).and_then(Value::as_bool).unwrap_or(false);
     group(ui, "Clipboard", Some("edit.clipboardPane"), app, |ui, app| {
-        // NexusOffice (QC-DOC-13): no hard-coded Mac key ("Paste (⌘V)" on Windows); the menu's
-        // Paste item shows the platform's own key.
+        // The hint adds the platform's key ("Paste (Ctrl+V)"); the name screen readers read is "Paste".
         menu_button(ui, app, crate::widgets::MenuButtonOptions::new("paste", Some("Paste"), "Paste", true, "edit.paste"), |ui, app| {
             mi(ui, app, "Paste", "edit.paste", json!({}));
             mi(ui, app, "Keep Text Only", "edit.pasteText", json!({}));
