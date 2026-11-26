@@ -263,3 +263,17 @@ reason = "craft-docx/odf/rtf/html/latex (craft-libs) ghi cứng tên WordCraft v
 path = "crates/formats/src/nexus.rs"
 pattern = 'https://getartcraft\.com/apps/wordcraft'
 reason = "Dòng đầu tệp LaTeX craft-latex ghi (\"% Written by WordCraft (https://getartcraft.com/apps/wordcraft).\"); nexus.rs tìm đúng dòng đó để thay bằng \"% Written by Nexus Docs (NexusOffice).\""
+
+# ---------------------------------------------------------------------------------------------
+# Đồng bộ 2026-11-26
+# ---------------------------------------------------------------------------------------------
+
+[[allow]]
+path = "crates/ui-egui/src/font_download.rs"
+pattern = 'tl!\("Or install it for every app: copy the font files to the \.local/share/fonts folder in your home folder, then restart WordCraft\."\)'
+reason = "Đi qua tl! → i18n::brand() thay tên lúc chạy như mọi chuỗi tl! khác; mục chung `tl!\\(\\s*\"[^\"/]*\"` không khớp chỉ vì chuỗi có đường dẫn .local/share/fonts. Giữ key để khớp catalog upstream."
+
+[[allow]]
+path = "crates/fonts/src/font_downloads.json"
+pattern = '^\s*"about": ".*WordCraft links to the page.*",?$'
+reason = "Trường tài liệu \"about\" của danh sách phông tải về; download.rs chỉ đọc mảng \"downloads\", trường này không bao giờ hiện cho người dùng."
