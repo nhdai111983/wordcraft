@@ -425,7 +425,6 @@ fn peak_bytes(width: u32, height: u32, native: u64, held: u64) -> Option<u64> {
 /// the decoder keeps the last copy, so a harmless first one must not hide a JPEG one after it.
 fn tiff_compression(bytes: &[u8]) -> Option<u16> {
     craft_tiff::probe::first_image_compression(bytes)
-
 }
 
 #[cfg(test)]
